@@ -21,9 +21,15 @@ export function getSecret() {
   return secret;
 }
 
+// `sv` is the account's session_version when the token is made. The token only works while it
+// still matches the database. Adding 1 to the column ends every token made before which is
+// the only way to end a session because a signed token cannot be taken back.
 export function signToken(user) {
+  if (user.session_version === undefined || user.session_version === null) {
+    throw new Error('signToken needs the user row with session_version. Without it the token could never be ended.');
+  }
   return jwt.sign(
-    { id: user.id, role: user.role, name: user.name },
+    { id: user.id, role: user.role, name: user.name, sv: Number(user.session_version) },
     getSecret(),
     { expiresIn: '7d' },
   );
@@ -48,8 +54,14 @@ async function resolveSession(req) {
     return null; // wrong signature, broken token or expired
   }
 
-  const [user] = await q('SELECT id, name, role FROM users WHERE id = $1', [claims.id]);
-  return user || null; // null if the account was deleted
+  const [user] = await q('SELECT id, name, role, session_version FROM users WHERE id = $1', [claims.id]);
+  if (!user) return null; // the account was deleted
+
+  // The counter must match exactly. A token made before session_version existed has no `sv`
+  // so it fails here and the person signs in again.
+  if (Number(claims.sv) !== Number(user.session_version)) return null;
+
+  return { id: user.id, role: user.role, name: user.name };
 }
 
 // Needs a signed-in user. Pass roles to allow only those roles.
@@ -66,6 +78,12 @@ export function requireAuth(...roles) {
     }
     next();
   };
+}
+
+// Ends every session the account has. Used by sign out and by password reset.
+// It adds 1 instead of setting a value, so two of these at the same moment cannot cancel out.
+export async function revokeSessions(userId) {
+  await q('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [userId]);
 }
 
 // Only people with an ALU email can register.

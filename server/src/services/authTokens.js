@@ -1,4 +1,4 @@
-// One-time tokens for the links we email. Today that is the email verification link.
+// One-time tokens for the links we email, the email verification link and the password reset link.
 //
 // Two rules are kept here, so the routes cannot forget them:
 //   1. Only a hash of the token is saved. The real token exists once, when it is made, and
@@ -7,8 +7,8 @@
 import crypto from 'node:crypto';
 import { q } from '../db.js';
 
-// The purposes the database allows. Checked here too, so a typo gives a clear error.
-export const TOKEN_PURPOSES = ['verify_email'];
+// The purposes the database allows. Checked here too so a typo gives a clear error.
+export const TOKEN_PURPOSES = ['verify_email', 'reset_password'];
 
 // SHA-256 is used instead of bcrypt. The token is 32 random bytes, so it cannot be guessed
 // from a word list, and a plain hash lets us look it up quickly.

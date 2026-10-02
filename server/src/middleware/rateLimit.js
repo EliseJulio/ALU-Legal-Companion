@@ -117,3 +117,43 @@ export const resendIpLimiter = rateLimit({
   skip: skipInTests,
   handler: respond429(RESEND_MESSAGE),
 });
+
+const FORGOT_MESSAGE = 'Too many password reset emails requested. Please wait 15 minutes and try again.';
+
+// POST /auth/forgot-password: strict, counted per email. It works the same way as resend. The
+// risk is someone filling one person's inbox so the count is per address. It does not skip
+// successful requests because the route always answers 200. The count uses the email that was
+// typed so a 429 does not show which emails have an account.
+export const forgotPasswordEmailLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTests,
+  keyGenerator: emailOrIp,
+  handler: respond429(FORGOT_MESSAGE),
+});
+
+// POST /auth/forgot-password: loose backstop per IP address. It has its own budget, so using up
+// the resend limit never blocks a password reset request.
+export const forgotPasswordIpLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTests,
+  handler: respond429(FORGOT_MESSAGE),
+});
+
+// POST /auth/reset-password: counted per IP address. The caller sends a token and no email, so
+// there is nothing to count per address. A strict limit would turn into a strict per-IP limit
+// and lock out everyone on a shared campus IP. The token cannot be guessed. This limit only stops
+// free database and password-hashing work.
+export const resetPasswordLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTests,
+  handler: respond429('Too many password reset attempts. Please wait 15 minutes and try again.'),
+});

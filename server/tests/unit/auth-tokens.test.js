@@ -40,7 +40,7 @@ describe('auth tokens', () => {
   test('a token made for one purpose does not work for another', async () => {
     const userId = await makeUser(`t4.${Date.now()}@alustudent.com`);
     const raw = await issueToken(userId, 'verify_email');
-    expect(await consumeToken(raw, 'something_else')).toBeNull();
+    expect(await consumeToken(raw, 'reset_password')).toBeNull();
   });
 
   test('an unknown purpose is rejected when making a token', async () => {

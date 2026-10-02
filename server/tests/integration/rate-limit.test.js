@@ -131,6 +131,18 @@ describe('resend verification: 5 per email in 15 minutes', () => {
   });
 });
 
+describe('forgot password: 5 per email in 15 minutes', () => {
+  test('the 6th request for one email gets a 429, whether or not the email has an account', async () => {
+    const email = freshEmail('forgot');
+    const statuses = [];
+    for (let i = 0; i < 6; i++) {
+      statuses.push((await request(app).post('/api/auth/forgot-password').send({ email })).status);
+    }
+    expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
+    expect(statuses[5]).toBe(429);
+  });
+});
+
 describe('verify-email: 100 per IP in 15 minutes', () => {
   test('the 101st request gets a 429', async () => {
     const statuses = [];
