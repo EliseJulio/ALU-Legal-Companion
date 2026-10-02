@@ -204,11 +204,180 @@ router.post('/login', loginIpLimiter, loginEmailLimiter, async (req, res) => {
   res.json({ token: signToken(user), user: publicUser(user) });
 });
 
-// GET /api/auth/me: the signed-in user as they are in the database now. This can differ
-// from the token if their role has changed.
+// GET /api/auth/me: the signed-in user as they are in the database now. This can differ from
+// the token if their role has changed. It also reports the state of the account, so the
+// settings page can show if the email is confirmed and if a change is waiting.
+// The fields are listed one by one and never copied with `...user`, because the row also has
+// the password hash.
 router.get('/me', requireAuth(), async (req, res) => {
-  const [user] = await q('SELECT id, name, email, role, created_at FROM users WHERE id = $1', [req.user.id]);
-  res.json({ ...publicUser(user), created_at: user.created_at });
+  const [user] = await q(
+    'SELECT id, name, email, role, email_verified_at, pending_email, created_at FROM users WHERE id = $1',
+    [req.user.id],
+  );
+  res.json({
+    ...publicUser(user),
+    email_verified_at: user.email_verified_at,
+    // null and not left out, so "nothing is waiting" is clear to the page.
+    pending_email: user.pending_email ?? null,
+    created_at: user.created_at,
+  });
+});
+
+// PUT /api/auth/me: change your name.
+// It reads the name and nothing else. If it read the whole body, someone could send
+// role: "admin" and make themselves an admin. The email has its own flow below because it needs
+// proof, and the role can never be changed by the user.
+router.put('/me', requireAuth(), async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  if (!name) return res.status(400).json({ error: 'Your name cannot be empty.' });
+
+  const [user] = await q(
+    'UPDATE users SET name = $1 WHERE id = $2 RETURNING id, name, email, role, session_version',
+    [name, req.user.id],
+  );
+  // A new token, because the name is stored in the token and the header shows it from there.
+  res.json({ token: signToken(user), user: publicUser(user) });
+});
+
+// POST /api/auth/change-email: ask to move to a new email address.
+// Only `pending_email` changes here. The address moves once the new mailbox confirms it (see
+// confirm-email-change). If the address changed first, one typo would lock the person out of
+// their own account, because login needs a verified email.
+//
+// The current password is needed. A session alone is not enough, because the email is the
+// way to reset the password. Whoever controls it can take the account.
+router.post('/change-email', requireAuth(), async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const { password } = req.body || {};
+  if (typeof req.body?.email !== 'string' || !email || !password) {
+    return res.status(400).json({ error: 'email and password are required' });
+  }
+
+  const [me] = await q(
+    'SELECT id, name, email, role, password_hash FROM users WHERE id = $1',
+    [req.user.id],
+  );
+  if (!me || !(await bcrypt.compare(String(password), me.password_hash))) {
+    return res.status(401).json({ error: 'That password is not correct.' });
+  }
+
+  // The ALU domain rule depends on the role. Students and staff are ALU people, so they must
+  // keep an ALU address. Legal experts are invited from outside the university, so the same
+  // rule would stop them changing their address at all.
+  if ((me.role === 'student' || me.role === 'staff') && !isAllowedEmail(email)) {
+    return res.status(400).json({
+      error: `Students and staff must use an ALU address (${ALLOWED_DOMAINS.join(' or ')}).`,
+    });
+  }
+
+  if (email === me.email) return res.status(400).json({ error: 'That is already your address.' });
+
+  // This tells the person plainly that the address is taken. It is fine here, because they are
+  // signed in and have just given their password. Silently doing nothing would be worse.
+  const [taken] = await q('SELECT 1 FROM users WHERE email = $1', [email]);
+  if (taken) return res.status(400).json({ error: 'Another account already uses that address.' });
+
+  await q('UPDATE users SET pending_email = $1 WHERE id = $2', [email, me.id]);
+  const raw = await issueToken(me.id, 'change_email', 24);
+
+  // The link goes to the NEW address. Opening it proves they own that mailbox.
+  try {
+    await sendMail({
+      to: email,
+      subject: 'Confirm your new ALU Legal Companion address',
+      text: [
+        `Hi ${me.name},`,
+        '',
+        `Someone asked to move the ALU Legal Companion account that uses ${me.email} to this address. Confirm it with this link:`,
+        `${appUrl()}/confirm-email-change?token=${encodeURIComponent(raw)}`,
+        '',
+        'The link works once and expires in 24 hours. Until you use it, the account keeps its old address.',
+        'If you did not ask for this, ignore this email. Nothing has changed.',
+      ].join('\n'),
+    });
+  } catch (err) {
+    // The pending change already exists, so answering with an error would hide that from the
+    // person. Log the reason and carry on, like register does.
+    console.error('[change-email] send failed', { userId: me.id, message: err.message });
+  }
+
+  res.json({ message: `Check ${email} for a link to confirm the change. Your address stays as it is until you do.` });
+});
+
+// POST /api/auth/confirm-email-change: use the link from the new mailbox.
+// It does not need a login on purpose. The person may open the email in a browser that is not
+// signed in, and the token is the proof.
+router.post('/confirm-email-change', async (req, res) => {
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  const consumed = await consumeToken(token, 'change_email');
+  if (!consumed) {
+    const why = await tokenStatus(token, 'change_email');
+    const message = {
+      used: 'This link has already been used. Your address has not changed again.',
+      expired: 'This confirmation link has expired. Ask for the change again from your settings.',
+    }[why] || 'That confirmation link is not valid. Ask for the change again from your settings.';
+    return res.status(400).json({ error: message });
+  }
+
+  const [me] = await q('SELECT id, pending_email FROM users WHERE id = $1', [consumed.user_id]);
+  if (!me) return res.status(400).json({ error: 'That account no longer exists.' });
+  if (!me.pending_email) {
+    return res.status(400).json({ error: 'There is no address change waiting on this account.' });
+  }
+
+  // Check again that the address is free. Someone else could have registered it while this
+  // link sat in an inbox. Without this check the person would see a server error.
+  const [taken] = await q('SELECT 1 FROM users WHERE email = $1 AND id <> $2', [me.pending_email, me.id]);
+  if (taken) {
+    await q('UPDATE users SET pending_email = NULL WHERE id = $1', [me.id]);
+    return res.status(400).json({ error: 'Another account has already taken that address. Your address is unchanged.' });
+  }
+
+  // Opening the link proves they own the new mailbox, so the email counts as verified.
+  // session_version goes up by 1 because moving the email is a way to take over an account, so
+  // every session opened before the move should end.
+  const [updated] = await q(
+    `UPDATE users
+        SET email = pending_email,
+            pending_email = NULL,
+            email_verified_at = now(),
+            session_version = session_version + 1
+      WHERE id = $1
+      RETURNING id, name, email, role, session_version`,
+    [me.id],
+  );
+
+  // Signed in again on the new address, with a token that has the new session_version.
+  res.json({ token: signToken(updated), user: publicUser(updated) });
+});
+
+// POST /api/auth/change-password: the signed-in version of a password reset.
+// It ends every OTHER session, for the same reason as a reset: people do this when they think
+// their account is compromised. The person keeps their own session, because the token sent
+// back has the new session_version.
+router.post('/change-password', requireAuth(), async (req, res) => {
+  const { current_password: currentPassword, new_password: newPassword } = req.body || {};
+
+  // Checked first, so the person learns the rule without needing the other field to be right.
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const [me] = await q('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!me || !(await bcrypt.compare(String(currentPassword ?? ''), me.password_hash))) {
+    return res.status(401).json({ error: 'That password is not correct.' });
+  }
+
+  const hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  // Always the signed-in user's id, never an id from the request body.
+  const [updated] = await q(
+    `UPDATE users SET password_hash = $1, session_version = session_version + 1
+      WHERE id = $2 RETURNING id, name, email, role, session_version`,
+    [hash, me.id],
+  );
+  res.json({ token: signToken(updated), user: publicUser(updated) });
 });
 
 // POST /api/auth/logout: ends every session this account has.
