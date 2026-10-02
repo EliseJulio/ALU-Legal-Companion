@@ -4,7 +4,7 @@ import { signToken } from '../src/middleware/auth.js';
 
 // Empties the tables. When more tables are added, list the child tables first.
 export async function resetDb() {
-  await q('TRUNCATE guides, auth_tokens, users RESTART IDENTITY CASCADE');
+  await q('TRUNCATE guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
 }
 
 // Makes a verified user and a token that is ready to use. A low bcrypt cost keeps the tests
@@ -19,6 +19,10 @@ export async function makeUser(role, email) {
   const token = signToken(user);
   return { user, token, auth: `Bearer ${token}` };
 }
+
+// How many chunks a guide has.
+export const countChunks = async (guideId) =>
+  Number((await q('SELECT count(*)::int AS n FROM guide_chunks WHERE guide_id = $1', [guideId]))[0].n);
 
 // A complete, valid guide with every template field the API needs.
 export function guideBody(overrides = {}) {

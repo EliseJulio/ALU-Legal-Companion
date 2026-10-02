@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam } from '../middleware/validate.js';
+import { indexGuide, deindexGuide } from '../services/rag.js';
 
 const router = Router();
 const TEMPLATE_FIELDS = ['domain', 'title', 'situation', 'law_says', 'your_rights', 'steps', 'get_help', 'source_law'];
@@ -81,6 +82,9 @@ router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res)
   if (!DOMAINS.includes(merged.domain)) {
     return res.status(400).json({ error: `Unknown area of law: ${DOMAINS.join(', ')}` });
   }
+  // The assistant's text for this guide is deleted first. If saving fails after that the
+  // assistant simply has no text for the guide which is the safe result.
+  await deindexGuide(existing.id);
   const [guide] = await q(
     `UPDATE guides SET domain=$1,title=$2,situation=$3,law_says=$4,your_rights=$5,steps=$6,get_help=$7,source_law=$8,source_url=$9,
             status='draft', verified_by=NULL, verified_at=NULL, updated_at=now()
@@ -107,6 +111,8 @@ router.post('/:id/verify', requireAuth('legal_expert'), requireIntParam('id'), a
      WHERE id=$2 AND status='pending_review' RETURNING *`,
     [req.user.id, req.params.id]);
   if (!guide) return res.status(400).json({ error: 'Only guides pending review can be verified' });
+  // Only now does the assistant get to read the guide. The chunks are made after publishing.
+  await indexGuide(guide);
   res.json(guide);
 });
 
