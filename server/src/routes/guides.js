@@ -34,9 +34,27 @@ router.get('/', async (req, res) => {
 
 // GET /api/guides/all: every guide in every status for admins and legal experts.
 // It must come before /:id or "all" would be read as an id.
+// It also shows the expert's comment when the guide was returned. The comment is internal
+// feedback for the admin, so no public route shows it.
+//
+// The subquery takes the latest review of each guide. The comment is only shown if that
+// latest review was a return. So a later verification hides the old comment and a draft made
+// by an admin edit does not show a comment from a review that is already finished.
 router.get('/all', requireAuth('admin', 'legal_expert'), async (_req, res) => {
-  res.json(await q(`SELECT g.*, u.name AS verified_by_name
-                      FROM guides g LEFT JOIN users u ON u.id = g.verified_by
+  res.json(await q(`SELECT g.*, u.name AS verified_by_name,
+                           r.comment     AS review_comment,
+                           r.created_at  AS review_comment_at,
+                           ru.name       AS review_comment_by_name
+                      FROM guides g
+                      LEFT JOIN users u ON u.id = g.verified_by
+                      LEFT JOIN LATERAL (
+                        SELECT gr.comment, gr.created_at, gr.reviewer_id, gr.decision
+                          FROM guide_reviews gr
+                         WHERE gr.guide_id = g.id
+                         ORDER BY gr.id DESC
+                         LIMIT 1
+                      ) r ON r.decision = 'returned'
+                      LEFT JOIN users ru ON ru.id = r.reviewer_id
                      ORDER BY g.updated_at DESC`));
 });
 
@@ -111,9 +129,34 @@ router.post('/:id/verify', requireAuth('legal_expert'), requireIntParam('id'), a
      WHERE id=$2 AND status='pending_review' RETURNING *`,
     [req.user.id, req.params.id]);
   if (!guide) return res.status(400).json({ error: 'Only guides pending review can be verified' });
+  // Save the decision. This ends the review, so an earlier return comment stops showing.
+  await q(`INSERT INTO guide_reviews (guide_id, reviewer_id, decision) VALUES ($1, $2, 'verified')`,
+    [guide.id, req.user.id]);
   // Only now does the assistant get to read the guide. The chunks are made after publishing.
   await indexGuide(guide);
   res.json(guide);
+});
+
+// POST /api/guides/:id/return: a legal expert sends a guide back to draft with the reason.
+// The reason is required. A guide sent back with no reason leaves the admin with a draft they
+// cannot act on. The reason is checked before the guide is moved, so a request that is going
+// to be refused does not take the guide out of the review queue.
+router.post('/:id/return', requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+  if (!comment) {
+    return res.status(400).json({ error: 'Please say what needs changing before returning this guide.' });
+  }
+
+  const [guide] = await q(
+    `UPDATE guides SET status='draft', updated_at=now() WHERE id=$1 AND status='pending_review' RETURNING *`,
+    [req.params.id]);
+  if (!guide) return res.status(400).json({ error: 'Only guides pending review can be returned' });
+
+  await q(
+    `INSERT INTO guide_reviews (guide_id, reviewer_id, decision, comment) VALUES ($1, $2, 'returned', $3)`,
+    [guide.id, req.user.id, comment]);
+
+  res.json({ ...guide, review_comment: comment });
 });
 
 export default router;
