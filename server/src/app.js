@@ -3,6 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+// Lets an error inside an async route reach the error handler below. Without it, the
+// request hangs. Import it before the routes.
+import 'express-async-errors';
+import authRoutes from './routes/auth.js';
 
 dotenv.config();
 
@@ -42,6 +46,7 @@ app.use(cors({
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.use('/api/auth', authRoutes);
 
 // Anything no route matched. Must come after all routes. Keeps the "every error is
 // { error: message }" promise, instead of Express's default HTML page.

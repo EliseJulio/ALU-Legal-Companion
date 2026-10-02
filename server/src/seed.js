@@ -3,8 +3,7 @@
 // Safe to run twice: an account that already exists is left alone.
 import bcrypt from 'bcryptjs';
 import { q, pool } from './db.js';
-
-const BCRYPT_ROUNDS = 12;
+import { BCRYPT_ROUNDS } from './middleware/auth.js';
 
 async function upsertUser(name, email, password, role) {
   const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
