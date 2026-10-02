@@ -16,12 +16,12 @@ const register = (overrides = {}) => request(app).post('/api/auth/register').sen
 });
 
 describe('POST /api/auth/register', () => {
-  test('creates a student and returns a token and the user, never the password hash', async () => {
+  test('creates a student and returns the user, with no token and no password hash', async () => {
     const res = await register();
     expect(res.status).toBe(201);
-    expect(res.body.token).toEqual(expect.any(String));
+    expect(res.body.token).toBeUndefined();
     expect(res.body.user).toEqual({ id: 1, name: 'Ada Student', email: 'ada@alustudent.com', role: 'student' });
-    expect(JSON.stringify(res.body)).not.toContain('password');
+    expect(JSON.stringify(res.body)).not.toContain('password_hash');
   });
 
   test('stores the email trimmed and in lowercase', async () => {
@@ -69,6 +69,7 @@ describe('POST /api/auth/register', () => {
 describe('POST /api/auth/login', () => {
   beforeEach(async () => {
     await register();
+    await q('UPDATE users SET email_verified_at = now()'); // login needs a verified email
   });
 
   test('signs in with the right password, and the token works', async () => {

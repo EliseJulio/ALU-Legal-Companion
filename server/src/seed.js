@@ -5,10 +5,12 @@ import bcrypt from 'bcryptjs';
 import { q, pool } from './db.js';
 import { BCRYPT_ROUNDS } from './middleware/auth.js';
 
+// The demo accounts are already verified. Login needs a verified email and there is no inbox
+// behind these addresses to click a link in.
 async function upsertUser(name, email, password, role) {
   const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   await q(
-    `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (name, email, password_hash, role, email_verified_at) VALUES ($1, $2, $3, $4, now())
      ON CONFLICT (email) DO NOTHING`,
     [name, email, hash, role],
   );
