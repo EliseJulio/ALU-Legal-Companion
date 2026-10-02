@@ -5,6 +5,10 @@ import { q } from '../db.js';
 import {
   signToken, isAllowedEmail, normalizeEmail, ALLOWED_DOMAINS, BCRYPT_ROUNDS, requireAuth,
 } from '../middleware/auth.js';
+import {
+  loginEmailLimiter, loginIpLimiter, registerLimiter, verifyEmailLimiter,
+  resendEmailLimiter, resendIpLimiter,
+} from '../middleware/rateLimit.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail } from '../services/mailer.js';
 
@@ -53,7 +57,7 @@ async function sendVerificationEmail(user) {
 }
 
 // POST /api/auth/register: students and staff only with an ALU email address
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   const { name, email, password, role } = req.body || {};
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'name, email, password and role are required' });
@@ -99,7 +103,7 @@ router.post('/register', async (req, res) => {
 // POST /api/auth/verify-email: use the link, prove the email and sign the user in.
 // This is the one place that says why a link was refused. That is safe because the person
 // already holds the link and "used" and "expired" need different next steps.
-router.post('/verify-email', async (req, res) => {
+router.post('/verify-email', verifyEmailLimiter, async (req, res) => {
   const { token } = req.body || {};
   if (!token) return res.status(400).json({ error: 'token is required' });
 
@@ -130,7 +134,7 @@ const RESEND_REPLY = 'If that address has an account still waiting to be verifie
 // POST /api/auth/resend-verification: the same answer for everybody.
 // Do not make this answer more helpful. If it answered differently for an email that has an
 // account, anyone could use it to find out which ALU emails are registered.
-router.post('/resend-verification', async (req, res) => {
+router.post('/resend-verification', resendIpLimiter, resendEmailLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'email is required' });
 
@@ -150,7 +154,7 @@ router.post('/resend-verification', async (req, res) => {
 });
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginIpLimiter, loginEmailLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
   if (typeof email !== 'string' || typeof password !== 'string') {
