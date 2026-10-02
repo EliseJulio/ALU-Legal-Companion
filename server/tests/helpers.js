@@ -4,7 +4,7 @@ import { signToken } from '../src/middleware/auth.js';
 
 // Empties the tables. When more tables are added, list the child tables first.
 export async function resetDb() {
-  await q('TRUNCATE auth_tokens, users RESTART IDENTITY CASCADE');
+  await q('TRUNCATE guides, auth_tokens, users RESTART IDENTITY CASCADE');
 }
 
 // Makes a verified user and a token that is ready to use. A low bcrypt cost keeps the tests
@@ -18,4 +18,20 @@ export async function makeUser(role, email) {
   );
   const token = signToken(user);
   return { user, token, auth: `Bearer ${token}` };
+}
+
+// A complete, valid guide with every template field the API needs.
+export function guideBody(overrides = {}) {
+  return {
+    domain: 'employment',
+    title: 'Internship contracts',
+    situation: 'You started an internship and have not been paid.',
+    law_says: 'Article 8 of Law No. 66/2018 requires a written employment contract.',
+    your_rights: 'You are entitled to the terms written in your contract.',
+    steps: 'Ask HR in writing, then contact the labour inspector.',
+    get_help: 'District Labour Inspector (MIFOTRA).',
+    source_law: 'Law No. 66/2018 of 30/08/2018',
+    source_url: 'https://www.amategeko.gov.rw/',
+    ...overrides,
+  };
 }

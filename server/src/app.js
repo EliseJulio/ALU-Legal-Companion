@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 // request hangs. Import it before the routes.
 import 'express-async-errors';
 import authRoutes from './routes/auth.js';
+import guideRoutes from './routes/guides.js';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
+app.use('/api/guides', guideRoutes);
 
 // Anything no route matched. Must come after all routes. Keeps the "every error is
 // { error: message }" promise, instead of Express's default HTML page.
