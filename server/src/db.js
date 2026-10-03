@@ -6,6 +6,10 @@ dotenv.config();
 // Only the test setup sets this. It points the connections at the schema made for that test run.
 const testSchema = process.env.ALU_TEST_SCHEMA;
 
+// A DATE column comes back as a plain string like '2026-09-21' not a JavaScript Date.
+// A Date would be shifted by the time zone and a legal date one day out is a wrong answer.
+pg.types.setTypeParser(1082, (value) => value);
+
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   application_name: process.env.PGAPPNAME || 'alu-legal-server',

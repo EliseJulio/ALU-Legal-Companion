@@ -4,7 +4,7 @@ import { signToken } from '../src/middleware/auth.js';
 
 // Empties the tables. When more tables are added, list the child tables first.
 export async function resetDb() {
-  await q('TRUNCATE guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
+  await q('TRUNCATE directory_reviews, providers, guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
 }
 
 // Makes a verified user and a token that is ready to use. A low bcrypt cost keeps the tests
@@ -23,6 +23,25 @@ export async function makeUser(role, email) {
 // How many chunks a guide has.
 export const countChunks = async (guideId) =>
   Number((await q('SELECT count(*)::int AS n FROM guide_chunks WHERE guide_id = $1', [guideId]))[0].n);
+
+// A directory entry. Pass { verifiedBy: userId } to make it already published. The database
+// refuses a published entry with no verifier, so a test cannot skip that step.
+export async function makeProvider(overrides = {}, { verifiedBy } = {}) {
+  const row = {
+    name: 'MAJ Gasabo', type: 'maj_office', location: 'Gasabo', contact: '0788000000',
+    services: 'Free legal advice', languages: 'Kinyarwanda, English', is_free: true,
+    ...overrides,
+  };
+  const [p] = await q(
+    `INSERT INTO providers (name, type, location, contact, services, languages, is_free,
+                            status, verified_by, verified_at, last_checked_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    [row.name, row.type, row.location, row.contact, row.services, row.languages, row.is_free,
+     verifiedBy ? 'published' : 'draft', verifiedBy || null, verifiedBy ? new Date() : null,
+     verifiedBy ? new Date() : null],
+  );
+  return p;
+}
 
 // A complete, valid guide with every template field the API needs.
 export function guideBody(overrides = {}) {
