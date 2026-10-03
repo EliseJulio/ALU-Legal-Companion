@@ -4,7 +4,7 @@ import { signToken } from '../src/middleware/auth.js';
 
 // Empties the tables. When more tables are added, list the child tables first.
 export async function resetDb() {
-  await q('TRUNCATE matter_routes, directory_reviews, providers, guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
+  await q('TRUNCATE reminders, matter_events, matters, matter_routes, directory_reviews, providers, guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
 }
 
 // Makes a verified user and a token that is ready to use. A low bcrypt cost keeps the tests

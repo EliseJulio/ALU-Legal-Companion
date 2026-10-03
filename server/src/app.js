@@ -9,6 +9,7 @@ import 'express-async-errors';
 import authRoutes from './routes/auth.js';
 import guideRoutes from './routes/guides.js';
 import directoryRoutes from './routes/directory.js';
+import matterRoutes from './routes/matters.js';
 import adminRoutes from './routes/admin.js';
 import miscRoutes from './routes/misc.js';
 
@@ -53,6 +54,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/guides', guideRoutes);
 app.use('/api/directory', directoryRoutes);
+app.use('/api/matters', matterRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api', miscRoutes);
 
