@@ -1,11 +1,11 @@
 // Rate limits on the auth routes.
 //
-// The limits are off in tests by default. This file switches them on, and switches them off
+// The limits are off in tests by default. This file switches them on and switches them off
 // again afterwards so other test files are not affected.
 //
 // Every request in this file comes from the same IP address, which is what a whole campus
 // behind one network looks like to the server. So each test that wears down an IP limit
-// does it in one test, and the total stays under that limit. Account limits are kept apart
+// does it in one test and the total stays under that limit. Account limits are kept apart
 // by using a fresh email in each test.
 import request from 'supertest';
 import app from '../../src/app.js';
@@ -46,7 +46,7 @@ describe('login: 10 failed attempts per email in 15 minutes', () => {
   });
 
   test('11 "email not verified" answers never use up the budget', async () => {
-    // A 403 only happens after the password was right, so it is not password guessing.
+    // A 403 only happens after the password was right so it is not password guessing.
     // Someone waiting for their verification email must not be locked out for refreshing.
     const email = freshEmail('unverified');
     const { user } = await makeUser('student', email);
@@ -140,6 +140,29 @@ describe('forgot password: 5 per email in 15 minutes', () => {
     }
     expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
     expect(statuses[5]).toBe(429);
+  });
+});
+
+describe('questions: lookups and submissions', () => {
+  test('the 101st guess at an anonymous token gets a 429', async () => {
+    const statuses = [];
+    for (let i = 0; i < 101; i++) {
+      statuses.push((await request(app).get('/api/questions/anon/FAKE-TOKN-0000')).status);
+    }
+    expect(statuses).toContain(429);
+    expect(statuses.filter((s) => s === 404).length).toBeLessThanOrEqual(100);
+  });
+
+  test('the 31st anonymous submission in an hour gets a 429', async () => {
+    const statuses = [];
+    let limitedBody = null;
+    for (let i = 0; i < 31; i++) {
+      const res = await request(app).post('/api/questions').send({ text: `Rate limit test question ${i}` });
+      statuses.push(res.status);
+      if (res.status === 429 && !limitedBody) limitedBody = res.body;
+    }
+    expect(statuses).toContain(429);
+    expect(limitedBody).toEqual({ error: 'Too many submissions. Please wait a while and try again.' });
   });
 });
 

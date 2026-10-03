@@ -18,6 +18,7 @@
 import rateLimit from 'express-rate-limit';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
 
 const skipInTests = () => process.env.NODE_ENV === 'test'
   && process.env.JEST_WORKER_ID !== undefined
@@ -107,7 +108,7 @@ export const resendEmailLimiter = rateLimit({
   handler: respond429(RESEND_MESSAGE),
 });
 
-// POST /auth/resend-verification: loose backstop per IP address, for one computer cycling
+// POST /auth/resend-verification: loose backstop per IP address for one computer
 // through many email addresses.
 export const resendIpLimiter = rateLimit({
   windowMs: FIFTEEN_MINUTES,
@@ -134,7 +135,7 @@ export const forgotPasswordEmailLimiter = rateLimit({
   handler: respond429(FORGOT_MESSAGE),
 });
 
-// POST /auth/forgot-password: loose backstop per IP address. It has its own budget, so using up
+// POST /auth/forgot-password: loose backstop per IP address. It has its own budget so using up
 // the resend limit never blocks a password reset request.
 export const forgotPasswordIpLimiter = rateLimit({
   windowMs: FIFTEEN_MINUTES,
@@ -156,4 +157,28 @@ export const resetPasswordLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipInTests,
   handler: respond429('Too many password reset attempts. Please wait 15 minutes and try again.'),
+});
+
+// GET /questions/anon/:token: counted per IP address. The token is the only key to an
+// anonymous question, so unlimited guessing would be a real risk. The limit is loose because a
+// whole campus can share one IP.
+export const questionTokenLimiter = rateLimit({
+  windowMs: FIFTEEN_MINUTES,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTests,
+  handler: respond429('Too many lookups. Please wait 15 minutes and try again.'),
+});
+
+// POST /questions: open to everyone and it writes data. The limit is generous, because a real
+// anonymous reporter files one report or two and a tight limit would harm them. It also stops
+// someone flooding the experts' inbox.
+export const questionSubmitLimiter = rateLimit({
+  windowMs: ONE_HOUR,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipInTests,
+  handler: respond429('Too many submissions. Please wait a while and try again.'),
 });

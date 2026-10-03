@@ -9,7 +9,7 @@ export const BCRYPT_ROUNDS = 12;
 const INSECURE_VALUES = new Set(['dev-secret', 'change-me-in-production']);
 
 // Reads JWT_SECRET each time it is called so tests can change it. The server must stop if
-// the secret is missing or weak, because anyone could then make a fake admin token.
+// the secret is missing or weak because anyone could then make a fake admin token.
 export function getSecret() {
   const secret = process.env.JWT_SECRET;
   if (!secret || secret.length < 32 || INSECURE_VALUES.has(secret)) {
@@ -62,6 +62,17 @@ async function resolveSession(req) {
   if (Number(claims.sv) !== Number(user.session_version)) return null;
 
   return { id: user.id, role: user.role, name: user.name };
+}
+
+// Sets req.user when there is a valid login and carries on when there is not. A visitor with
+// no login or with an ended session goes through as a visitor. It is not refused.
+export function optionalAuth(req, _res, next) {
+  resolveSession(req)
+    .then((user) => {
+      if (user) req.user = user;
+      next();
+    })
+    .catch(next);
 }
 
 // Needs a signed-in user. Pass roles to allow only those roles.
