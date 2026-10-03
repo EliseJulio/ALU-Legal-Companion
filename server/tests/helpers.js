@@ -4,7 +4,7 @@ import { signToken } from '../src/middleware/auth.js';
 
 // Empties the tables. When more tables are added, list the child tables first.
 export async function resetDb() {
-  await q('TRUNCATE directory_reviews, providers, guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
+  await q('TRUNCATE matter_routes, directory_reviews, providers, guide_reviews, guide_chunks, guides, auth_tokens, users RESTART IDENTITY CASCADE');
 }
 
 // Makes a verified user and a token that is ready to use. A low bcrypt cost keeps the tests
@@ -41,6 +41,22 @@ export async function makeProvider(overrides = {}, { verifiedBy } = {}) {
      verifiedBy ? new Date() : null],
   );
   return p;
+}
+
+// A complete, valid route that points at the directory entry `forumId`.
+export function routeBody(forumId, overrides = {}) {
+  return {
+    matter_type: 'unreturned_deposit',
+    title: 'My landlord will not return my deposit',
+    keywords: 'rent deposit landlord tenancy house money back',
+    first_forum_id: forumId,
+    legal_basis: 'Law No. 37/2016, Art. 10',
+    exclusions: 'Not if the landlord is a company or the State (Art. 11).',
+    steps: ['Go to the Abunzi committee of your cell', 'Appeal to the sector committee if unhappy'],
+    deadline_days: 30,
+    deadline_runs_from: 'the sector committee decision',
+    ...overrides,
+  };
 }
 
 // A complete, valid guide with every template field the API needs.
