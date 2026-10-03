@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 // GET /api/guides/all: every guide in every status for admins and legal experts.
 // It must come before /:id or "all" would be read as an id.
 // It also shows the expert's comment when the guide was returned. The comment is internal
-// feedback for the admin, so no public route shows it.
+// feedback for the admin so no public route shows it.
 //
 // The subquery takes the latest review of each guide. The comment is only shown if that
 // latest review was a return. So a later verification hides the old comment and a draft made
@@ -157,6 +157,35 @@ router.post('/:id/return', requireAuth('legal_expert'), requireIntParam('id'), a
     [guide.id, req.user.id, comment]);
 
   res.json({ ...guide, review_comment: comment });
+});
+
+// Saved guides for students and staff. The list itself is in routes/bookmarks.js.
+
+// POST /api/guides/:id/bookmark: save a guide.
+// Only a published guide can be saved. The 404 is the same one a draft gets when it is read,
+// so nobody can use this route to find out that an unverified guide exists.
+// Saving twice does nothing, because a double tap on a slow connection is not an error.
+router.post('/:id/bookmark', requireAuth('student', 'staff'), requireIntParam('id'), async (req, res) => {
+  const [guide] = await q(`SELECT id FROM guides WHERE id = $1 AND status = 'published'`, [req.params.id]);
+  if (!guide) return res.status(404).json({ error: 'Guide not found' });
+
+  await q(
+    `INSERT INTO bookmarks (user_id, guide_id) VALUES ($1, $2)
+     ON CONFLICT (user_id, guide_id) DO NOTHING`,
+    [req.user.id, guide.id],
+  );
+  res.status(201).json({ guide_id: guide.id, bookmarked: true });
+});
+
+// DELETE /api/guides/:id/bookmark: remove a save. It only touches the caller's own row, so
+// removing someone else's is just a miss.
+router.delete('/:id/bookmark', requireAuth('student', 'staff'), requireIntParam('id'), async (req, res) => {
+  const removed = await q(
+    'DELETE FROM bookmarks WHERE user_id = $1 AND guide_id = $2 RETURNING id',
+    [req.user.id, req.params.id],
+  );
+  if (!removed.length) return res.status(404).json({ error: 'You have not saved this guide' });
+  res.status(204).end();
 });
 
 export default router;
