@@ -4,6 +4,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+tests/
 
 # Build and test output
 dist/
