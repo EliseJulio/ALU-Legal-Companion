@@ -1,0 +1,19 @@
+node_modules/
+
+# Secrets stay out of git. The template .env.example is the only .env file kept.
+.env
+.env.*
+!.env.example
+
+# Build and test output
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+
+# Editor and system files
+.DS_Store
+
+# Python bytecode from the scripts
+__pycache__/
