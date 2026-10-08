@@ -61,7 +61,7 @@ async function resolveSession(req) {
 }
 
 // Sets req.user when there is a valid login and carries on when there is not.
-// A visitor with no login, or with an ended session, goes through as a visitor.
+// A visitor with no login or with an ended session goes through as a visitor.
 export function optionalAuth(req, _res, next) {
   resolveSession(req)
     .then((user) => {

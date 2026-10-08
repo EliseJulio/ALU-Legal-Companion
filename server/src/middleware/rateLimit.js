@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
-// The limits are off while Jest runs, or other tests would meet 429 errors that have nothing
+// The limits are off while Jest runs. Other tests would meet 429 errors that have nothing
 // to do with what they check. The rate limit tests switch them on with RATE_LIMIT_TEST=1.
 // The JEST_WORKER_ID check stops NODE_ENV=test alone from switching them off on a real server.
 const skipInTests = () => process.env.NODE_ENV === 'test'

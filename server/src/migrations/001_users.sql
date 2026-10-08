@@ -8,7 +8,7 @@ CREATE TABLE users (
   -- Login is refused until the person proves they own the address.
   email_verified_at TIMESTAMPTZ,
   -- An account is switched off and never deleted. Guides, directory entries and bookings
-  -- point at users. A delete would break them, and a published guide must keep naming who checked it.
+  -- point at users. A delete would break them. A published guide must keep naming who checked it.
   deactivated_at    TIMESTAMPTZ,
   -- Adding 1 ends every login the account has. A signed token cannot be taken back,
   -- so each token carries this number and works only while it still matches.
