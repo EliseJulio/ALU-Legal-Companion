@@ -9,6 +9,8 @@ import dotenv from 'dotenv';
 // imported because it only patches routers that are made after it runs.
 import 'express-async-errors';
 import authRoutes from './routes/auth.js';
+import directoryRoutes from './routes/directory.js';
+import contactRoutes from './routes/contacts.js';
 
 dotenv.config();
 
@@ -52,6 +54,8 @@ app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
+app.use('/api/directory', directoryRoutes);
+app.use('/api/emergency-contacts', contactRoutes);
 
 // A path nothing matched. Every error from this API is { error: "message" }, even for a typo.
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
