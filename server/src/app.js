@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import 'express-async-errors';
 import authRoutes from './routes/auth.js';
 import directoryRoutes from './routes/directory.js';
+import matterRouteRoutes from './routes/matterRoutes.js';
 import contactRoutes from './routes/contacts.js';
 
 dotenv.config();
@@ -55,6 +56,7 @@ app.use(express.json({ limit: '100kb' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/directory', directoryRoutes);
+app.use('/api/directory', matterRouteRoutes);
 app.use('/api/emergency-contacts', contactRoutes);
 
 // A path nothing matched. Every error from this API is { error: "message" }, even for a typo.

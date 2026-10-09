@@ -67,6 +67,77 @@ for (const e of ENTRIES) {
 }
 console.log(`✓ directory: ${ENTRIES.length} entries queued for the legal expert (nothing published)`);
 
+// Where each kind of matter goes first. These also go in as pending_review.
+const ROUTES = [
+  { matter_type: 'small_civil_claim', forum: 'Abunzi committee of your cell',
+    title: 'Someone owes me money, kept my deposit or broke an agreement (up to Frw 3,000,000)',
+    keywords: 'deposit landlord rent tenant debt loan money owed broke agreement contract neighbour refund',
+    legal_basis: 'Law No. 37/2016, Art. 10. The Ministry of Justice treats Abunzi mediation as a step before court.',
+    exclusions: 'Not for a dispute with the State or with a company (Art. 11). If your landlord is a registered business, go to the Access to Justice Bureau instead.',
+    steps: ['Take the matter to the Abunzi committee of the cell where it happened', 'If you disagree with the decision, appeal to the Abunzi committee of the sector', 'If you still disagree, take it to the Primary Court'],
+    deadline_days: 30, deadline_runs_from: 'the sector committee decision', deadline_note: 'Law No. 37/2016, Art. 27' },
+  { matter_type: 'employment_dispute', forum: 'District labour inspector',
+    title: 'My employer has not paid me, gave me no written contract or dismissed me',
+    keywords: 'wages salary pay unpaid job work employer fired dismissed internship contract probation boss',
+    legal_basis: 'Law No. 66/2018, Art. 102. A court may refuse a case where this step was skipped.',
+    exclusions: null,
+    steps: ['Raise it with the workers’ representatives at your workplace if there are any', 'Take it to the labour inspector of your district', 'If it is not settled, go to the national labour inspector and then the court'],
+    deadline_days: 730, deadline_runs_from: 'the day the dispute started', deadline_note: 'The claim lapses two years after the dispute starts (Art. 104).' },
+  { matter_type: 'gender_based_violence', forum: 'Isange One Stop Centre',
+    title: 'I have experienced sexual or gender-based violence or a child is being abused',
+    keywords: 'rape assault abuse violence domestic sexual harassment child gbv beaten',
+    legal_basis: 'Isange One Stop Centres provide care, evidence, counselling and shelter in one place.',
+    exclusions: null,
+    steps: ['If you are in danger now, call 112', 'Call 3029 (or 116 for a child) before travelling because many centres do not open at night', 'Go to the nearest Isange One Stop Centre'],
+    deadline_days: null, deadline_runs_from: null, deadline_note: 'Go as soon as you can. Medical evidence is time-sensitive.' },
+  { matter_type: 'report_a_crime', forum: 'Rwanda Investigation Bureau (RIB)',
+    title: 'I want to report a crime',
+    keywords: 'crime theft stolen robbery fraud scam threat police report criminal',
+    legal_basis: 'Law No. 12/2017. The Bureau passes the file to the prosecution, which decides whether to charge (Law No. 14/2018, Art. 26).',
+    exclusions: null,
+    steps: ['Call 166 or report online', 'Keep any evidence such as messages, receipts and photos'],
+    deadline_days: null, deadline_runs_from: null, deadline_note: null },
+  { matter_type: 'residence_permit', forum: 'Directorate General of Immigration and Emigration',
+    title: 'I need a residence permit or student visa or mine is about to expire',
+    keywords: 'visa permit residence immigration student foreigner international expire expired renew',
+    legal_basis: 'Directorate General of Immigration and Emigration.',
+    exclusions: null,
+    steps: ['Apply on IremboGov', 'Renew within five days of expiry or pay a penalty', 'Processing takes about seven days'],
+    deadline_days: 15, deadline_runs_from: 'the day you arrived in Rwanda', deadline_note: null },
+  { matter_type: 'register_business', forum: 'Office of the Registrar General (RDB)',
+    title: 'I want to register a business',
+    keywords: 'business company register registration startup freelance tax tin trade',
+    legal_basis: 'Office of the Registrar General at the Rwanda Development Board.',
+    exclusions: null,
+    steps: ['Register online on the business registration website', 'Your certificate comes with a tax number'],
+    deadline_days: null, deadline_runs_from: null, deadline_note: null },
+  { matter_type: 'free_legal_advice', forum: 'Access to Justice Bureau (MAJ) of your district',
+    title: 'I need free advice or a lawyer and I cannot pay',
+    keywords: 'free lawyer advice legal aid cannot afford poor help representation',
+    legal_basis: 'One Access to Justice Bureau in each of the thirty districts.',
+    exclusions: null,
+    steps: ['Walk in at the Access to Justice Bureau of your district'],
+    deadline_days: null, deadline_runs_from: null, deadline_note: null },
+  { matter_type: 'phone_advice', forum: 'Legal Aid Forum',
+    title: 'I want free legal advice by telephone',
+    keywords: 'phone telephone call advice free hotline',
+    legal_basis: 'The Legal Aid Forum is a network of thirty-eight organisations.',
+    exclusions: null,
+    steps: ['Call 1022'],
+    deadline_days: null, deadline_runs_from: null, deadline_note: null },
+];
+for (const r of ROUTES) {
+  const [forum] = await q('SELECT id FROM providers WHERE name = $1', [r.forum]);
+  await q(
+    `INSERT INTO matter_routes (matter_type, title, keywords, first_forum_id, legal_basis, exclusions, steps,
+                                deadline_days, deadline_runs_from, deadline_note, status)
+     SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pending_review'
+      WHERE NOT EXISTS (SELECT 1 FROM matter_routes WHERE matter_type = $1)`,
+    [r.matter_type, r.title, r.keywords, forum.id, r.legal_basis, r.exclusions, r.steps,
+     r.deadline_days, r.deadline_runs_from, r.deadline_note]);
+}
+console.log(`✓ routes: ${ROUTES.length} queued for the legal expert (nothing published)`);
+
 // The crisis contacts. They are the same list the API falls back to when the table is empty.
 for (const [i, c] of BUILT_IN_CONTACTS.entries()) {
   await q(
