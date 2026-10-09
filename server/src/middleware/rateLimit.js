@@ -58,3 +58,19 @@ export const authIpLimiter = createLimiter({
   max: 100,
   message: AUTH_MESSAGE,
 });
+
+// Anonymous submissions such as a booking or a question. The limit is per IP and is generous
+// because a real anonymous reporter files one or two. It stops someone flooding an expert's
+// inbox. Each route calls this to get its own limiter so one route does not use up another's budget.
+export const newSubmitLimiter = () => createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: 'Too many submissions. Please wait a while and try again.',
+});
+
+// Looking something up by its anonymous token. The token is the only key to the record so
+// unlimited guessing would be a risk. The limit is loose because a campus can share one IP.
+export const newTokenLookupLimiter = () => createLimiter({
+  max: 100,
+  message: 'Too many lookups. Please wait 15 minutes and try again.',
+});

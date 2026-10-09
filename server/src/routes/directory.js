@@ -25,11 +25,11 @@ export const PROVIDER_TYPES = [
 // The row also holds user_id and a public page must not show which account sits behind an entry.
 export const PUBLIC_PROVIDER_COLUMNS = `
   p.id, p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
-  p.official_source_url, p.last_checked_at, p.verified_at, vu.name AS verified_by_name,
+  p.bookable, p.official_source_url, p.last_checked_at, p.verified_at, vu.name AS verified_by_name,
   (p.last_checked_at IS NULL OR p.last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS}) AS stale`;
 
 // The facts an expert checks. Editing one on a published entry sends it back to draft.
-// Changing user_id does not. Nobody relying on the directory is misled by that.
+// Changing user_id, bookable or meet_link does not. Nobody relying on the directory is misled by that.
 export const PROVIDER_CHECKED_FIELDS = [
   'name', 'category', 'type', 'location', 'contact', 'services', 'languages', 'is_free',
   'official_source_url',
@@ -55,6 +55,18 @@ async function providerError(p) {
     const [expert] = await q("SELECT id FROM users WHERE id = $1 AND role = 'legal_expert'", [p.user_id]);
     if (!expert) return 'user_id must be the id of a legal expert account';
   }
+  // The room is shown as a link. A link like javascript:... would run a script when it is
+  // clicked. So only an https://meet.google.com/ address is accepted.
+  if (p.meet_link) {
+    let url;
+    try { url = new URL(String(p.meet_link)); } catch { return 'meet_link must be a full https://meet.google.com/... address'; }
+    if (url.protocol !== 'https:' || url.hostname !== 'meet.google.com') {
+      return 'meet_link must be an https://meet.google.com/... address';
+    }
+  }
+  // The expert finds booking requests through the linked account. Without it the requests
+  // would go nowhere and nothing would show an error.
+  if (p.bookable && !p.user_id) return 'Link a legal expert account before the entry can take bookings.';
   return null;
 }
 
@@ -85,7 +97,7 @@ router.get('/providers', async (req, res) => {
     `SELECT ${PUBLIC_PROVIDER_COLUMNS}
        FROM providers p LEFT JOIN users vu ON vu.id = p.verified_by
       WHERE ${where}
-      ORDER BY p.name`,
+      ORDER BY p.bookable DESC, p.name`,
     params));
 });
 
@@ -99,6 +111,7 @@ router.get('/providers', async (req, res) => {
 router.get('/providers/all', requireAuth('admin', 'legal_expert'), async (req, res) => {
   res.json(await q(
     `SELECT p.id, CASE WHEN $1::text = 'admin' THEN p.user_id END AS user_id,
+            CASE WHEN $1::text = 'admin' THEN p.meet_link END AS meet_link, p.bookable,
             p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
             p.official_source_url, p.last_checked_at, p.status, p.verified_at, p.updated_at,
             vu.name AS verified_by_name,
@@ -122,6 +135,8 @@ router.post('/providers', requireAuth('admin'), async (req, res) => {
     type: b.type,
     is_free: b.is_free === true,
     user_id: b.user_id ?? null,
+    bookable: b.bookable === true,
+    meet_link: clean(b.meet_link) || null,
   };
   for (const k of OPTIONAL_TEXT) p[k] = clean(b[k]) || null;
   const error = await providerError(p);
@@ -129,10 +144,10 @@ router.post('/providers', requireAuth('admin'), async (req, res) => {
 
   const [row] = await q(
     `INSERT INTO providers (name, category, type, location, contact, services, languages, is_free,
-                            official_source_url, user_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+                            official_source_url, user_id, bookable, meet_link)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
-     p.official_source_url, p.user_id]);
+     p.official_source_url, p.user_id, p.bookable, p.meet_link]);
   res.status(201).json(row);
 });
 
@@ -147,11 +162,13 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
 
   const has = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k);
   const merged = {};
-  for (const k of [...PROVIDER_CHECKED_FIELDS, 'user_id']) {
+  for (const k of [...PROVIDER_CHECKED_FIELDS, 'user_id', 'bookable', 'meet_link']) {
     merged[k] = has(k) ? clean(req.body[k]) : existing[k];
   }
   for (const k of OPTIONAL_TEXT) merged[k] = merged[k] || null;
   merged.is_free = merged.is_free === true;
+  merged.bookable = merged.bookable === true;
+  merged.meet_link = merged.meet_link || null;
 
   const error = await providerError(merged);
   if (error) return res.status(400).json({ error });
@@ -161,10 +178,12 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
 
   const [row] = await q(
     `UPDATE providers SET name=$1, category=$2, type=$3, location=$4, contact=$5, services=$6,
-            languages=$7, is_free=$8, official_source_url=$9, user_id=$10, updated_at=now()${resetSql}
-      WHERE id=$11 RETURNING *`,
+            languages=$7, is_free=$8, official_source_url=$9, user_id=$10, bookable=$11,
+            meet_link=$12, updated_at=now()${resetSql}
+      WHERE id=$13 RETURNING *`,
     [merged.name, merged.category, merged.type, merged.location, merged.contact, merged.services,
-     merged.languages, merged.is_free, merged.official_source_url, merged.user_id, existing.id]);
+     merged.languages, merged.is_free, merged.official_source_url, merged.user_id, merged.bookable,
+     merged.meet_link, existing.id]);
   res.json(row);
 });
 

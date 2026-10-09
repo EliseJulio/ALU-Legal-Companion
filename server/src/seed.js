@@ -28,7 +28,9 @@ await upsertUser('Demo Student', 'test.student@alustudent.com', process.env.SEED
 const ENTRIES = [
   { name: 'Demo Pro-bono Lawyer', category: 'lawyer', type: 'pro_bono_lawyer', location: 'Kigali',
     contact: 'via platform', services: 'Employment, tenancy and business matters. A sample entry for the demo.',
-    languages: 'Kinyarwanda, English', is_free: true, user_id: expert.id },
+    languages: 'Kinyarwanda, English', is_free: true, user_id: expert.id,
+    // An obviously fake room. Replace it with the expert's real room before a live consultation.
+    bookable: true, meet_link: 'https://meet.google.com/aaa-bbbb-ccc' },
   { name: 'Access to Justice Bureau (MAJ) of your district', category: 'consultant', type: 'maj_office',
     location: 'All thirty districts', contact: 'Walk in at the district office',
     services: 'Free legal advice and representation for people who cannot pay',
@@ -60,10 +62,12 @@ const ENTRIES = [
 ];
 for (const e of ENTRIES) {
   await q(
-    `INSERT INTO providers (name, category, type, location, contact, services, languages, is_free, user_id, status)
-     SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,'pending_review'
+    `INSERT INTO providers (name, category, type, location, contact, services, languages, is_free, user_id,
+                            bookable, meet_link, status)
+     SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'pending_review'
       WHERE NOT EXISTS (SELECT 1 FROM providers WHERE name = $1)`,
-    [e.name, e.category, e.type, e.location, e.contact, e.services, e.languages, e.is_free, e.user_id ?? null]);
+    [e.name, e.category, e.type, e.location, e.contact, e.services, e.languages, e.is_free, e.user_id ?? null,
+     e.bookable === true, e.meet_link ?? null]);
 }
 console.log(`✓ directory: ${ENTRIES.length} entries queued for the legal expert (nothing published)`);
 
