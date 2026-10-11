@@ -33,3 +33,12 @@ export function readableDays(days) {
   if (n % 365 === 0) return n === 365 ? '1 year' : `${n / 365} years`;
   return n === 1 ? '1 day' : `${n} days`;
 }
+
+// The five areas of law the guides cover. The database and the server have the same list.
+export const DOMAINS = [
+  { value: 'tenancy', label: 'Renting' },
+  { value: 'employment', label: 'Work' },
+  { value: 'business', label: 'Business' },
+  { value: 'immigration', label: 'Immigration' },
+  { value: 'harassment', label: 'Harassment' },
+];

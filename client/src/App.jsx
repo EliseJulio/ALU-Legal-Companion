@@ -8,6 +8,16 @@ import VerifyEmail from '@/pages/VerifyEmail';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import RedeemInvite from '@/pages/RedeemInvite';
+import MyActivity from '@/pages/MyActivity';
+import AccountSettings from '@/pages/AccountSettings';
+import AskQuestion from '@/pages/AskQuestion';
+import CheckAnswer from '@/pages/CheckAnswer';
+import GuideLibrary from '@/pages/GuideLibrary';
+import GuideDetail from '@/pages/GuideDetail';
+import SavedGuides from '@/pages/SavedGuides';
+import MyMatters from '@/pages/MyMatters';
+import NewMatter from '@/pages/NewMatter';
+import MatterDetail from '@/pages/MatterDetail';
 import Directory from '@/pages/Directory';
 import BookProvider from '@/pages/BookProvider';
 import CheckBooking from '@/pages/CheckBooking';
@@ -38,6 +48,16 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/redeem-invite" element={<RedeemInvite />} />
+        <Route path="/my-activity" element={<MyActivity />} />
+        <Route path="/settings" element={<AccountSettings />} />
+        <Route path="/ask" element={<AskQuestion />} />
+        <Route path="/ask/check" element={<CheckAnswer />} />
+        <Route path="/guides" element={<GuideLibrary />} />
+        <Route path="/guides/:id" element={<GuideDetail />} />
+        <Route path="/saved" element={<SavedGuides />} />
+        <Route path="/matters" element={<MyMatters />} />
+        <Route path="/matters/new" element={<NewMatter />} />
+        <Route path="/matters/:id" element={<MatterDetail />} />
         <Route path="/directory" element={<Directory />} />
         <Route path="/directory/book/:id" element={<BookProvider />} />
         <Route path="/directory/booking-check" element={<CheckBooking />} />

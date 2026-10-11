@@ -248,7 +248,10 @@ router.post('/change-password', authIpLimiter, requireAuth(), async (req, res) =
 
   const [me] = await q('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
   if (!me || !(await checkPassword(String(currentPassword ?? ''), me.password_hash))) {
-    return res.status(401).json({ error: 'That password is not correct.' });
+    // This is 400 and not 401. The session is fine. The caller typed a wrong password.
+    // The website treats every 401 as an ended session and signs the person out. A typo here
+    // must not do that.
+    return res.status(400).json({ error: 'That password is not correct.' });
   }
 
   // Always the id from the session. This route can only change the caller's own account.
