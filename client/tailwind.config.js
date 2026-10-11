@@ -5,7 +5,7 @@ export default {
     extend: {
       // Every colour points at a variable in src/index.css. Change a colour there only.
       // A colour made this way cannot take an opacity suffix such as bg-primary/30. Tailwind
-      // would drop the class without any error. src/lib/tokens.test.js checks for that.
+      // would drop the class without any error. tests/lib/tokens.test.js checks for that.
       colors: {
         primary: {
           DEFAULT: 'var(--primary)',

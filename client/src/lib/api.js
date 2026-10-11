@@ -107,7 +107,7 @@ async function request(method, path, body, { anonymous = false } = {}) {
   );
 }
 
-export const apiGet = (path) => request('GET', path);
+export const apiGet = (path, options) => request('GET', path, undefined, options);
 export const apiPost = (path, body = {}, options) => request('POST', path, body, options);
 export const apiPut = (path, body = {}) => request('PUT', path, body);
 export const apiDelete = (path) => request('DELETE', path);

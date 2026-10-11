@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-
-const RING = 'focus-visible:ring-2 focus-visible:ring-primary-strong focus-visible:ring-offset-2';
+import { RING, RING_ON_WARNING } from '@/lib/ui';
 
 // The five things the platform is for. Each one leads to the page where it lives.
 const PILLARS = [
@@ -40,18 +39,18 @@ export default function Landing() {
         <h2 id="landing-urgent" className="font-bold text-warning-strong">If you are in danger right now</h2>
         <ul className="mt-2 space-y-1 text-sm">
           <li>
-            <a href="tel:3029" className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING} focus-visible:ring-offset-warning-subtle`}>
+            <a href="tel:3029" className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING_ON_WARNING}`}>
               <span className="font-mono text-base font-bold text-primary">3029</span> Isange One Stop Centre
             </a>
           </li>
           <li>
-            <a href="tel:112" className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING} focus-visible:ring-offset-warning-subtle`}>
+            <a href="tel:112" className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING_ON_WARNING}`}>
               <span className="font-mono text-base font-bold text-primary">112</span> Police
             </a>
           </li>
         </ul>
         <p className="mt-2 text-sm">
-          <Link to="/emergency" className={`inline-flex min-h-touch items-center text-primary underline ${RING} focus-visible:ring-offset-warning-subtle`}>
+          <Link to="/emergency" className={`inline-flex min-h-touch items-center text-primary underline ${RING_ON_WARNING}`}>
             More urgent contacts
           </Link>
         </p>
