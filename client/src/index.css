@@ -1,0 +1,60 @@
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/montserrat-600.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('/fonts/montserrat-700.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens. The palette is navy, red and white, taken from alueducation.com.
+   The contrast numbers were computed. Work them out again before changing a value.
+   Hard rule: red never sits on a navy surface. #d00d2d on #002e6d is 2.34:1 and fails. */
+:root {
+  --primary: #002e6d;          /* 13.03:1 on white */
+  --primary-strong: #012b62;   /* 13.79:1 on white. Used for hover and the focus ring */
+  --primary-subtle: #e8f0fc;   /* citation chips. Primary on it is 11.36:1 */
+  --primary-foreground: #ffffff;
+
+  --ink: #333333;              /* 12.63:1 on white */
+  --muted-foreground: #656565; /* 5.83:1 on white */
+  /* The same value as muted-foreground by coincidence. It is its own token so that
+     changing the disabled colour never changes the colour of body text. */
+  --disabled: #656565;
+
+  --canvas: #f7f8fa;
+  --surface: #ffffff;
+
+  --border: #dfe3e8;           /* 1.29:1. Decorative lines only */
+  --border-input: #7d8794;     /* 3.64:1. Borders of form controls need 3:1 */
+
+  /* Warning means "read this carefully": the SOS link, the crisis block and token warnings.
+     It is always outlined and never filled, so asking for help does not look like an error. */
+  --warning: #d00d2d;          /* 5.56:1 on white */
+  --warning-subtle: #fdecee;
+  --warning-border: #f4b8c0;
+  --warning-strong: #a00a22;   /* 7.19:1 on warning-subtle */
+
+  --radius: 4px;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
