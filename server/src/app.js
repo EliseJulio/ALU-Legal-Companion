@@ -13,6 +13,7 @@ import directoryRoutes from './routes/directory.js';
 import matterRouteRoutes from './routes/matterRoutes.js';
 import contactRoutes from './routes/contacts.js';
 import bookingRoutes from './routes/bookings.js';
+import matterTrackingRoutes from './routes/matters.js';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/api/directory', directoryRoutes);
 app.use('/api/directory', matterRouteRoutes);
 app.use('/api/emergency-contacts', contactRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/matters', matterTrackingRoutes);
 
 // A path nothing matched. Every error from this API is { error: "message" }, even for a typo.
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));

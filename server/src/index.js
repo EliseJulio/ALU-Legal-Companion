@@ -2,6 +2,7 @@
 import app from './app.js';
 import { getSecret } from './middleware/auth.js';
 import { isRealTransport } from './services/mailer.js';
+import { startReminderScheduler } from './services/reminders.js';
 
 // Stop at startup if JWT_SECRET is missing or weak. Otherwise anyone could make their own admin token.
 try {
@@ -15,6 +16,10 @@ try {
 const notes = [
   isRealTransport() ? null : 'mail in dev mode: no SMTP_URL, links are printed to this log',
 ].filter(Boolean);
+
+// Checks for due reminders once an hour. REMINDERS=off turns this off when a separate cron job
+// runs "npm run reminders" instead. This way two processes never send the same reminder.
+if (process.env.REMINDERS !== 'off') startReminderScheduler();
 
 const port = process.env.PORT || 4000;
 app.listen(port, () => console.log(`ALU Legal Companion API on :${port}${notes.length ? ` (${notes.join('; ')})` : ''}`));
