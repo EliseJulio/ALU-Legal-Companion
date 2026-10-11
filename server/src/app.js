@@ -17,6 +17,7 @@ import matterTrackingRoutes from './routes/matters.js';
 import guideRoutes from './routes/guides.js';
 import questionRoutes from './routes/questions.js';
 import bookmarkRoutes from './routes/bookmarks.js';
+import adminRoutes from './routes/admin.js';
 
 dotenv.config();
 
@@ -66,6 +67,7 @@ app.use('/api/emergency-contacts', contactRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/matters', matterTrackingRoutes);
 app.use('/api/guides', guideRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/questions', questionRoutes);
 // Mounted at /api because it serves /api/bookmarks and /api/guides/:id/bookmark.
 app.use('/api', bookmarkRoutes);

@@ -17,6 +17,9 @@ const DEFAULT_FROM = 'ALU Legal Companion <no-reply@alu-legal.invalid>';
 
 const mailFrom = () => process.env.MAIL_FROM || DEFAULT_FROM;
 
+// The base address that links in emails are built from. The default is the Vite dev server.
+export const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
+
 // Read at call time and not at import time, so a late config or a test sees the truth.
 export function isRealTransport() {
   return Boolean(process.env.SMTP_URL);

@@ -9,6 +9,7 @@ import { loginEmailLimiter, emailLimiter, authIpLimiter } from '../middleware/ra
 import { hashPassword, checkPassword } from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail } from '../services/mailer.js';
+import { consumeInvite, releaseInvite, inviteStatus } from '../services/invites.js';
 
 const router = Router();
 
@@ -353,6 +354,49 @@ router.post('/reset-password', authIpLimiter, async (req, res) => {
   if (!user) return res.status(400).json({ error: 'This account cannot be reset. If you think that is a mistake, contact the ALU Legal Companion team.' });
 
   res.json({ token: signToken(user), user: publicUser(user) });
+});
+
+// POST /api/auth/redeem-invite: the only way to become a legal expert.
+// The invitation was emailed to the person, so using it proves they own the address. That is
+// why the new account counts as verified. Like verify-email this route may say why a link was
+// refused because the caller already holds the token.
+router.post('/redeem-invite', authIpLimiter, async (req, res) => {
+  const { invite_token: inviteToken, name: rawName, password } = req.body || {};
+  if (!inviteToken || !rawName || !password) {
+    return res.status(400).json({ error: 'invite_token, name and password are required' });
+  }
+  const name = typeof rawName === 'string' ? rawName.trim() : '';
+  if (!name || name.length > 100) return res.status(400).json({ error: 'Your name must be 1 to 100 characters' });
+  // Checked before the invitation is used. The link works once and must not be burned on a
+  // password the server was always going to refuse.
+  if (typeof password !== 'string' || password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  const invite = await consumeInvite(inviteToken);
+  if (!invite) {
+    const why = await inviteStatus(inviteToken);
+    const message = {
+      used: 'This invitation has already been used or replaced by a newer one. Ask the admin for a new invitation if you need one.',
+      expired: 'This invitation has expired. Ask the admin for a new one.',
+    }[why] || 'That invitation is not valid. Ask the admin for a new one.';
+    return res.status(400).json({ error: message });
+  }
+
+  // ON CONFLICT covers an account made with this address after the invitation was sent.
+  const [user] = await q(
+    `INSERT INTO users (name, email, password_hash, role, email_verified_at)
+     VALUES ($1, $2, $3, 'legal_expert', now())
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, name, email, role, session_version`,
+    [name, invite.email, await hashPassword(password)]);
+  if (!user) {
+    // No account was made, so the invitation is given back and not wasted.
+    await releaseInvite(invite.id);
+    return res.status(400).json({ error: 'An account with this email already exists' });
+  }
+
+  res.status(201).json({ token: signToken(user), user: publicUser(user) });
 });
 
 export default router;
