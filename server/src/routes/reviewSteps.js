@@ -17,7 +17,9 @@ async function recordReview(type, id, reviewerId, decision, comment = null) {
 
 // `verifiedSql` is extra SQL that runs when a record is verified. It starts with a comma.
 export function addReviewSteps(router, { segment, table, recordType, noun, verifiedSql = '' }) {
-  router.post(`/${segment}/:id/submit`, requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  // An empty segment puts the steps straight under the router, like /api/guides/:id/submit.
+  const base = segment ? `/${segment}` : '';
+  router.post(`${base}/:id/submit`, requireAuth('admin'), requireIntParam('id'), async (req, res) => {
     const [row] = await q(
       `UPDATE ${table} SET status='pending_review', updated_at=now()
         WHERE id=$1 AND status='draft' RETURNING id, status`,
@@ -26,7 +28,7 @@ export function addReviewSteps(router, { segment, table, recordType, noun, verif
     res.json(row);
   });
 
-  router.post(`/${segment}/:id/verify`, requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
+  router.post(`${base}/:id/verify`, requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
     const [row] = await q(
       `UPDATE ${table} SET status='published', verified_by=$1, verified_at=now(), updated_at=now()${verifiedSql}
         WHERE id=$2 AND status='pending_review' RETURNING id, status, verified_at`,
@@ -36,7 +38,7 @@ export function addReviewSteps(router, { segment, table, recordType, noun, verif
     res.json(row);
   });
 
-  router.post(`/${segment}/:id/return`, requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
+  router.post(`${base}/:id/return`, requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
     const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
     if (!comment) return res.status(400).json({ error: 'Please say what needs changing before returning it.' });
     const [row] = await q(

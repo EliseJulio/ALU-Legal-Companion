@@ -14,6 +14,9 @@ import matterRouteRoutes from './routes/matterRoutes.js';
 import contactRoutes from './routes/contacts.js';
 import bookingRoutes from './routes/bookings.js';
 import matterTrackingRoutes from './routes/matters.js';
+import guideRoutes from './routes/guides.js';
+import questionRoutes from './routes/questions.js';
+import bookmarkRoutes from './routes/bookmarks.js';
 
 dotenv.config();
 
@@ -62,6 +65,10 @@ app.use('/api/directory', matterRouteRoutes);
 app.use('/api/emergency-contacts', contactRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/matters', matterTrackingRoutes);
+app.use('/api/guides', guideRoutes);
+app.use('/api/questions', questionRoutes);
+// Mounted at /api because it serves /api/bookmarks and /api/guides/:id/bookmark.
+app.use('/api', bookmarkRoutes);
 
 // A path nothing matched. Every error from this API is { error: "message" }, even for a typo.
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));

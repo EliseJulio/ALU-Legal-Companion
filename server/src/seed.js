@@ -142,6 +142,24 @@ for (const r of ROUTES) {
 }
 console.log(`✓ routes: ${ROUTES.length} queued for the legal expert (nothing published)`);
 
+// A sample guide. It also goes in as pending_review. The expert reads it and verifies it.
+await q(
+  `INSERT INTO guides (domain, title, situation, law_says, your_rights, steps, get_help, source_law, source_url, status)
+   SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,'pending_review'
+    WHERE NOT EXISTS (SELECT 1 FROM guides WHERE title = $2)`,
+  [
+    'employment',
+    'Internship and first job contracts: know your rights',
+    'You have been offered an internship or your first job in Rwanda. You are not sure what should be in the contract. You are not sure whether the probation rules protect you. You do not know what to do if something goes wrong.',
+    'If you are engaged for 3 months or more the contract must be in writing. A foreign national must always receive a written contract. A probation period cannot be longer than 3 months. It can be renewed once for at most 3 more months and only with a written evaluation shared with you. Notice of termination must be in writing and state the reasons. Only gross misconduct allows dismissal without notice. Your contract must state your pay and your weekly working hours. (Law No. 66/2018. The legal expert checks the current articles on amategeko.gov.rw before this guide is published.)',
+    'You are entitled to a written contract for work of 3 months or more. You are entitled to a probation period of at most 3 months plus 3 with a written evaluation. You are entitled to written reasons for any termination and to the pay stated in your contract. Signing as an "intern" does not remove these protections when you do real work under an employer’s direction.',
+    '1. Before signing, read the contract and check the duration, pay, working hours and probation length. 2. Keep copies of the signed contract, your payslips and any written evaluations. 3. If a problem arises, raise it in writing with your employer first. 4. If it is not settled, contact the district labour inspector, which is free. You can also go to an Access to Justice Bureau.',
+    'District labour inspector: free complaints and mediation. Access to Justice Bureau (MAJ): free legal aid in every district. You can book a session with a pro-bono lawyer through this platform.',
+    'Law No. 66/2018 of 30/08/2018 Regulating Labour in Rwanda',
+    'https://www.amategeko.gov.rw/',
+  ]);
+console.log('✓ guides: 1 sample guide queued for the legal expert');
+
 // The crisis contacts. They are the same list the API falls back to when the table is empty.
 for (const [i, c] of BUILT_IN_CONTACTS.entries()) {
   await q(
