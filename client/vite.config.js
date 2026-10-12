@@ -16,7 +16,7 @@ export default defineConfig({
     globals: true,
     setupFiles: './tests/setup.js',
     // The end-to-end tests have their own runner. Vitest cannot run them.
-    exclude: [...configDefaults.exclude, 'e2e/**'],
+    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
     // Typing a whole sentence one key at a time is slow when several test files run at once.
     testTimeout: 15000,
     hookTimeout: 15000,
