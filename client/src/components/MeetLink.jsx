@@ -1,13 +1,5 @@
 import { RING } from '@/lib/ui';
-
-function safeHttps(value) {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
+import { secureAddress } from '@/lib/url';
 
 // How a confirmed appointment happens. The server sends `meet_link` only for an accepted
 // booking. So this component does not decide when a room may be shown. It does handle the case
@@ -19,7 +11,7 @@ export default function MeetLink({ booking, className = '' }) {
   // The server only saves a Google Meet address. The page checks again before it makes a link.
   // A value such as javascript:... would run code when clicked. Anything that is not https is
   // treated as no room.
-  const room = safeHttps(booking.meet_link);
+  const room = secureAddress(booking.meet_link);
 
   if (!room) {
     return (

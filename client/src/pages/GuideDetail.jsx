@@ -9,6 +9,7 @@ import GuideSection from '@/components/GuideSection';
 import SaveGuideButton from '@/components/SaveGuideButton';
 import ErrorNotice from '@/components/ErrorNotice';
 import { RING, BUTTON_PRIMARY } from '@/lib/ui';
+import { secureAddress } from '@/lib/url';
 
 export default function GuideDetail() {
   const { id } = useParams();
@@ -63,10 +64,11 @@ export default function GuideDetail() {
         <GuideSection title="What the law says">
           {guide.law_says}
           <p className="mt-2">
-            <span className="rounded bg-primary-subtle px-2 py-0.5 font-mono text-xs text-primary">{guide.source_law}</span>
-            {guide.source_url && (
+            <span className="rounded bg-primary-subtle px-2 py-0.5 
+            font-mono text-xs text-primary">{guide.source_law}</span>
+            {secureAddress(guide.source_url) && (
               <a
-                href={guide.source_url}
+                href={secureAddress(guide.source_url)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`ml-2 text-xs text-primary underline ${RING}`}

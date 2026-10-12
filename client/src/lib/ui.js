@@ -20,3 +20,6 @@ export const DATE_FIELD = `${FIELD} focus-within:ring-2 focus-within:ring-primar
 const BUTTON_BASE = 'inline-flex min-h-touch items-center rounded px-4 font-head text-sm font-semibold';
 export const BUTTON_PRIMARY = `${BUTTON_BASE} bg-primary text-primary-foreground ${RING}`;
 export const BUTTON_OUTLINE = `${BUTTON_BASE} border border-primary bg-surface text-primary ${RING}`;
+
+// A white card with a thin border. Most blocks of content on a page use it.
+export const PANEL = 'rounded border border-border bg-surface p-4';

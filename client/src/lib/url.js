@@ -14,3 +14,15 @@ export function scrubTokenFromUrl() {
     // No history support. The page still works. Never let cleaning up break the page.
   }
 }
+
+// An address that came from the database is only made into a link when it is a full https
+// address. A value such as javascript:... would run code when clicked. The server checks this
+// when it saves. The page checks again before it makes a link. Anything else gives null.
+export function secureAddress(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}

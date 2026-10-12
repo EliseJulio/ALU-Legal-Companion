@@ -6,6 +6,18 @@ const PHRASES = {
   // matters
   open: 'Open',
   closed: 'Finished',
+  // guides, directory entries and routes
+  draft: 'Draft',
+  pending_review: 'Pending review',
+  published: 'Published',
+  // accounts
+  active: 'Active',
+  deactivated: 'Switched off',
+  unverified: 'Email not confirmed',
+  // invitations
+  pending: 'Waiting',
+  used: 'Used',
+  expired: 'Expired',
   // bookings
   requested: 'Requested',
   accepted: 'Accepted',

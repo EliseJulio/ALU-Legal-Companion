@@ -8,6 +8,20 @@ import VerifyEmail from '@/pages/VerifyEmail';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import RedeemInvite from '@/pages/RedeemInvite';
+import RequireRole from '@/components/RequireRole';
+import AdminDashboard from '@/pages/AdminDashboard';
+import AdminGuides from '@/pages/AdminGuides';
+import AdminGuideEditor from '@/pages/AdminGuideEditor';
+import AdminProviders from '@/pages/AdminProviders';
+import AdminRoutes from '@/pages/AdminRoutes';
+import AdminUsers from '@/pages/AdminUsers';
+import AdminInvites from '@/pages/AdminInvites';
+import AdminContacts from '@/pages/AdminContacts';
+import ExpertQueue from '@/pages/ExpertQueue';
+import ExpertQuestions from '@/pages/ExpertQuestions';
+import ExpertBookings from '@/pages/ExpertBookings';
+import ExpertDirectory from '@/pages/ExpertDirectory';
+import ExpertMatters from '@/pages/ExpertMatters';
 import MyActivity from '@/pages/MyActivity';
 import AccountSettings from '@/pages/AccountSettings';
 import AskQuestion from '@/pages/AskQuestion';
@@ -36,6 +50,10 @@ function ScrollToTop() {
   return null;
 }
 
+// The staff workspaces. Each page sits inside the guard for its role.
+const Expert = ({ children }) => <RequireRole roles={['legal_expert']}>{children}</RequireRole>;
+const Admin = ({ children }) => <RequireRole roles={['admin']}>{children}</RequireRole>;
+
 export default function App() {
   return (
     <Layout>
@@ -48,6 +66,20 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/redeem-invite" element={<RedeemInvite />} />
+        <Route path="/admin" element={<Admin><AdminDashboard /></Admin>} />
+        <Route path="/admin/guides" element={<Admin><AdminGuides /></Admin>} />
+        <Route path="/admin/guides/new" element={<Admin><AdminGuideEditor /></Admin>} />
+        <Route path="/admin/guides/:id" element={<Admin><AdminGuideEditor /></Admin>} />
+        <Route path="/admin/providers" element={<Admin><AdminProviders /></Admin>} />
+        <Route path="/admin/routes" element={<Admin><AdminRoutes /></Admin>} />
+        <Route path="/admin/users" element={<Admin><AdminUsers /></Admin>} />
+        <Route path="/admin/invites" element={<Admin><AdminInvites /></Admin>} />
+        <Route path="/admin/contacts" element={<Admin><AdminContacts /></Admin>} />
+        <Route path="/expert" element={<Expert><ExpertQueue /></Expert>} />
+        <Route path="/expert/questions" element={<Expert><ExpertQuestions /></Expert>} />
+        <Route path="/expert/bookings" element={<Expert><ExpertBookings /></Expert>} />
+        <Route path="/expert/directory" element={<Expert><ExpertDirectory /></Expert>} />
+        <Route path="/expert/matters" element={<Expert><ExpertMatters /></Expert>} />
         <Route path="/my-activity" element={<MyActivity />} />
         <Route path="/settings" element={<AccountSettings />} />
         <Route path="/ask" element={<AskQuestion />} />
