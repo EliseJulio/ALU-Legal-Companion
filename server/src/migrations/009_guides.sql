@@ -1,6 +1,6 @@
--- Guides: plain-language legal information that a legal expert has verified.
+-- Guides: legal information in simple words. An admin checks and publishes each one.
 -- A guide follows the same steps as a directory entry: draft, then pending_review, then published.
--- Only a legal expert publishes. Any edit to a published guide sends it back to draft.
+-- Only an admin publishes. Any edit to a published guide sends it back to draft.
 CREATE TABLE guides (
   id          SERIAL PRIMARY KEY,
   domain      TEXT NOT NULL CHECK (domain IN ('tenancy', 'employment', 'business', 'immigration', 'harassment')),
@@ -18,13 +18,13 @@ CREATE TABLE guides (
   verified_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  -- A published guide must name the legal expert who verified it.
+  -- A published guide must name the admin who published it.
   CONSTRAINT guides_published_is_verified
     CHECK (status <> 'published' OR (verified_by IS NOT NULL AND verified_at IS NOT NULL))
 );
 CREATE INDEX guides_status_idx ON guides (status, domain);
 
--- The decisions of a legal expert are kept in directory_reviews for guides too.
+-- The publish decisions are kept in directory_reviews for guides too.
 ALTER TABLE directory_reviews DROP CONSTRAINT directory_reviews_record_type_check;
 ALTER TABLE directory_reviews ADD CONSTRAINT directory_reviews_record_type_check
   CHECK (record_type IN ('provider', 'route', 'guide'));
@@ -32,7 +32,7 @@ ALTER TABLE directory_reviews ADD CONSTRAINT directory_reviews_record_type_check
 -- Saved guides for signed-in students and staff. There is no anonymous version. A saved list
 -- tied to an anonymous token would be a lasting record of what an anonymous person read.
 -- A row is kept when a guide goes back to draft, so the save comes back by itself once the
--- guide is verified again.
+-- guide is published again.
 CREATE TABLE bookmarks (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

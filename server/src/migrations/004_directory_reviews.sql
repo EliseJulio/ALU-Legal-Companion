@@ -1,4 +1,4 @@
--- The decisions a legal expert makes about directory entries.
+-- The publish and return decisions about directory entries. Guides and routes use it too.
 -- Rows are only added. A second return never erases the reason for the first.
 -- record_id points at a provider now and at a route later, so it has no foreign key.
 CREATE TABLE directory_reviews (

@@ -1,6 +1,6 @@
 -- The directory: the lawyers, consultants and organisations in Rwanda that solve legal problems.
 -- An entry follows the same steps as a guide: draft, then pending_review, then published.
--- Only a legal expert publishes. Editing a checked fact sends the entry back to draft.
+-- Only an admin publishes. Editing a checked fact sends the entry back to draft.
 CREATE TABLE providers (
   id                  SERIAL PRIMARY KEY,
   -- The login of the legal expert behind this entry. Most entries have none.
@@ -25,7 +25,7 @@ CREATE TABLE providers (
   verified_at         TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
-  -- A published entry must name the legal expert who verified it.
+  -- A published entry must name the admin who published it.
   CONSTRAINT providers_published_is_verified
     CHECK (status <> 'published' OR (verified_by IS NOT NULL AND verified_at IS NOT NULL))
 );
