@@ -1,11 +1,12 @@
 // Routing: from the words a person types to the kind of matter and so to the body that must
 // hear it first. No language model is used. The match is a database text search over each
-// route's title and keywords. The answer is a row that a legal expert verified.
+// route's title and keywords. The answer is a row that an admin published.
 import { q } from '../db.js';
+import { DOMAINS, normalizeDomain } from './domains.js';
 
 // Finds the matters that match what the person typed. The best match comes first.
-// With no text it returns every matter.
-export async function searchRoutes(text = '') {
+// With no text it returns every matter. With an area it keeps only the matters of that area.
+export async function searchRoutes(text = '', area = '') {
   const t = typeof text === 'string' ? text.trim().slice(0, 300) : '';
   const params = [];
   let rank = '0';
@@ -23,12 +24,19 @@ export async function searchRoutes(text = '') {
     rank = `ts_rank(r.tsv, ${tsq}, 1)`;
     filter = `AND r.tsv @@ ${tsq}`;
   }
+  // An area the platform does not know is ignored. The reader then sees every matter.
+  const wanted = normalizeDomain(area);
+  if (DOMAINS.includes(wanted)) {
+    params.push(wanted);
+    filter += ` AND r.area = $${params.length}`;
+  }
   // A route is listed only when the route and the body it sends people to are both published.
   // A checked route that points at an unchecked office would still send someone to a place
   // nobody has verified.
   return q(
-    `SELECT r.id, r.matter_type, r.title, r.deadline_days, r.deadline_runs_from,
+    `SELECT r.id, r.matter_type, r.title, r.area, r.deadline_days, r.deadline_runs_from,
             p.id AS first_forum_id, p.name AS first_forum_name, p.type AS first_forum_type,
+            r.verified_at,
             ${rank} AS score
        FROM matter_routes r
        JOIN providers p ON p.id = r.first_forum_id AND p.status = 'published'

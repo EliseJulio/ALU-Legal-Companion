@@ -31,6 +31,9 @@ function sendViaTerminal({ to, subject, text }) {
   if (isRealTransport()) {
     throw new Error('Dev mail mode refused to run: SMTP_URL is set and printing the message would leak a live link into the logs.');
   }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Refused to send: SMTP_URL is not set in production. Printing the message would leak a live link into the logs.');
+  }
   const preview = [
     '──────── mail: DEV MODE — NOT SENT (no SMTP_URL) ────────',
     `From:    ${mailFrom()}`,
