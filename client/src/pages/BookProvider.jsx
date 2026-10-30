@@ -171,8 +171,8 @@ export default function BookProvider() {
       ) : bookedAsSelf ? (
         <div ref={doneRef} tabIndex={-1} className="mt-4 rounded-card border border-border bg-surface p-6 outline-none">
           <p>
-            Your request is with the lawyer. Nobody will email you. Whether they accepted the time
-            shows on the site under your account.
+            Your request is with the lawyer. When they accept the time, you will get an email with the
+            time and the meeting link. You can also see the answer at any time on the site under your account.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             There is no code. The request is kept with your account so the lawyer can see who asked.
@@ -263,6 +263,17 @@ export default function BookProvider() {
                   <span>Without my name</span>
                 </label>
               </fieldset>
+            )}
+
+            {canChoose && choice === 'self' && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                When the lawyer accepts, an email with the time and the meeting link goes to the address of your account.
+              </p>
+            )}
+            {canChoose && choice === 'anonymous' && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                No email is sent, because there is no address. Your code is how you find out.
+              </p>
             )}
 
             {asAnonymous && (

@@ -131,7 +131,7 @@ export default function ExpertBookings() {
           <Group
             id="pending-heading"
             title="Pending requests"
-            note="Review incoming requests for your linked listing."
+            note="Review incoming requests for your linked listing. When you accept, a person who signed in is emailed the time and your meeting link. A person who asked anonymously has no address and checks with their code."
             bookings={of('requested')}
             empty="No requests are waiting for you."
             onDone={refetch}

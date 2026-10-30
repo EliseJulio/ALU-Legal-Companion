@@ -5,6 +5,19 @@ The REST API for the platform. It serves the directory of lawyers, consultants a
 - **Runtime:** Node.js 20 or newer, Express 4, ES modules
 - **Database:** PostgreSQL 16 with plain SQL through `pg` (no ORM)
 - **Tests:** Jest and Supertest against a real database
+- **Live:** https://alu-legal-companion.onrender.com/api. The documentation is at https://alu-legal-companion.onrender.com/api/docs
+
+## The live API
+
+The API runs on Render at https://alu-legal-companion.onrender.com. The website at https://alu-legal-companion-qu8w.onrender.com is the only browser address it accepts (`CORS_ORIGINS`).
+
+| Address | What it gives |
+|---|---|
+| `https://alu-legal-companion.onrender.com/api/health` | `{"status":"ok"}` when the server is running. Use it to check the server is awake |
+| `https://alu-legal-companion.onrender.com/api/docs` | Swagger. Every route, who may call it and what it returns. **Try it out** sends real requests to the live server |
+| `https://alu-legal-companion.onrender.com/api/openapi.json` | The same description as a file. Import it into Postman or any other tool |
+
+To call it from Postman, set the `baseUrl` variable to `https://alu-legal-companion.onrender.com/api`. Run single read-only requests only. Do not run the whole collection against the live API. It creates records named "Postman" and signs in with the demo passwords, which do not exist there.
 
 ## Set up
 
@@ -86,6 +99,10 @@ They go in `server/.env`. The template is `.env.example`.
 | `MAIL_FROM` | no | The sender address. It must be one your mail provider has verified |
 | `APP_URL` | no | The website address that email links point to. The default is `http://localhost:5173` |
 | `REMINDERS` | no | Set it to `off` if a cron job runs `npm run reminders` instead |
+| `NODE_ENV` | on a live server | Set it to `production`. The server then refuses to start with no `CORS_ORIGINS` and never prints an email link in its log |
+| `DOCUMENT_KEY` | for uploads | 64 hex characters that encrypt the documents attached to a matter. With none, uploads answer 503. If it is lost, every stored document is lost |
+| `REDIS_URL` | no | Keeps the rate limits in Redis so more than one copy of the server shares them. With none they are kept in the server's memory, which is fine for one copy |
+| `SEED_ADMIN_PASSWORD`, `SEED_EXPERT_PASSWORD`, `SEED_STUDENT_PASSWORD` | no | The passwords the seed gives the demo accounts. The defaults are for local use only. Set your own before seeding a live database |
 | `TEST_DATABASE_URL` | no | The database for the tests. The default is `alu_legal_test` on localhost |
 
 **Email in development.** With no `SMTP_URL` the server prints verification links, reset links and invitations in its terminal. Copy the link from there. This lets you try every flow with no mail account. The printing code refuses to run when `SMTP_URL` is set, so a live link is never written to a production log.
