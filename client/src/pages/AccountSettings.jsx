@@ -57,6 +57,69 @@ function NameForm({ current }) {
   );
 }
 
+// Change your email address. The account keeps the old address until the link sent to the new one
+// is used. The server gives the same answer whether or not the new address is already in use.
+function EmailForm({ onRequested }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState('');
+
+  async function save(event) {
+    event.preventDefault();
+    setMessage('');
+    if (!email.trim()) {
+      setError({ message: 'Enter the new email address.' });
+      return;
+    }
+    if (!password) {
+      setError({ message: 'Enter your current password.' });
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const reply = await apiPost('/auth/change-email', { email: email.trim(), current_password: password });
+      setMessage(reply?.message || 'If that address can be used, a confirmation link is on its way to it. Your address does not change until you use the link.');
+      setEmail('');
+      onRequested();
+    } catch (err) {
+      setError(err);
+    } finally {
+      // The password box never keeps its text, whether it worked or not.
+      setPassword('');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={save} className={PANEL} aria-labelledby="email-heading">
+      <h2 id="email-heading" className="font-head text-2xl leading-heading text-primary">Change your email address</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        A link is sent to the new address. Your address changes only when you use it.
+      </p>
+      <label htmlFor="settings-new-email" className="mt-3 block text-sm font-medium">New email address</label>
+      <input id="settings-new-email" type="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={FIELD} />
+      <PasswordField
+        id="email-current-password"
+        label="Your password"
+        className="mt-3"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        shown={false}
+        toggle={false}
+        autoComplete="current-password"
+      />
+      {error && <ErrorNotice error={error} className="mt-3" />}
+      <div role="status">{message && <p className="mt-3 text-sm">{message}</p>}</div>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
+        {busy ? 'Sending…' : 'Send confirmation link'}
+      </button>
+    </form>
+  );
+}
+
 // Change your password. It ends every other session of the account and keeps this one. People
 // change a password when they think someone else has got in.
 function PasswordForm() {
@@ -155,7 +218,7 @@ export default function AccountSettings() {
   const { user } = useAuth();
   const here = useLocation();
   // The account is requested only for a signed-in person. A visitor would get a 401.
-  const { data: me, error, loading } = useApi(user ? '/auth/me' : null);
+  const { data: me, error, loading, refetch } = useApi(user ? '/auth/me' : null);
 
   if (!user) {
     return (
@@ -172,7 +235,7 @@ export default function AccountSettings() {
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Account settings" />
       <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Account settings</h1>
-      <p className="mt-4 max-w-reading text-muted-foreground">Manage your name and password. No extra personal information is collected.</p>
+      <p className="mt-4 max-w-reading text-muted-foreground">Manage your name, your email address and your password. No extra personal information is collected.</p>
 
       {loading && <p className="mt-4 text-muted-foreground">Loading your account…</p>}
       {error && <ErrorNotice error={error} className="mt-4" />}
@@ -190,6 +253,11 @@ export default function AccountSettings() {
                 <div>
                   <dt className={LABEL}>Email / confirmation</dt>
                   <dd className="mt-1 font-medium">{me.email} {me.email_verified_at ? '(confirmed)' : '(not confirmed)'}</dd>
+                  {me.pending_email && (
+                    <dd className="mt-1 text-muted-foreground">
+                      Waiting for confirmation: {me.pending_email}. Use the link sent to that address.
+                    </dd>
+                  )}
                 </div>
                 <div>
                   <dt className={LABEL}>Role</dt>
@@ -212,6 +280,7 @@ export default function AccountSettings() {
 
         <div className="min-w-0 space-y-6">
           <NameForm current={user.name} />
+          <EmailForm onRequested={refetch} />
           <PasswordForm />
         </div>
       </div>

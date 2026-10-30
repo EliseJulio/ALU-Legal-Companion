@@ -38,6 +38,7 @@ const schemas = {
     id: whole('The account number.'), name: text('The name.'), email: text('The address.'),
     role: oneOf(['student', 'staff', 'legal_expert', 'admin']),
     email_verified_at: moment('When the address was proved.'), created_at: moment('When the account was made.'),
+    pending_email: text('A new address that is waiting for its link to be used. Null when no change is under way.', { nullable: true }),
   }),
 
   Provider: obj({
@@ -384,6 +385,17 @@ const OPS = [
     roles: ANYONE_SIGNED_IN, limited: true, errors: [400],
     body: obj({ current_password: text('The password now.'), new_password: text('At least 8 characters.') }, ['current_password', 'new_password']),
     reply: [200, 'Changed.', ref('Session')],
+  }),
+  op('post', '/auth/change-email', 'Accounts', 'Ask to change my email address', {
+    desc: 'Needs the current password. Nothing changes yet. The new address waits until the link sent to it is used, so a typo cannot lock anyone out. Students and staff must use an ALU address. The answer is the same for every address that passes the checks, so it never shows which addresses have an account.',
+    roles: ANYONE_SIGNED_IN, limited: true, errors: [400],
+    body: obj({ email: text('The new address.'), current_password: text('The password now.') }, ['email', 'current_password']),
+    reply: [200, 'The same message for every address.', ref('Message')],
+  }),
+  op('post', '/auth/confirm-email-change', 'Accounts', 'Use the emailed link to confirm the new address', {
+    desc: 'Works from any device. Switches the address, ends every older session and signs the person in again.',
+    body: obj({ token: text('The token from the link.') }, ['token']),
+    reply: [200, 'Changed and signed in.', ref('Session')], errors: [400], limited: true,
   }),
   op('post', '/auth/forgot-password', 'Accounts', 'Ask for a password reset link', {
     desc: 'The answer is the same for every address.', body: obj({ email: text('The address.') }, ['email']),
