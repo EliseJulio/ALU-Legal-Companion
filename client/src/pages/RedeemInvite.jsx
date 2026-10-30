@@ -4,6 +4,9 @@ import { apiPost } from '@/lib/api';
 import { scrubTokenFromUrl } from '@/lib/url';
 import { useAuth } from '@/lib/AuthContext';
 import ErrorNotice from '@/components/ErrorNotice';
+import AuthLayout from '@/components/AuthLayout';
+import Callout from '@/components/Callout';
+import PasswordField from '@/components/PasswordField';
 import { RING, FIELD } from '@/lib/ui';
 
 // The only way to become a legal expert. An admin sends an invitation by email. Using it proves
@@ -15,6 +18,8 @@ export default function RedeemInvite() {
   const [code, setCode] = useState(params.get('token') ?? '');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [again, setAgain] = useState('');
+  const [shown, setShown] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const { signIn } = useAuth();
@@ -34,6 +39,10 @@ export default function RedeemInvite() {
       setError({ message: 'Choose a password of at least 8 characters.' });
       return;
     }
+    if (password !== again) {
+      setError({ message: 'The two passwords are not the same.' });
+      return;
+    }
     setError(null);
     setSending(true);
     try {
@@ -44,27 +53,28 @@ export default function RedeemInvite() {
       });
       scrubTokenFromUrl();
       signIn(session);
-      navigate('/expert');
+      navigate('/expert/questions');
     } catch (err) {
       // The server says why an invitation was refused. The message is shown as it is.
       setError(err);
     } finally {
       setPassword('');
+      setShown(false);
+      setAgain('');
       setSending(false);
     }
   }
 
   return (
-    <div>
-      <h1 className="font-head text-2xl text-primary">Redeem your invitation</h1>
-      <p className="mt-1 text-muted-foreground">
-        Legal experts join by invitation only. The invitation works once and creates your account.
-      </p>
+    <AuthLayout eyebrow="Invitation" title="Accept your invitation" intro="Invited experts only. No self-registration.">
+      <Callout title="Invited experts only" className="mt-4">
+        Your invitation code is in the email you were sent. It is filled in for you when you open the link.
+      </Callout>
 
       {error && <ErrorNotice error={error} className="mt-4" />}
 
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded border border-border bg-surface p-4">
-        <label htmlFor="code" className="block text-sm font-medium">Invitation code</label>
+      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
+        <label htmlFor="code" className="block text-sm font-medium">Invitation</label>
         <input
           id="code"
           type="text"
@@ -75,37 +85,54 @@ export default function RedeemInvite() {
           className={`${FIELD} font-mono`}
         />
 
-        <label htmlFor="name" className="mt-4 block text-sm font-medium">Your name</label>
+        <label htmlFor="name" className="mt-4 block text-sm font-medium">Name</label>
         <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={FIELD} />
 
-        <label htmlFor="password" className="mt-4 block text-sm font-medium">Password</label>
-        <p id="password-hint" className="mt-1 text-sm text-muted-foreground">At least 8 characters.</p>
-        <input
+        <PasswordField
           id="password"
-          type="password"
+          label="Password"
+          hint="At least 8 characters."
+          className="mt-4"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          aria-describedby="password-hint"
+          shown={shown}
+          toggle={false}
           autoComplete="new-password"
-          className={FIELD}
+        />
+
+        <PasswordField
+          id="again"
+          label="Confirm password"
+          className="mt-4"
+          value={again}
+          onChange={(e) => setAgain(e.target.value)}
+          shown={shown}
+          onShownChange={setShown}
+          toggleLabel="Show passwords"
+        controls="password again"
+          autoComplete="new-password"
         />
 
         <button
           type="submit"
-          disabled={sending}
-          className={`mt-4 inline-flex min-h-touch items-center rounded px-4 font-head 
+          aria-disabled={sending || undefined}
+          className={`mt-4 inline-flex min-h-button items-center justify-center rounded px-5 font-sans
             font-semibold text-primary-foreground ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
         >
-          {sending ? 'Creating your account…' : 'Create my account'}
+          {sending ? 'Creating your account…' : 'Redeem invitation'}
         </button>
       </form>
 
+      <p className="mt-4 text-sm text-muted-foreground">
+        Your invitation can be used once. If it has expired, contact the person who invited you.
+      </p>
+
       <p className="mt-4 text-sm">
         <Link to="/login" className={`inline-flex min-h-touch items-center font-semibold 
-          text-primary underline ${RING} focus-visible:ring-offset-canvas`}>
-          Back to sign in
+          text-info underline underline-offset-2 ${RING} focus-visible:ring-offset-canvas`}>
+          Back to sign in →
         </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }

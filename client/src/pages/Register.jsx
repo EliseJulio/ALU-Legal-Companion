@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { isAluEmail, ALLOWED_DOMAINS } from '@/lib/email';
 import ErrorNotice from '@/components/ErrorNotice';
+import AuthLayout from '@/components/AuthLayout';
+import Callout from '@/components/Callout';
+import PasswordField from '@/components/PasswordField';
 import { RING, RING_ON_CANVAS, FIELD } from '@/lib/ui';
 
 // Sign-up for students and staff with an ALU address. Registering is not signing in. The
@@ -21,6 +24,7 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [shown, setShown] = useState(false);
   const [role, setRole] = useState('student');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -43,51 +47,49 @@ export default function Register() {
       setError(err);
     } finally {
       setPassword('');
+      setShown(false);
       setSending(false);
     }
   }
 
   if (message) {
     return (
-      <div>
-        <h1 className="font-head text-2xl text-primary">Check your email</h1>
-        <div role="status" className="mt-4 rounded border border-border bg-surface p-4">
-          <p>{message}</p>
-          <Link to="/login" className={`mt-4 inline-flex min-h-touch items-center rounded bg-primary px-4 font-head font-semibold text-primary-foreground ${RING}`}>
+      <AuthLayout eyebrow="Verification" title="Check your email" intro="Single-use confirmation link required before access.">
+        <div className="mt-4 rounded-card border border-border bg-surface p-6">
+          <div role="status"><Callout title="Email confirmation required">{message}</Callout></div>
+          <Link to="/login" className={`mt-4 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`}>
             Go to sign in
           </Link>
         </div>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div>
-      <h1 className="font-head text-2xl text-primary">Create an account</h1>
-      <p className="mt-1 text-muted-foreground">
-        For ALU students and staff. An account lets you track your matters and get reminders. You
-        do not need one to use the directory or ask a question anonymously.
-      </p>
-
+    <AuthLayout
+      eyebrow="Register"
+      title="Create an ALU account"
+      intro="Students and staff only. Legal experts join by invitation. An account lets you track your matters and get reminders. You do not need one to use the directory or ask a question anonymously."
+    >
       {error && <ErrorNotice error={error} className="mt-4" />}
 
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded border border-border bg-surface p-4">
+      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
         <label htmlFor="name" className="block text-sm font-medium">Your name</label>
         <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={FIELD} />
 
         <label htmlFor="email" className="mt-4 block text-sm font-medium">ALU email address</label>
         <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={FIELD} />
 
-        <label htmlFor="password" className="mt-4 block text-sm font-medium">Password</label>
-        <p id="password-hint" className="mt-1 text-sm text-muted-foreground">At least 8 characters.</p>
-        <input
+        <PasswordField
           id="password"
-          type="password"
+          label="Password"
+          shown={shown}
+          onShownChange={setShown}
+          hint="At least 8 characters."
+          className="mt-4"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          aria-describedby="password-hint"
           autoComplete="new-password"
-          className={FIELD}
         />
 
         <fieldset className="mt-4">
@@ -108,9 +110,9 @@ export default function Register() {
 
         <button
           type="submit"
-          disabled={sending}
-          className={`mt-4 inline-flex min-h-touch items-center rounded px-4 
-            font-head font-semibold text-primary-foreground 
+          aria-disabled={sending || undefined}
+          className={`mt-4 inline-flex min-h-button items-center justify-center rounded px-5
+            font-sans font-semibold text-primary-foreground
             ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
         >
           {sending ? 'Creating your account…' : 'Create account'}
@@ -118,12 +120,11 @@ export default function Register() {
       </form>
 
       <p className="mt-4 text-sm">
-        Already have an account?{' '}
         <Link to="/login" className={`inline-flex min-h-touch items-center font-semibold 
-          text-primary underline ${RING_ON_CANVAS}`}>
-          Sign in
+          text-info underline underline-offset-2 ${RING_ON_CANVAS}`}>
+          Already registered? Sign in →
         </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }

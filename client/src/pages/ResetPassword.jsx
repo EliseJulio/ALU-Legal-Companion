@@ -3,8 +3,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { scrubTokenFromUrl } from '@/lib/url';
 import { useAuth } from '@/lib/AuthContext';
+import { homeFor } from '@/lib/nav';
 import ErrorNotice from '@/components/ErrorNotice';
-import { RING, FIELD } from '@/lib/ui';
+import AuthLayout from '@/components/AuthLayout';
+import PasswordField from '@/components/PasswordField';
+import { RING } from '@/lib/ui';
 
 // Set a new password with the link from the email. The link works once. The page checks the
 // two passwords before it sends anything so the link is not used up on a typo. When it works the
@@ -16,6 +19,7 @@ export default function ResetPassword() {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [again, setAgain] = useState('');
+  const [shown, setShown] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
 
@@ -36,12 +40,13 @@ export default function ResetPassword() {
       // The link is spent. A failed try keeps it in the address because it is not spent then.
       scrubTokenFromUrl();
       signIn(session);
-      navigate('/');
+      navigate(homeFor(session.user), { replace: true });
     } catch (err) {
       // The server says why a link was refused. The message is shown as it is.
       setError(err);
     } finally {
       setPassword('');
+      setShown(false);
       setAgain('');
       setSending(false);
     }
@@ -49,64 +54,62 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div>
-        <h1 className="font-head text-2xl text-primary">This link is incomplete</h1>
-        <p className="mt-2">Open the link from the email again or ask for a new one.</p>
-        <Link to="/forgot-password" className={`mt-4 inline-flex min-h-touch items-center rounded 
-          bg-primary px-4 font-head font-semibold text-primary-foreground ${RING}`}>
+      <AuthLayout eyebrow="Reset" title="This link is incomplete">
+        <p className="mt-3">Open the link from the email again or ask for a new one.</p>
+        <Link to="/forgot-password" className={`mt-4 inline-flex min-h-button items-center justify-center rounded
+          bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`}>
           Ask for a new link
         </Link>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div>
-      <h1 className="font-head text-2xl text-primary">Set a new password</h1>
-
+    <AuthLayout eyebrow="Reset" title="Choose a new password" intro="After resetting your password, other sessions will be signed out.">
       {error && <ErrorNotice error={error} className="mt-4" />}
 
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded border 
-      border-border bg-surface p-4">
-        <label htmlFor="password" className="block text-sm font-medium">New password</label>
-        <p id="password-hint" className="mt-1 text-sm text-muted-foreground">At least 8 characters.</p>
-        <input
+      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
+        <PasswordField
           id="password"
-          type="password"
+          label="New password"
+          hint="At least 8 characters."
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          aria-describedby="password-hint"
+          shown={shown}
+          toggle={false}
           autoComplete="new-password"
-          className={FIELD}
         />
 
-        <label htmlFor="again" className="mt-4 block text-sm font-medium">Type it again</label>
-        <input
+        <PasswordField
           id="again"
-          type="password"
+          label="Confirm new password"
+          className="mt-4"
           value={again}
           onChange={(e) => setAgain(e.target.value)}
+          shown={shown}
+          onShownChange={setShown}
+          toggleLabel="Show passwords"
+        controls="password again"
           autoComplete="new-password"
-          className={FIELD}
         />
 
         <button
           type="submit"
-          disabled={sending}
-          className={`mt-4 inline-flex min-h-touch items-center rounded px-4 
-            font-head font-semibold text-primary-foreground 
+          aria-disabled={sending || undefined}
+          className={`mt-4 inline-flex min-h-button items-center justify-center rounded px-5
+            font-sans font-semibold text-primary-foreground
             ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
         >
-          {sending ? 'Saving…' : 'Save new password'}
+          {sending ? 'Saving…' : 'Reset password'}
         </button>
       </form>
 
       <p className="mt-4 text-sm">
-        <Link to="/forgot-password" className={`inline-flex min-h-touch items-center 
-          font-semibold text-primary underline ${RING} focus-visible:ring-offset-canvas`}>
-          Need a new link?
+        <Link to="/forgot-password" className={`inline-flex min-h-touch items-center
+          font-semibold text-info underline underline-offset-2 ${RING} focus-visible:ring-offset-canvas`}>
+          Request reset instructions →
         </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }

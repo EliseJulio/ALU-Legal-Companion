@@ -4,9 +4,10 @@ import { apiPost } from '@/lib/api';
 import { scrubTokenFromUrl } from '@/lib/url';
 import { useAuth } from '@/lib/AuthContext';
 import ErrorNotice from '@/components/ErrorNotice';
+import AuthLayout from '@/components/AuthLayout';
 import { RING } from '@/lib/ui';
 
-const BUTTON_LINK = `mt-4 inline-flex min-h-touch items-center rounded bg-primary px-4 font-head font-semibold text-primary-foreground ${RING}`;
+const BUTTON_LINK = `mt-4 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`;
 
 // The link in the email opens this page. The check runs when the page opens because the reader
 // has already clicked the link. A second button would be a second click for the same thing.
@@ -39,39 +40,38 @@ export default function VerifyEmail() {
 
   if (!token) {
     return (
-      <div>
-        <h1 className="font-head text-2xl text-primary">This link is incomplete</h1>
-        <p className="mt-2">Open the link from the email again. If it does not work, 
+      <AuthLayout eyebrow="Verification" title="This link is incomplete">
+        <p className="mt-3">Open the link from the email again. If it does not work,
           ask for a new one on the sign-in page.</p>
         <Link to="/login" className={BUTTON_LINK}>Go to sign in</Link>
-      </div>
+      </AuthLayout>
     );
   }
 
   if (verified) {
     return (
-      <div>
-        <h1 className="font-head text-2xl text-primary">Your address is verified</h1>
-        <p className="mt-2" role="status">Welcome, {verified.name}. You are signed in.</p>
+      <AuthLayout eyebrow="Verification" title="Email confirmed">
+        <p className="mt-3" role="status">
+          Welcome, {verified.name}. You are signed in to your private workspace. This
+          confirmation link cannot be used again.
+        </p>
         <Link to="/" className={BUTTON_LINK}>Go to the home page</Link>
-      </div>
+      </AuthLayout>
     );
   }
 
   if (error) {
     return (
-      <div>
-        <h1 className="font-head text-2xl text-primary">We could not verify your address</h1>
+      <AuthLayout eyebrow="Verification" title="We could not verify your address">
         <ErrorNotice error={error} className="mt-4" />
         <Link to="/login" className={BUTTON_LINK}>Go to sign in</Link>
-      </div>
+      </AuthLayout>
     );
   }
 
   return (
-    <div>
-      <h1 className="font-head text-2xl text-primary">Verifying your address</h1>
-      <p className="mt-2 text-muted-foreground">One moment…</p>
-    </div>
+    <AuthLayout eyebrow="Verification" title="Verifying your address">
+      <p className="mt-3 text-muted-foreground">One moment…</p>
+    </AuthLayout>
   );
 }

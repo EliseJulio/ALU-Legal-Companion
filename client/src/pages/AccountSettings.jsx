@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { signInPath } from '@/lib/url';
 import { apiPost, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/AuthContext';
+import Breadcrumb from '@/components/Breadcrumb';
+import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
+import PasswordField from '@/components/PasswordField';
 import { readableDate } from '@/lib/dates';
 import { FIELD, BUTTON_PRIMARY } from '@/lib/ui';
 
-const PANEL = 'rounded border border-border bg-surface p-4';
+const PANEL = 'rounded-card border border-border bg-surface p-6';
+const LABEL = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
 const ROLE_WORDS = { student: 'Student', staff: 'Staff', legal_expert: 'Legal expert', admin: 'Administrator' };
 
 // Change your own name. The server reads the name and nothing else, so this form cannot be used
@@ -39,13 +44,13 @@ function NameForm({ current }) {
   }
 
   return (
-    <form onSubmit={save} className={`mt-6 ${PANEL}`} aria-labelledby="name-heading">
-      <h2 id="name-heading" className="font-head text-lg font-semibold text-primary">Your name</h2>
+    <form onSubmit={save} className={PANEL} aria-labelledby="name-heading">
+      <h2 id="name-heading" className="font-head text-2xl leading-heading text-primary">Your name</h2>
       <label htmlFor="settings-name" className="mt-2 block text-sm font-medium">Name</label>
       <input id="settings-name" type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={FIELD} />
       {error && <ErrorNotice error={error} className="mt-3" />}
       <div role="status">{done && <p className="mt-3 text-sm">Your name is saved.</p>}</div>
-      <button type="submit" disabled={busy} className={`${BUTTON_PRIMARY} mt-3`}>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
         {busy ? 'Saving…' : 'Save name'}
       </button>
     </form>
@@ -59,6 +64,7 @@ function PasswordForm() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [again, setAgain] = useState('');
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
@@ -90,28 +96,53 @@ function PasswordForm() {
       setCurrent('');
       setNext('');
       setAgain('');
+      setShown(false);
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={save} className={`mt-6 ${PANEL}`} aria-labelledby="password-heading">
-      <h2 id="password-heading" className="font-head text-lg font-semibold text-primary">Change your password</h2>
+    <form onSubmit={save} className={PANEL} aria-labelledby="password-heading">
+      <h2 id="password-heading" className="font-head text-2xl leading-heading text-primary">Change your password</h2>
       <p className="mt-1 text-sm text-muted-foreground">This signs you out everywhere else and keeps you signed in here.</p>
 
-      <label htmlFor="current-password" className="mt-3 block text-sm font-medium">Current password</label>
-      <input id="current-password" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" className={FIELD} />
-
-      <label htmlFor="new-password" className="mt-3 block text-sm font-medium">New password</label>
-      <p id="new-password-hint" className="mt-1 text-sm text-muted-foreground">At least 8 characters.</p>
-      <input id="new-password" type="password" value={next} onChange={(e) => setNext(e.target.value)} aria-describedby="new-password-hint" autoComplete="new-password" className={FIELD} />
-
-      <label htmlFor="again-password" className="mt-3 block text-sm font-medium">Type the new password again</label>
-      <input id="again-password" type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" className={FIELD} />
+      <PasswordField
+        id="current-password"
+        label="Current password"
+        className="mt-3"
+        value={current}
+        onChange={(e) => setCurrent(e.target.value)}
+        shown={shown}
+        toggle={false}
+        autoComplete="current-password"
+      />
+      <PasswordField
+        id="new-password"
+        label="New password"
+        hint="At least 8 characters."
+        className="mt-3"
+        value={next}
+        onChange={(e) => setNext(e.target.value)}
+        shown={shown}
+        toggle={false}
+        autoComplete="new-password"
+      />
+      <PasswordField
+        id="again-password"
+        label="Confirm new password"
+        className="mt-3"
+        value={again}
+        onChange={(e) => setAgain(e.target.value)}
+        shown={shown}
+        onShownChange={setShown}
+        toggleLabel="Show passwords"
+        controls="current-password new-password again-password"
+        autoComplete="new-password"
+      />
 
       {error && <ErrorNotice error={error} className="mt-3" />}
       <div role="status">{done && <p className="mt-3 text-sm">Your password is changed. Other devices are signed out.</p>}</div>
-      <button type="submit" disabled={busy} className={`${BUTTON_PRIMARY} mt-3`}>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
         {busy ? 'Saving…' : 'Change password'}
       </button>
     </form>
@@ -122,14 +153,15 @@ function PasswordForm() {
 // a student number. The platform keeps as little about a person as it can.
 export default function AccountSettings() {
   const { user } = useAuth();
+  const here = useLocation();
   // The account is requested only for a signed-in person. A visitor would get a 401.
   const { data: me, error, loading } = useApi(user ? '/auth/me' : null);
 
   if (!user) {
     return (
       <div className={`mt-6 ${PANEL}`}>
-        <h1 className="font-head text-2xl text-primary">Sign in to manage your account</h1>
-        <Link to="/login" className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
+        <h1 className="font-head text-4xl leading-heading text-primary md:text-5xl">Sign in to manage your account</h1>
+        <Link to={signInPath(here)} className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
       </div>
     );
   }
@@ -138,28 +170,51 @@ export default function AccountSettings() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Your account</h1>
+      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Account settings" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Account settings</h1>
+      <p className="mt-4 max-w-reading text-muted-foreground">Manage your name and password. No extra personal information is collected.</p>
 
       {loading && <p className="mt-4 text-muted-foreground">Loading your account…</p>}
       {error && <ErrorNotice error={error} className="mt-4" />}
 
-      {me && (
-        <section className={`mt-4 ${PANEL}`} aria-labelledby="overview-heading">
-          <h2 id="overview-heading" className="font-head text-lg font-semibold text-primary">Overview</h2>
-          <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-            <dt className="text-muted-foreground">Name</dt>
-            <dd className="font-medium">{me.name}</dd>
-            <dt className="text-muted-foreground">Email</dt>
-            <dd className="font-medium">{me.email} {me.email_verified_at ? '(confirmed)' : '(not confirmed)'}</dd>
-            <dt className="text-muted-foreground">Role</dt>
-            <dd className="font-medium">{ROLE_WORDS[me.role] ?? me.role}</dd>
-            {since && (<><dt className="text-muted-foreground">Member since</dt><dd className="font-medium">{since}</dd></>)}
-          </dl>
-        </section>
-      )}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
+          {me && (
+            <section className={PANEL} aria-labelledby="overview-heading">
+              <h2 id="overview-heading" className="font-head text-2xl leading-heading text-primary">Overview</h2>
+              <dl className="mt-3 space-y-4 text-sm">
+                <div>
+                  <dt className={LABEL}>Name</dt>
+                  <dd className="mt-1 font-medium">{me.name}</dd>
+                </div>
+                <div>
+                  <dt className={LABEL}>Email / confirmation</dt>
+                  <dd className="mt-1 font-medium">{me.email} {me.email_verified_at ? '(confirmed)' : '(not confirmed)'}</dd>
+                </div>
+                <div>
+                  <dt className={LABEL}>Role</dt>
+                  <dd className="mt-1 font-medium">{ROLE_WORDS[me.role] ?? me.role}</dd>
+                </div>
+                {since && (
+                  <div>
+                    <dt className={LABEL}>Member since</dt>
+                    <dd className="mt-1 font-medium">{since}</dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          )}
 
-      <NameForm current={user.name} />
-      <PasswordForm />
+          <Callout title="Your account stays separate from shared matter identity">
+            Free text can still identify you. Share only what you intend to disclose.
+          </Callout>
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          <NameForm current={user.name} />
+          <PasswordForm />
+        </div>
+      </div>
     </div>
   );
 }

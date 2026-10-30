@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { looksLikeEmail } from '@/lib/email';
 import { useAuth } from '@/lib/AuthContext';
+import { homeFor } from '@/lib/nav';
+import { safeNext } from '@/lib/url';
 import ErrorNotice from '@/components/ErrorNotice';
-import { RING, RING_ON_CANVAS, FIELD } from '@/lib/ui';
+import PasswordField from '@/components/PasswordField';
+import Breadcrumb from '@/components/Breadcrumb';
+import { FIELD, BUTTON_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT } from '@/lib/ui';
 
 // The server answers an unknown email and a wrong password with the same 401. This page must
 // not break that. Nothing below depends on why a sign in failed. The server's message is shown
@@ -25,6 +29,7 @@ function blankProblem(email, password) {
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [shown, setShown] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   // The address that a 403 was returned for. A 403 means the account exists and is not
@@ -37,6 +42,7 @@ export default function Login() {
   const [resendError, setResendError] = useState(null);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -55,14 +61,18 @@ export default function Login() {
     setResendError(null);
     setSending(true);
     try {
-      signIn(await apiPost('/auth/login', { email: address, password }));
-      navigate('/');
+      const session = await apiPost('/auth/login', { email: address, password });
+      signIn(session);
+      // Back to the page the person came from, if it is a plain path on this site. Otherwise to
+      // the start page for their role. The address is never trusted as it is.
+      navigate(safeNext(params.get('next')) ?? homeFor(session.user), { replace: true });
     } catch (err) {
       setError(err);
       if (err.status === 403) setUnverified(address);
     } finally {
       // The password does not stay in the page after a try. The email is kept for a retry.
       setPassword('');
+      setShown(false);
       setSending(false);
     }
   }
@@ -84,8 +94,11 @@ export default function Login() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Sign in</h1>
-      <p className="mt-1 text-muted-foreground">
+      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Sign in" />
+      <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-10">
+      <div className="min-w-0">
+      <h1 className="font-head text-4xl leading-heading text-primary md:text-5xl">Sign in</h1>
+      <p className="mt-4 max-w-reading text-muted-foreground">
         For ALU students and staff with an account and for legal experts who have redeemed their
         invite. You do not need an account to read a guide, see the directory or ask a question
         anonymously.
@@ -94,8 +107,8 @@ export default function Login() {
       {error && <ErrorNotice error={error} className="mt-4" />}
 
       {unverified && (
-        <div className="mt-4 rounded border border-border bg-surface p-4">
-          <h2 className="font-head text-base font-semibold text-primary">Need a new link?</h2>
+        <div className="mt-4 rounded-card border border-border bg-surface p-6">
+          <h2 className="font-head text-xl leading-heading text-primary">Need a new link?</h2>
           <p className="mt-2 text-sm">
             We can send another one to {unverified}. A link lasts 24 hours and works once.
           </p>
@@ -103,9 +116,8 @@ export default function Login() {
           <button
             type="button"
             onClick={handleResend}
-            disabled={resending}
-            className={`mt-4 inline-flex min-h-touch items-center rounded border 
-              bg-surface px-4 font-head text-sm font-semibold ${RING} ${resending ? 'border-border text-muted-foreground' : 'border-primary text-primary'}`}
+            aria-disabled={resending || undefined}
+            className={`mt-4 ${resending ? BUTTON_DISABLED : BUTTON_OUTLINE}`}
           >
             {resending ? 'Sending a new link…' : 'Send me a new link'}
           </button>
@@ -116,7 +128,7 @@ export default function Login() {
       )}
 
       {/* noValidate so the page shows its own message and not the browser's bubble. */}
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded border border-border bg-surface p-4">
+      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
         <label htmlFor="email" className="block text-sm font-medium">Email</label>
         <input
           id="email"
@@ -127,22 +139,21 @@ export default function Login() {
           className={FIELD}
         />
 
-        <label htmlFor="password" className="mt-4 block text-sm font-medium">Password</label>
-        <input
+        <PasswordField
           id="password"
-          type="password"
+          label="Password"
+          shown={shown}
+          onShownChange={setShown}
+          className="mt-4"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
-          className={FIELD}
         />
 
         <button
           type="submit"
-          disabled={sending}
-          className={`mt-4 inline-flex min-h-touch items-center rounded px-4 
-            font-head font-semibold text-primary-foreground 
-            ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
+          aria-disabled={sending || undefined}
+          className={`mt-4 ${sending ? BUTTON_DISABLED : BUTTON_PRIMARY}`}
         >
           {sending ? 'Signing you in…' : 'Sign in'}
         </button>
@@ -151,25 +162,38 @@ export default function Login() {
       {/* Always shown. If it appeared only after a failed sign in it would tell a stranger
           something about the account. */}
       <p className="mt-4 text-sm">
-        <Link to="/forgot-password" className={`inline-flex min-h-touch items-center 
-          font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-          Forgot your password?
-        </Link>
+        <Link to="/forgot-password" className={BUTTON_TEXT}>Forgot your password?</Link>
       </p>
       <p className="text-sm">
         No account yet?{' '}
-        <Link to="/register" className={`inline-flex min-h-touch items-center 
-          font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-          Create one with your ALU address
-        </Link>
+        <Link to="/register" className={BUTTON_TEXT}>Create one with your ALU address</Link>
       </p>
       <p className="text-sm text-muted-foreground">
         Invited to join as a legal expert?{' '}
-        <Link to="/redeem-invite" className={`inline-flex min-h-touch items-center 
-          font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-          Redeem your invite
-        </Link>
+        <Link to="/redeem-invite" className={BUTTON_TEXT}>Redeem your invite</Link>
       </p>
+      </div>
+
+      <aside className="self-start rounded-card border border-chrome-raised bg-chrome p-8 text-chrome-foreground" aria-labelledby="record-heading">
+        <h2 id="record-heading" className="font-head text-3xl leading-heading">A record you control.</h2>
+        <p className="mt-4 text-on-chrome">
+          Matters are private by default. You choose whether to share a record with an expert, and
+          you can revoke access immediately.
+        </p>
+        <div className="mt-6 rounded-card bg-surface p-6 text-ink">
+          <h3 className="font-head text-2xl leading-heading text-primary">Just browsing?</h3>
+          <p className="mt-2 text-sm">
+            Where to Go, the Directory, Legal Guides and urgent help remain available without
+            signing in.
+          </p>
+          <div className="mt-2 flex flex-col items-start">
+            <Link to="/" className={BUTTON_TEXT}>Return to public information →</Link>
+            <Link to="/check-request" className={BUTTON_TEXT}>Check an anonymous request with your code →</Link>
+          </div>
+        </div>
+        <p className="mt-6 text-sm text-on-chrome">Expert accounts are invitation-only. There is no expert self-registration.</p>
+      </aside>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { looksLikeEmail } from '@/lib/email';
 import ErrorNotice from '@/components/ErrorNotice';
+import AuthLayout from '@/components/AuthLayout';
+import Callout from '@/components/Callout';
 import { RING, RING_ON_CANVAS, FIELD } from '@/lib/ui';
 
 // Ask for a link to set a new password. The server gives the same answer for every address,
@@ -26,6 +28,7 @@ export default function ForgotPassword() {
       return;
     }
     setError(null);
+    setMessage(null);
     setSending(true);
     try {
       const reply = await apiPost('/auth/forgot-password', { email: address });
@@ -38,18 +41,14 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div>
-      <h1 className="font-head text-2xl text-primary">Forgot your password?</h1>
-      <p className="mt-1 text-muted-foreground">Enter your email and we will 
-        send you a link for setting a new one.</p>
-
+    <AuthLayout eyebrow="Recovery" title="Forgot your password?" intro="If an account exists, reset instructions will be sent.">
       {error && <ErrorNotice error={error} className="mt-4" />}
       <div role="status">
-        {message && <p className="mt-4 rounded border border-border bg-surface p-4">{message}</p>}
+        {message && <Callout title="Check your email" className="mt-4">{message}</Callout>}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded border border-border bg-surface p-4">
-        <label htmlFor="email" className="block text-sm font-medium">Email</label>
+      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
+        <label htmlFor="email" className="block text-sm font-medium">Email address</label>
         <input
           id="email"
           type="email"
@@ -60,20 +59,20 @@ export default function ForgotPassword() {
         />
         <button
           type="submit"
-          disabled={sending}
-          className={`mt-4 inline-flex min-h-touch items-center rounded px-4 font-head 
+          aria-disabled={sending || undefined}
+          className={`mt-4 inline-flex min-h-button items-center justify-center rounded px-5 font-sans
             font-semibold text-primary-foreground ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
         >
-          {sending ? 'Sending…' : 'Send me a link'}
+          {sending ? 'Sending…' : 'Send reset instructions'}
         </button>
       </form>
 
       <p className="mt-4 text-sm">
-        <Link to="/login" className={`inline-flex min-h-touch items-center 
-          font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-          Back to sign in
+        <Link to="/login" className={`inline-flex min-h-touch items-center
+          font-semibold text-info underline underline-offset-2 ${RING_ON_CANVAS}`}>
+          Back to sign in →
         </Link>
       </p>
-    </div>
+    </AuthLayout>
   );
 }
