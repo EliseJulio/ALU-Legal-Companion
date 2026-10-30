@@ -21,3 +21,9 @@ test-results/
 
 # Python bytecode from the scripts
 __pycache__/
+
+# Encrypted documents people attach to their matters
+server/uploads/
+
+.github/
+render.yaml
