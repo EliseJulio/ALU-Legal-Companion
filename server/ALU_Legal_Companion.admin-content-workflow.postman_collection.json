@@ -1,0 +1,49 @@
+{
+  "info": {
+    "name": "ALU Legal Companion — Administrator Content Workflow",
+    "description": "Current content workflow for the approved administrator-direct publishing model. Run only against a development or demo database. Set baseUrl (normally http://localhost:4000/api) and adminToken before running. This collection creates, publishes, reads and withdraws one guide.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000/api" },
+    { "key": "adminToken", "value": "" },
+    { "key": "guideId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health check",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/health" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('health check succeeds', function () { pm.response.to.have.status(200); });"] } }]
+    },
+    {
+      "name": "Create a draft guide as administrator",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"domain\": \"employment\",\n  \"title\": \"Postman administrator workflow guide\",\n  \"situation\": \"A student needs clear employment information.\",\n  \"law_says\": \"Check the cited law before publishing.\",\n  \"your_rights\": \"You can ask for support.\",\n  \"steps\": \"Read the official source and contact the appropriate office.\",\n  \"get_help\": \"Contact the relevant legal support service.\",\n  \"source_law\": \"Official legal source\",\n  \"source_url\": \"https://www.amategeko.gov.rw/\",\n  \"summary\": \"A guide created solely for a development API check.\"\n}" },
+        "url": "{{baseUrl}}/guides"
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('draft is created', function () { pm.response.to.have.status(201); });", "pm.collectionVariables.set('guideId', pm.response.json().id);"] } }]
+    },
+    {
+      "name": "Publish the draft as administrator",
+      "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }], "url": "{{baseUrl}}/guides/{{guideId}}/publish" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('guide is published', function () { pm.response.to.have.status(200); });", "pm.test('published status is returned', function () { pm.expect(pm.response.json().status).to.eql('published'); });"] } }]
+    },
+    {
+      "name": "Read the published guide publicly",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/guides/{{guideId}}" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('published guide is public', function () { pm.response.to.have.status(200); });"] } }]
+    },
+    {
+      "name": "Withdraw the guide as administrator",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }, { "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{ \"comment\": \"Postman development workflow cleanup.\" }" },
+        "url": "{{baseUrl}}/guides/{{guideId}}/withdraw"
+      },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('guide is withdrawn', function () { pm.response.to.have.status(200); });", "pm.test('withdrawn status is returned', function () { pm.expect(pm.response.json().status).to.eql('withdrawn'); });"] } }]
+    }
+  ]
+}

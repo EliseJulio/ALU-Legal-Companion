@@ -15,9 +15,14 @@ import contactRoutes from './routes/contacts.js';
 import bookingRoutes from './routes/bookings.js';
 import matterTrackingRoutes from './routes/matters.js';
 import guideRoutes from './routes/guides.js';
+import checklistRoutes from './routes/checklists.js';
+import matterDocumentRoutes from './routes/matterDocuments.js';
 import questionRoutes from './routes/questions.js';
 import bookmarkRoutes from './routes/bookmarks.js';
 import adminRoutes from './routes/admin.js';
+import searchRoutes from './routes/search.js';
+import swaggerUi from 'swagger-ui-express';
+import { openapi } from './openapi.js';
 
 dotenv.config();
 
@@ -47,6 +52,9 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || '')
   .filter(Boolean);
 
 if (CORS_ORIGINS.length === 0) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('CORS_ORIGINS must be set in production');
+  }
   CORS_ORIGINS.push('http://localhost:5173');
   console.warn('CORS_ORIGINS is not set. Using http://localhost:5173 (the Vite dev server).');
 }
@@ -60,13 +68,19 @@ app.use(cors({
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+// The description of the API. Swagger UI is at /api/docs and the raw file is at /api/openapi.json.
+app.get('/api/openapi.json', (_req, res) => res.json(openapi));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'ALU Legal Companion API' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/directory', directoryRoutes);
 app.use('/api/directory', matterRouteRoutes);
 app.use('/api/emergency-contacts', contactRoutes);
+app.use('/api/search', searchRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/matters/:matterId/documents', matterDocumentRoutes);
 app.use('/api/matters', matterTrackingRoutes);
 app.use('/api/guides', guideRoutes);
+app.use('/api/checklists', checklistRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/questions', questionRoutes);
 // Mounted at /api because it serves /api/bookmarks and /api/guides/:id/bookmark.

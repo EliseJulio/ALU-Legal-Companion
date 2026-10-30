@@ -12,6 +12,7 @@ import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { scheduleReminders, isDateString, addDays, kigaliToday } from '../services/reminders.js';
+import { removeMatterFiles } from '../services/documentStore.js';
 
 const router = Router();
 const OWNERS = ['student', 'staff'];
@@ -69,7 +70,7 @@ router.get('/', requireAuth(...OWNERS), async (req, res) => {
 // When the route has a deadline and the person says when it started running (deadline_start),
 // the due date is worked out here from the checked number of days. It is not typed by the
 // person and not worked out in the browser. The sum that decides when someone loses a right
-// stays in one place next to the rows a legal expert verified.
+// stays in one place next to the rows an admin published.
 router.post('/', requireAuth(...OWNERS), async (req, res) => {
   const b = req.body || {};
   let title = clean(b.title);
@@ -169,6 +170,28 @@ router.delete('/:id/share', requireAuth(...OWNERS), requireIntParam('id'), async
   res.json(ownerView(full.matter));
 });
 
+// POST /api/matters/:id/checklist { checklist_id } : the owner follows a published checklist. Then the
+// matter shows which documents are still missing. Only a published list can be followed. Changing it or
+// stopping it never touches the documents that are already attached.
+router.post('/:id/checklist', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
+  const access = await loadMatter(req.params.id, req.user);
+  if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
+  const checklistId = req.body?.checklist_id;
+  if (!isValidId(checklistId)) return res.status(400).json({ error: 'Choose a checklist' });
+  const [c] = await q(`SELECT id, title FROM document_checklists WHERE id = $1 AND status = 'published'`, [checklistId]);
+  if (!c) return res.status(400).json({ error: 'That checklist is not available' });
+  await q('UPDATE matters SET checklist_id = $1, updated_at = now() WHERE id = $2', [c.id, access.matter.id]);
+  res.json({ checklist_id: c.id, title: c.title });
+});
+
+// DELETE /api/matters/:id/checklist : the owner stops following a checklist. The documents stay.
+router.delete('/:id/checklist', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
+  const access = await loadMatter(req.params.id, req.user);
+  if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
+  await q('UPDATE matters SET checklist_id = NULL, updated_at = now() WHERE id = $1', [access.matter.id]);
+  res.json({ checklist_id: null });
+});
+
 // GET /api/matters/:id: the matter, what has been done on it and its reminders.
 router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id'), async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
@@ -191,6 +214,9 @@ router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id')
     // The expert sees the matter and its history. The expert does not see who shared it.
     delete view.shared_with;
     delete view.shared_at;
+    // One expert never sees the name of another. If the owner shares with a different office later,
+    // the new expert reads the earlier notes as a legal expert and not as the work of a named colleague.
+    for (const e of events) e.author_name = null;
   }
   res.json({ ...view, viewer: access.as, events, reminders });
 });
@@ -247,6 +273,9 @@ router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntPar
 router.delete('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
   if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
+  // The encrypted files go first. Once the matter row is gone the cascade has removed the rows that say
+  // where they are. This is the only place where a matter or its documents are deleted.
+  await removeMatterFiles(access.matter.id);
   await q('DELETE FROM matters WHERE id = $1', [access.matter.id]);
   res.status(204).end();
 });

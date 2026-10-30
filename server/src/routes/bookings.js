@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { newSubmitLimiter, newTokenLookupLimiter } from '../middleware/rateLimit.js';
 import { makeAnonToken, normalizeAnonToken, hashAnonToken } from '../services/anonToken.js';
+import { bookingAccepted } from '../services/notify.js';
 
 const router = Router();
 
@@ -141,6 +142,8 @@ router.post('/:id/status', requireAuth('legal_expert'), requireIntParam('id'), a
        RETURNING ${BOOKING_COLUMNS.replaceAll('b.', '')}`,
       [status, current.id, current.status]);
     if (!booking) return res.status(409).json({ error: 'That booking was just changed. Reload and try again.' });
+    // A signed-in person is told by email with the time and the room. A failed send is logged only.
+    if (status === 'accepted') bookingAccepted(booking.id);
     res.json(booking);
   } catch (err) {
     // The database allows one accepted booking for each provider and time.

@@ -32,7 +32,7 @@ export async function searchRoutes(text = '', area = '') {
   }
   // A route is listed only when the route and the body it sends people to are both published.
   // A checked route that points at an unchecked office would still send someone to a place
-  // nobody has verified.
+  // nobody has checked.
   return q(
     `SELECT r.id, r.matter_type, r.title, r.area, r.deadline_days, r.deadline_runs_from,
             p.id AS first_forum_id, p.name AS first_forum_name, p.type AS first_forum_type,

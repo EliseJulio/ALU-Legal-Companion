@@ -1,0 +1,148 @@
+{
+  "domain": "vehicles",
+  "title": "Buying a Second-Hand Car: Moving It Into Your Name",
+  "situation": "You are buying a second-hand car from someone in Rwanda. The sale is not finished for the authorities until the car is transferred into your name. This guide shows the documents you need, what the transfer costs, where it is done and the steps in order. It also shows where to book a vehicle technical inspection.",
+  "law_says": "The owner of a motor vehicle must effect the ownership transfer when the vehicle is sold or donated (Art. 30(1), Law n° 014/2026 of 06/03/2026 governing road traffic). The registering organ keeps electronic records of the registration and of every transfer (Art. 30(2)). A Ministerial Order sets the procedures for the transfer (Art. 30(3)). This guide could not obtain the text of that Order, so the steps below follow what the Rwanda Revenue Authority (RRA) publishes on its own pages.\n\nRRA's page for this service gives the transfer fee as FRW 60,000 for a car and FRW 30,000 for a motorcycle. It says the fee is paid inside the online request and that the request is cancelled if the fee is not paid.",
+  "your_rights": "RRA requires a notarized sale agreement that states the price and shows the car was paid for in full. You are entitled to ask the seller for that agreement and for the car's latest yellow card (the registration card) before you hand over the money. Art. 30(1) puts the transfer on the owner, so keep your copy of everything until the new registration card is in your hand.",
+  "steps": "1. Agree the sale. Ask the seller to settle any tax they owe. RRA checks this before it approves the transfer.\n2. Go to a private notary with the seller. The agreement must state the price and show it was paid in full. It must give the seller's valid Rwandan ID or passport and the plate and chassis numbers. Both of you sign and date it.\n3. Scan the notarized agreement, both IDs or passports, the car's latest yellow card and the insurance records as clear PDFs. Check the checklist for this matter to see the full list.\n4. Make sure you have a TIN. RRA needs the buyer's TIN in every case.\n5. Log in to RRA e-Tax with the buyer's TIN. Open the motor vehicle ownership transfer request.\n6. Fill in the plate and chassis numbers and the details of the buyer and the seller. Say that the reason is a sale. Choose who will collect the plates and the logbook. Upload your PDFs.\n7. Pay the transfer fee inside the request. If it is not paid the request is cancelled.\n8. An RRA officer checks your documents and the seller's tax position and gives you an appointment.\n9. Go to the appointment at an RRA motor vehicle office. The old plates and the old registration card are handed back on the day. Collect the new plate or registration card and the logbook.\n10. Book a vehicle technical inspection on Irembo, under Vehicle Technical Inspection & Emission Testing. Irembo calls the first booking the 1st visit appointment. This is a separate booking from the transfer. This guide could not confirm whether RRA asks for the inspection as part of a transfer, so ask RRA when you book your appointment.\n11. Take the car to the Rwanda National Police inspection site at Control Technique in Remera on the day you booked. Irembo also offers a 2nd visit appointment.",
+  "get_help": "Rwanda Revenue Authority (RRA): the transfer is requested on RRA e-Tax (etax.rra.gov.rw). RRA's page for this service is linked at the top of this guide.\n\nRwanda National Police: the vehicle technical inspection is booked on Irembo (irembo.gov.rw) and done at the Control Technique site in Remera.\n\nA private notary prepares and notarizes the sale agreement.\n\nIf the seller will not cooperate or you cannot agree on the paperwork, book a lawyer from the Get help page.\n\nThis guide is legal information, not legal advice. Laws change — check the current text or consult a qualified provider for your specific case.",
+  "source_law": "Law n° 014/2026 of 06/03/2026 governing road traffic (Official Gazette Special of 10/03/2026)",
+  "source_url": "https://police.gov.rw/uploads/tx_download/OG_n___Special_of_10.03.2026__Ikoreshwa_ry_umuhanda.pdf",
+  "service": {
+    "portal": {
+      "name": "RRA e-Tax",
+      "url": "https://etax.rra.gov.rw",
+      "help_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+    },
+    "who_can_apply": "The buyer of a second-hand car or motorcycle, with a TIN. The seller's cooperation is needed for the notarized agreement and the yellow card.",
+    "fees": [
+      {
+        "item": "Ownership transfer of a car",
+        "amount_rwf": 60000,
+        "note": "Paid inside the online request. The request is cancelled if it is not paid",
+        "source_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+      },
+      {
+        "item": "Ownership transfer of a motorcycle",
+        "amount_rwf": 30000,
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      }
+    ],
+    "processing": {
+      "text": "RRA does not publish how long a transfer takes. After an officer checks your documents you are given an appointment."
+    },
+    "documents": [
+      {
+        "name": "Notarized sale agreement",
+        "notes": "Signed by seller and buyer. States the price and shows it was paid in full. Gives the seller's valid Rwandan ID or passport, the plate and chassis numbers, both signatures and the date. A sale made abroad needs the Rwandan Embassy and MINAFFET, or an apostille.",
+        "where_to_get": "A private notary",
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      },
+      {
+        "name": "Your ID or passport (copy)",
+        "notes": "Scan it as a clear PDF.",
+        "where_to_get": "NIDA for a Rwandan national ID",
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      },
+      {
+        "name": "The seller's ID or passport (copy)",
+        "notes": "Scan it as a clear PDF.",
+        "where_to_get": "The seller",
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      },
+      {
+        "name": "Your Tax Identification Number (TIN)",
+        "notes": "Needed in every case.",
+        "where_to_get": "RRA",
+        "source_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+      },
+      {
+        "name": "The car's latest yellow card (registration card)",
+        "notes": "The old plates and the registration card are handed back on the day of the transfer.",
+        "where_to_get": "The seller",
+        "source_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+      },
+      {
+        "name": "Motor-vehicle insurance records",
+        "notes": "One year of insurance records for a private car.",
+        "where_to_get": "The insurance company",
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      },
+      {
+        "name": "EBM invoice",
+        "required_if": "the seller is VAT-registered or it is a business sale",
+        "where_to_get": "The seller's EBM system",
+        "source_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+      },
+      {
+        "name": "Company or organisation documents",
+        "required_if": "the buyer or the seller is a company, NGO or cooperative",
+        "notes": "The registration certificate, the board or assembly resolution and the legal representative's appointment letter.",
+        "where_to_get": "RDB, RGB or RCA and the organisation itself",
+        "source_url": "https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf"
+      },
+      {
+        "name": "Notarized power of attorney and the ID of the person collecting",
+        "required_if": "someone else collects the plates and the logbook",
+        "notes": "The ID must match the person named.",
+        "where_to_get": "A notary",
+        "source_url": "https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer"
+      }
+    ],
+    "offices": [
+      {
+        "name": "RRA motor vehicle services, Masaka (Dubai Port World)",
+        "address": "Masaka, Kigali. RRA does not publish a street address.",
+        "source_url": "https://police.gov.rw/media/news-detail/news/motor-vehicle-owners-urged-to-complete-ownership-transfers-before-grace-period-ends/"
+      },
+      {
+        "name": "RRA motor vehicle services, Gikondo (former Customs offices)",
+        "address": "Gikondo, Kigali. RRA does not publish a street address.",
+        "source_url": "https://www.rra.gov.rw/en/details?tx_news_pi1%5Baction%5D=detail&tx_news_pi1%5Bcontroller%5D=News&tx_news_pi1%5Bnews%5D=2869&cHash=dd20323e852a36100bc1987760a78254"
+      },
+      {
+        "name": "RRA ownership-transfer site, Nyamirambo",
+        "address": "Nyamirambo, Kigali. No street address is published.",
+        "source_url": "https://police.gov.rw/media/news-detail/news/motor-vehicle-owners-urged-to-complete-ownership-transfers-before-grace-period-ends/"
+      },
+      {
+        "name": "RRA ownership-transfer site, Canal Olimpia",
+        "address": "Canal Olimpia, Kigali. No street address is published.",
+        "source_url": "https://police.gov.rw/media/news-detail/news/motor-vehicle-owners-urged-to-complete-ownership-transfers-before-grace-period-ends/"
+      },
+      {
+        "name": "Rwanda National Police vehicle inspection site (Control Technique), Remera",
+        "address": "Control Technique, Remera, Kigali. The project author gave this address. It is not yet read off an official page.",
+        "map_url": "https://www.google.com/maps/search/?api=1&query=Control%20Technique%2C%20Remera%2C%20Kigali%2C%20Rwanda"
+      }
+    ],
+    "walkthrough": [
+      { "instruction": "Agree the sale. Ask the seller to settle any tax they owe, because RRA checks this before it approves the transfer." },
+      { "instruction": "Go to a private notary together. Have the agreement notarized with the price, proof of full payment, the seller's ID or passport, the plate and chassis numbers, both signatures and the date." },
+      { "instruction": "Scan the notarized agreement, both IDs or passports, the latest yellow card and the insurance records as clear PDFs." },
+      { "instruction": "Log in to RRA e-Tax with the buyer's TIN and open the motor vehicle ownership transfer request." },
+      { "instruction": "Fill in the plate and chassis numbers and the details of the buyer and the seller. Give the reason as a sale. Choose who collects the plates and the logbook. Upload the PDFs." },
+      { "instruction": "Pay the transfer fee inside the request. An unpaid request is cancelled." },
+      { "instruction": "Wait for the RRA officer to check your documents and give you an appointment." },
+      { "instruction": "Go to the appointment at an RRA motor vehicle office. Hand back the old plates and the old registration card. Collect the new plate or registration card and the logbook." },
+      { "instruction": "Book a vehicle technical inspection on Irembo, under Vehicle Technical Inspection & Emission Testing. Choose Motor Vehicle inspection 1st visit appointment. This is a separate booking from the transfer. Ask RRA whether it needs the inspection for your transfer.", "url_at_step": "https://irembo.gov.rw/user/citizen/service/rnp/motor_vehicle_inspection_appointment" },
+      { "instruction": "Take the car to the Rwanda National Police inspection site at Control Technique in Remera on the day you booked. Irembo also offers a 2nd visit appointment." }
+    ],
+    "unconfirmed": [
+      "Whether the seller must first create a \"Tracking Code\" in e-Tax. A news report says so but RRA's own pages do not mention it.",
+      "How long a transfer takes. RRA publishes no figure.",
+      "How soon after the sale you must transfer and what a late transfer costs. An older RRA page says 8 days and a 2026 report mentions 30 days. RRA also announced extra support for transfers that ran to 30 June 2026.",
+      "The street addresses and opening hours of the RRA motor vehicle offices.",
+      "How a student gets a TIN.",
+      "What a notary charges and what the insurance records cost.",
+      "The exact menu and button names in e-Tax. Those pages need a login.",
+      "The Ministerial Order that sets the transfer procedure under Art. 30(3). Its text was not found.",
+      "Whether the vehicle must still be physically checked as part of the transfer.",
+      "Whether RRA asks for a technical inspection certificate before it approves a transfer.",
+      "The inspection fee, the Irembo inspection deposit and the documents Irembo asks for. Those pages need a login.",
+      "The Irembo link for the inspection booking was given by the project author and has not been opened with a login.",
+      "The address of the Remera inspection site and that the Rwanda National Police run it. Both came from the project author and are not yet read off an official page."
+    ],
+    "checked_at": "2026-10-17"
+  }
+}

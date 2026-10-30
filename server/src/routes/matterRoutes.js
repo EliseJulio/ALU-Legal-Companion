@@ -1,7 +1,7 @@
 // Where to go: for each kind of matter the body that must hear it first, the law that says so,
 // the steps after that and the deadline.
 //
-// This is a lookup against rows a legal expert checked. No language model is used. The body a
+// This is a lookup against rows an admin checked and published. No language model is used. The body a
 // person must go to first and the deadline are facts that somebody checked. They are not text
 // that somebody generated.
 import { Router } from 'express';
@@ -10,16 +10,21 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { searchRoutes } from '../services/routing.js';
 import { PUBLIC_PROVIDER_COLUMNS } from './directory.js';
-import { addReviewSteps } from './reviewSteps.js';
+import { DOMAINS, normalizeDomain } from '../services/domains.js';
+import { recordReview } from './reviewSteps.js';
 
 const router = Router();
 
 const ROUTE_FIELDS = [
   'matter_type', 'title', 'keywords', 'first_forum_id', 'legal_basis', 'exclusions', 'steps',
-  'deadline_days', 'deadline_runs_from', 'deadline_note',
+  'deadline_days', 'deadline_runs_from', 'deadline_note', 'area',
 ];
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : v);
+
+// An empty area means none. Text is lower-cased. Anything else is kept as it is so the check below
+// refuses it. A number or a list must not be turned into "none" without a word.
+const areaFrom = (v) => (typeof v === 'string' ? normalizeDomain(v) || null : (v ?? null));
 
 function stepsFrom(value) {
   if (!Array.isArray(value)) return null;
@@ -44,6 +49,9 @@ function routeError(r) {
   if (hasDays && !(Number.isInteger(Number(r.deadline_days)) && Number(r.deadline_days) > 0)) {
     return 'deadline_days must be a whole number of days greater than zero';
   }
+  if (r.area !== null && r.area !== undefined && !DOMAINS.includes(r.area)) {
+    return `area must be one of: ${DOMAINS.join(', ')}`;
+  }
   return null;
 }
 
@@ -53,9 +61,12 @@ const daysValue = (r) => (r.deadline_days !== null && r.deadline_days !== undefi
 
 // GET /api/directory/routes?q=...
 // Every matter a reader can pick. With q it returns the matters whose wording matches what
-// they typed. The best match comes first.
+// they typed. The best match comes first. With area it keeps one area of law.
 router.get('/routes', async (req, res) => {
-  res.json(await searchRoutes(typeof req.query.q === 'string' ? req.query.q : ''));
+  res.json(await searchRoutes(
+    typeof req.query.q === 'string' ? req.query.q : '',
+    typeof req.query.area === 'string' ? req.query.area : '',
+  ));
 });
 
 // ------------------------------------------------------------------------------ staff
@@ -64,18 +75,14 @@ router.get('/routes', async (req, res) => {
 // of the office so a reviewer can see when a route is ready but its office is not.
 // It must be declared before /routes/:id. That route answers 404 for an id that is not a
 // number and would swallow the word "all".
-router.get('/routes/all', requireAuth('admin', 'legal_expert'), async (_req, res) => {
+router.get('/routes/all', requireAuth('admin'), async (_req, res) => {
   res.json(await q(
     `SELECT r.id, r.matter_type, r.title, r.keywords, r.first_forum_id, r.legal_basis,
-            r.exclusions, r.steps, r.deadline_days, r.deadline_runs_from, r.deadline_note,
-            r.status, r.verified_at, r.updated_at, vu.name AS verified_by_name,
-            p.name AS first_forum_name, p.status AS first_forum_status,
-            (SELECT dr.comment FROM directory_reviews dr
-              WHERE dr.record_type = 'route' AND dr.record_id = r.id
-              ORDER BY dr.id DESC LIMIT 1) AS review_comment
+            r.exclusions, r.steps, r.deadline_days, r.deadline_runs_from, r.deadline_note, r.area,
+            r.status, r.verified_at, r.updated_at,
+            p.name AS first_forum_name, p.status AS first_forum_status
        FROM matter_routes r
        JOIN providers p ON p.id = r.first_forum_id
-       LEFT JOIN users vu ON vu.id = r.verified_by
       ORDER BY r.updated_at DESC, r.id`));
 });
 
@@ -84,16 +91,15 @@ router.get('/routes/:id', requireIntParam('id'), async (req, res) => {
   const [route] = await q(
     `SELECT r.id, r.matter_type, r.title, r.legal_basis, r.exclusions, r.steps,
             r.deadline_days, r.deadline_runs_from, r.deadline_note,
-            r.verified_at, u.name AS verified_by_name, r.first_forum_id
+            r.verified_at, r.first_forum_id
        FROM matter_routes r
-       LEFT JOIN users u ON u.id = r.verified_by
       WHERE r.id = $1 AND r.status = 'published'`,
     [req.params.id],
   );
   if (!route) return res.status(404).json({ error: 'That matter is not in the directory' });
   const [forum] = await q(
     `SELECT ${PUBLIC_PROVIDER_COLUMNS}
-       FROM providers p LEFT JOIN users vu ON vu.id = p.verified_by
+       FROM providers p
       WHERE p.id = $1 AND p.status = 'published'`,
     [route.first_forum_id],
   );
@@ -105,7 +111,7 @@ router.get('/routes/:id', requireIntParam('id'), async (req, res) => {
 
 // ------------------------------------------------------------------------------ admin
 
-// A new route always starts as a draft. Publishing is a legal expert's act.
+// A new route always starts as a draft. Publishing is the admin's act.
 router.post('/routes', requireAuth('admin'), async (req, res) => {
   const b = req.body || {};
   const r = {
@@ -119,6 +125,7 @@ router.post('/routes', requireAuth('admin'), async (req, res) => {
     deadline_days: b.deadline_days ?? null,
     deadline_runs_from: clean(b.deadline_runs_from) || null,
     deadline_note: clean(b.deadline_note) || null,
+    area: areaFrom(b.area),
   };
   const error = routeError(r);
   if (error) return res.status(400).json({ error });
@@ -129,7 +136,7 @@ router.post('/routes', requireAuth('admin'), async (req, res) => {
 
   const [row] = await q(
     `INSERT INTO matter_routes (${ROUTE_FIELDS.join(',')})
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
     ROUTE_FIELDS.map((f) => (f === 'deadline_days' ? daysValue(r) : r[f])),
   );
   delete row.tsv;
@@ -151,6 +158,8 @@ router.put('/routes/:id', requireAuth('admin'), requireIntParam('id'), async (re
     if (merged[f] === '' && f !== 'keywords') merged[f] = null;
   }
   merged.keywords = merged.keywords || '';
+  // Capitals and spaces in an area do not matter, as with the area of a guide.
+  if (typeof merged.area === 'string') merged.area = normalizeDomain(merged.area) || null;
 
   const error = routeError(merged);
   if (error) return res.status(400).json({ error });
@@ -167,14 +176,22 @@ router.put('/routes/:id', requireAuth('admin'), requireIntParam('id'), async (re
   const [row] = await q(
     `UPDATE matter_routes SET matter_type=$1, title=$2, keywords=$3, first_forum_id=$4,
             legal_basis=$5, exclusions=$6, steps=$7, deadline_days=$8, deadline_runs_from=$9,
-            deadline_note=$10, status='draft', verified_by=NULL, verified_at=NULL, updated_at=now()
-      WHERE id=$11 RETURNING *`,
+            deadline_note=$10, area=$11, status='draft', verified_by=NULL, verified_at=NULL, updated_at=now()
+      WHERE id=$12 RETURNING *`,
     [...ROUTE_FIELDS.map((f) => (f === 'deadline_days' ? daysValue(merged) : merged[f])), existing.id],
   );
   delete row.tsv;
   res.json(row);
 });
 
-addReviewSteps(router, { segment: 'routes', table: 'matter_routes', recordType: 'route', noun: 'routes' });
+router.post('/routes/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  const [row] = await q(
+    `UPDATE matter_routes SET status = 'published', verified_by = $1, verified_at = now(), updated_at = now()
+      WHERE id = $2 AND status <> 'published' RETURNING id, status`,
+    [req.user.id, req.params.id]);
+  if (!row) return res.status(400).json({ error: 'That route could not be found or is already published' });
+  await recordReview('route', row.id, req.user.id, 'published');
+  res.json(row);
+});
 
 export default router;

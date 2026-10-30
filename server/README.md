@@ -1,6 +1,6 @@
 # ALU Legal Companion: server
 
-The REST API for the platform. It serves the directory of lawyers, consultants and organisations, the "Where to go" recommendations, consultations, matter tracking with reminders, verified guides, anonymous questions and the staff tools.
+The REST API for the platform. It serves the directory of lawyers, consultants and organisations, the "Where to go" recommendations, consultations, matter tracking with reminders, checked guides, anonymous questions and the staff tools.
 
 - **Runtime:** Node.js 20 or newer, Express 4, ES modules
 - **Database:** PostgreSQL 16 with plain SQL through `pg` (no ORM)
@@ -58,7 +58,7 @@ Check it with `curl http://localhost:4000/api/health`.
 
 These passwords are for local development only. Set `SEED_ADMIN_PASSWORD`, `SEED_EXPERT_PASSWORD` and `SEED_STUDENT_PASSWORD` to use others. Never use the defaults anywhere real.
 
-The seed also adds 9 directory entries, 8 "Where to go" routes, 1 sample guide and 5 crisis contacts. **All of them are queued as `pending_review` and none is published.** The platform says a legal expert checks everything before anyone sees it so the seed does not skip that step. To see the public pages fill up, sign in as the expert and verify the entries.
+The seed adds directory entries, "Where to go" routes, a sample guide and crisis contacts. **The legal-information records begin as drafts and none is published.** To see public pages fill up, sign in as an authorized administrator and publish the entries.
 
 ## Scripts
 
@@ -90,25 +90,37 @@ They go in `server/.env`. The template is `.env.example`.
 
 **Email in development.** With no `SMTP_URL` the server prints verification links, reset links and invitations in its terminal. Copy the link from there. This lets you try every flow with no mail account. The printing code refuses to run when `SMTP_URL` is set, so a live link is never written to a production log.
 
+**Email that says something changed.** A signed-in person gets an email when a lawyer accepts their consultation, with the time and the meeting link. A lawyer gets one when the owner adds, replaces or removes a document on a matter shared with them, and the owner gets one when the lawyer comments on or checks a document. Each says only that something changed and where to look. It never carries a comment, a document name, a matter title or who the owner is. A person who booked anonymously has no address and gets nothing. A burst of uploads sends the lawyer one email in five minutes. A failed send is logged without the address and never fails the request. The code is `src/services/notify.js`.
+
 ## How the code is organised
 
 ```text
 src/
   index.js          starts the server and the reminder scheduler
   app.js            security headers, CORS, JSON errors and the routes
+  openapi.js        the API description that Swagger shows at /api/docs
   db.js             the PostgreSQL connection (dates come back as plain strings)
   migrate.js        applies the migrations
   migrator.js       runs src/migrations/*.sql in order, each file once and all or nothing
   seed.js           the demo data
   run-reminders.js  one reminder pass for a cron job
-  migrations/       001 to 011, one file for each step of the schema
+  migrations/       001 to 025, one file for each step of the schema
   middleware/       auth (login and roles), rate limits, id checks
   routes/           one file for each area
-  services/         mail, one-time tokens, anonymous tokens, invitations, reminders, search
+  services/         mail and email notices, one-time tokens, anonymous tokens, invitations, reminders, search, guides, checklists, encrypted documents
 tests/
   integration/      the API against a real database
   unit/             small pure functions
 ```
+
+## Explore the API
+
+**Swagger.** Start the server and open `http://localhost:4000/api/docs`. It lists every route with who may call it, what it takes and what it returns, and each one can be tried from the page. Choose Authorize and paste the token that `POST /auth/login` gives. The raw description is at `/api/openapi.json`. It is written in `src/openapi.js`. The test `tests/integration/openapi.test.js` fails when a route is added or removed and that file is not updated. The page is public and read only. It holds no data.
+
+**Postman.** Two collections sit next to this file.
+
+- `ALU_Legal_Companion.postman_collection.json` runs every route in an order that builds on itself and checks each answer. Import it with `ALU_Legal_Companion.local.postman_environment.json`, or run it with Newman: `npx newman run ALU_Legal_Companion.postman_collection.json -e ALU_Legal_Companion.local.postman_environment.json`. Run it on a development database only. It creates records named "Postman" and it signs in with the default demo passwords, so seed without `SEED_*_PASSWORD` set. Set `DOCUMENT_KEY` on the server first, or the upload checks say they were skipped.
+- `ALU_Legal_Companion.admin-content-workflow.postman_collection.json` is the short administrator workflow: create, publish and withdraw.
 
 ## The API
 
@@ -118,13 +130,16 @@ All routes are under `/api`. Every error is `{ "error": "message" }`. Login is a
 |---|---|---|
 | Health | `GET /health` | anyone |
 | Accounts | `POST /auth/register` `/verify-email` `/resend-verification` `/login` `/logout` `/forgot-password` `/reset-password` `/change-password` `/redeem-invite`, `GET` and `PUT /auth/me` | see below |
-| Directory | `GET /directory/providers`, staff list at `/providers/all`, `POST` and `PUT /providers`, then `/providers/:id/submit` `/verify` `/return` | public to read, admin to write, expert to verify |
-| Where to go | `GET /directory/routes` (search with `?q=`), `/routes/:id`, staff list at `/routes/all`, `POST` and `PUT /routes`, then `/routes/:id/submit` `/verify` `/return` | same as the directory |
+| Directory | `GET /directory/providers`, staff list at `/providers/all`, `POST` and `PUT /providers`, then `/providers/:id/publish` | public to read; administrator writes and publishes |
+| Where to go | `GET /directory/routes` (search with `?q=`), `/routes/:id`, staff list at `/routes/all`, `POST` and `PUT /routes`, then `/routes/:id/publish` | public to read; administrator writes and publishes |
 | Crisis contacts | `GET /emergency-contacts` | anyone |
+| Search | `GET /search?q=` (add `&library=guides`, `routes` or `providers`) | anyone |
 | Consultations | `POST /bookings`, `POST /bookings/anonymous`, `GET /bookings/mine` `/anon/:token` `/expert`, `POST /bookings/:id/status` | student or staff, anyone, expert |
-| Matters | `GET` and `POST /matters`, `GET` `PUT` `DELETE /matters/:id`, `POST /matters/:id/events`, `GET /matters/share-targets` `/shared`, `POST` and `DELETE /matters/:id/share` | student or staff, expert for shared ones |
-| Guides | `GET /guides` (search with `?search=` and `?domain=`), `/guides/:id`, staff list at `/guides/all`, `POST` and `PUT /guides`, then `/guides/:id/submit` `/verify` `/return` | public to read, admin to write, expert to verify |
+| Matters | `GET` and `POST /matters`, `GET` `PUT` `DELETE /matters/:id`, `POST /matters/:id/events`, `GET /matters/share-targets` `/shared`, `POST` and `DELETE /matters/:id/share`, `POST` and `DELETE /matters/:id/checklist` | student or staff, expert for shared ones |
+| Guides | `GET /guides` (search with `?search=` and `?domain=`), `/guides/:id`, staff list at `/guides/all`, `POST` and `PUT /guides`, then `/guides/:id/publish` or `/guides/:id/withdraw` | public to read; administrator writes, publishes, and withdraws |
 | Saved guides | `GET /bookmarks`, `POST` and `DELETE /guides/:id/bookmark` | student or staff |
+| Checklists | `GET /checklists`, `/checklists/:id`, staff list at `/checklists/all`, `POST` and `PUT /checklists`, then `/checklists/:id/publish` | public to read; administrator writes and publishes |
+| Matter documents | `GET` and `POST /matters/:id/documents`, `GET /documents/checklist`, `GET /documents/:docId/file`, `DELETE /documents/:docId`, `PUT /documents/:docId/review`, `POST /documents/:docId/comments` | the owner; the expert a matter is shared with can read, check and comment |
 | Questions | `POST /questions`, `POST /questions/anonymous`, `GET /questions/mine` `/anon/:token` `/open`, `POST /questions/:id/answer` | student or staff, anyone, expert |
 | Admin | `/admin/invites`, `/admin/users` (role, deactivate, reactivate), `/admin/emergency-contacts`, `GET /admin/stats` | admin only |
 
@@ -132,8 +147,8 @@ All routes are under `/api`. Every error is `{ "error": "message" }`. Login is a
 
 These are the platform's promises. Each one has tests.
 
-1. **Nothing reaches the public until a legal expert verifies it.** Guides, directory entries and routes go from draft to pending review to published. Only an expert publishes. The admin cannot. The database refuses a published row with no verifier.
-2. **Editing a published guide takes it off the site at once.** It comes back only after an expert verifies it again. A mistaken edit is rejected before anything changes.
+1. **Nothing reaches the public until an administrator has checked and published it.** Guides, directory entries and routes go from draft to published. Only an administrator publishes. The database refuses a published row with no publisher.
+2. **Editing a published guide takes it off the site at once.** It comes back only after an administrator publishes it again. A mistaken edit is rejected before anything changes.
 3. **Anonymous means anonymous.** An anonymous question or booking stores no name and no account. It stores a hash of a random token. The person gets the token once. A signed-in person who uses the anonymous route stays anonymous.
 4. **Logging out really logs out.** Each token carries a session number that is checked on every request. Logging out, resetting a password and switching an account off all end the old tokens. A role change works on the next request.
 5. **Matters are private.** Somebody else's matter returns 404, the same as one that does not exist. An expert sees a matter only while the owner shares it. The expert never sees who the owner is.
@@ -160,5 +175,5 @@ node --experimental-vm-modules node_modules/jest/bin/jest.js
 ## Notes
 
 - Do not commit `.env`. Only `.env.example` belongs in git.
-- Accounts are switched off and never deleted. Guides and directory entries keep naming the expert who checked them.
+- Accounts are switched off and never deleted. Guides and directory entries keep the account of the administrator who published them.
 - To add a database change, make the next numbered file in `src/migrations/`. A file runs once. Never edit one that has already been applied.

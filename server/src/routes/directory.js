@@ -1,14 +1,14 @@
 // The directory: lawyers, consultants and organisations that solve legal problems.
 //
-// An entry follows the same steps as a guide.
-//   draft -> pending_review -> published      only a legal expert publishes
-//   published --(admin edits a checked fact)--> draft, stamp cleared
+//   draft -> published      the admin publishes directly
+//   published --(admin edits a checked fact)--> draft
 // A wrong entry sends a person to the wrong office. That is as harmful as a wrong guide.
 import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
-import { addReviewSteps } from './reviewSteps.js';
+import { recordReview } from './reviewSteps.js';
+import { kigaliToday } from '../services/reminders.js';
 
 const router = Router();
 
@@ -25,16 +25,19 @@ export const PROVIDER_TYPES = [
 // The row also holds user_id and a public page must not show which account sits behind an entry.
 export const PUBLIC_PROVIDER_COLUMNS = `
   p.id, p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
-  p.bookable, p.official_source_url, p.last_checked_at, p.verified_at, vu.name AS verified_by_name,
+  p.bookable, p.address, p.hours, p.address_note, p.official_source_url, p.last_checked_at,
+  p.verified_at,
   (p.last_checked_at IS NULL OR p.last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS}) AS stale`;
 
-// The facts an expert checks. Editing one on a published entry sends it back to draft.
+// The facts the admin checks. Editing one on a published entry sends it back to draft.
 // Changing user_id, bookable or meet_link does not. Nobody relying on the directory is misled by that.
 export const PROVIDER_CHECKED_FIELDS = [
   'name', 'category', 'type', 'location', 'contact', 'services', 'languages', 'is_free',
-  'official_source_url',
+  'official_source_url', 'address', 'hours', 'address_note',
 ];
-const OPTIONAL_TEXT = ['location', 'contact', 'services', 'languages', 'official_source_url'];
+const OPTIONAL_TEXT = [
+  'location', 'contact', 'services', 'languages', 'official_source_url', 'address', 'hours', 'address_note',
+];
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : v);
 
@@ -52,7 +55,9 @@ async function providerError(p) {
   }
   if (p.user_id !== null && p.user_id !== undefined) {
     if (!isValidId(p.user_id)) return 'user_id must be the id of a legal expert account';
-    const [expert] = await q("SELECT id FROM users WHERE id = $1 AND role = 'legal_expert'", [p.user_id]);
+    // An active account. The account behind an entry can read every matter shared with it. So it must
+    // be a real legal expert whose account is switched on.
+    const [expert] = await q("SELECT id FROM users WHERE id = $1 AND role = 'legal_expert' AND deactivated_at IS NULL", [p.user_id]);
     if (!expert) return 'user_id must be the id of a legal expert account';
   }
   // The room is shown as a link. A link like javascript:... would run a script when it is
@@ -73,7 +78,7 @@ async function providerError(p) {
 // ------------------------------------------------------------------------------ public
 
 // GET /api/directory/providers: published entries only.
-// Each row has the date it was last checked and who verified it.
+// Each row has the date it was last checked and when an admin published it.
 // Filters: ?category= ?type= ?free=true ?q= (name or place or services)
 router.get('/providers', async (req, res) => {
   const params = [];
@@ -95,7 +100,7 @@ router.get('/providers', async (req, res) => {
   }
   res.json(await q(
     `SELECT ${PUBLIC_PROVIDER_COLUMNS}
-       FROM providers p LEFT JOIN users vu ON vu.id = p.verified_by
+       FROM providers p
       WHERE ${where}
       ORDER BY p.bookable DESC, p.name`,
     params));
@@ -104,29 +109,33 @@ router.get('/providers', async (req, res) => {
 // ------------------------------------------------------------------------------ staff
 
 // GET /api/directory/providers/all: every entry in every state.
-// The admin and the legal expert use it. Only the admin sees user_id. The expert does not
-// need to know which account sits behind an entry to check a phone number.
-// review_comment is the comment on the latest review. It is empty after a verification,
-// so an old return stops showing by itself.
-router.get('/providers/all', requireAuth('admin', 'legal_expert'), async (req, res) => {
+// Only the admin can read it. It also carries user_id, the legal expert account behind an
+// entry. The public list never shows it.
+router.get('/providers/all', requireAuth('admin'), async (req, res) => {
   res.json(await q(
-    `SELECT p.id, CASE WHEN $1::text = 'admin' THEN p.user_id END AS user_id,
-            CASE WHEN $1::text = 'admin' THEN p.meet_link END AS meet_link, p.bookable,
+    `SELECT p.id, p.user_id, p.meet_link, p.bookable,
             p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
+            p.address, p.hours, p.address_note,
             p.official_source_url, p.last_checked_at, p.status, p.verified_at, p.updated_at,
-            vu.name AS verified_by_name,
-            (p.last_checked_at IS NULL OR p.last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS}) AS stale,
-            (SELECT dr.comment FROM directory_reviews dr
-              WHERE dr.record_type = 'provider' AND dr.record_id = p.id
-              ORDER BY dr.id DESC LIMIT 1) AS review_comment
+            (p.last_checked_at IS NULL OR p.last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS}) AS stale
        FROM providers p
-       LEFT JOIN users vu ON vu.id = p.verified_by
-      ORDER BY p.updated_at DESC, p.id`,
-    [req.user.role]));
+      ORDER BY p.updated_at DESC, p.id`));
 });
 
-// POST /api/directory/providers: a new entry always starts as a draft.
-// Publishing is a legal expert's act. It is never a field an admin can send.
+// GET /api/directory/providers/:id : one published listing in full. It must come after /providers/all
+// so that the word "all" is not read as an id. A draft, a submitted entry and an id that does not
+// exist all give the same 404. Nothing is learned about what is unpublished.
+router.get('/providers/:id', requireIntParam('id'), async (req, res) => {
+  const [provider] = await q(
+    `SELECT ${PUBLIC_PROVIDER_COLUMNS}
+       FROM providers p
+      WHERE p.id = $1 AND p.status = 'published'`,
+    [req.params.id]);
+  if (!provider) return res.status(404).json({ error: 'That listing is not in the directory' });
+  res.json(provider);
+});
+
+// POST /api/directory/providers: a new entry always starts as a draft. The admin publishes it once it is checked.
 router.post('/providers', requireAuth('admin'), async (req, res) => {
   const b = req.body || {};
   const p = {
@@ -144,18 +153,18 @@ router.post('/providers', requireAuth('admin'), async (req, res) => {
 
   const [row] = await q(
     `INSERT INTO providers (name, category, type, location, contact, services, languages, is_free,
-                            official_source_url, user_id, bookable, meet_link)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+                            official_source_url, user_id, bookable, meet_link, address, hours, address_note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
     [p.name, p.category, p.type, p.location, p.contact, p.services, p.languages, p.is_free,
-     p.official_source_url, p.user_id, p.bookable, p.meet_link]);
+     p.official_source_url, p.user_id, p.bookable, p.meet_link, p.address, p.hours, p.address_note]);
   res.status(201).json(row);
 });
 
 // PUT /api/directory/providers/:id
 // A key the request did not send keeps its value. A key sent as null is cleared. This is how an
 // admin unlinks an expert account.
-// If a checked fact changed the entry goes back to draft and loses its stamp until an expert
-// checks it again. A change to user_id does not.
+// If a checked fact changed the entry goes back to draft and loses its stamp until the admin
+// publishes it again. A change to user_id does not.
 router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   const [existing] = await q('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Provider not found' });
@@ -179,24 +188,39 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
   const [row] = await q(
     `UPDATE providers SET name=$1, category=$2, type=$3, location=$4, contact=$5, services=$6,
             languages=$7, is_free=$8, official_source_url=$9, user_id=$10, bookable=$11,
-            meet_link=$12, updated_at=now()${resetSql}
-      WHERE id=$13 RETURNING *`,
+            meet_link=$12, address=$13, hours=$14, address_note=$15, updated_at=now()${resetSql}
+      WHERE id=$16 RETURNING *`,
     [merged.name, merged.category, merged.type, merged.location, merged.contact, merged.services,
      merged.languages, merged.is_free, merged.official_source_url, merged.user_id, merged.bookable,
-     merged.meet_link, existing.id]);
+     merged.meet_link, merged.address, merged.hours, merged.address_note, existing.id]);
+
+  // Pointing the entry at a different account or removing the link changes who can read every matter
+  // already shared with it. The owners agreed to share with this office and not with whoever an admin
+  // links to it next. So those shares end here and each owner is told. They can share again.
+  if (String(merged.user_id ?? '') !== String(existing.user_id ?? '')) {
+    await q(
+      `WITH ended AS (
+         UPDATE matters SET shared_with = NULL, shared_at = NULL, updated_at = now()
+          WHERE shared_with = $1 RETURNING id, user_id)
+       INSERT INTO matter_events (matter_id, author_id, occurred_on, description)
+       SELECT id, user_id, $2, $3 FROM ended`,
+      [row.id, kigaliToday(),
+       `Sharing with ${row.name} ended because the contact account of that office was changed. Share again if you still want them to see this.`]);
+  }
   res.json(row);
 });
 
-// ------------------------------------------------------------------------------ the steps
+// ------------------------------------------------------------------------------ publishing
 
-// Verifying an entry also sets last_checked_at. The expert's check against the body's own
-// source is the check that date describes. It is the date in Kigali.
-addReviewSteps(router, {
-  segment: 'providers',
-  table: 'providers',
-  recordType: 'provider',
-  noun: 'directory entries',
-  verifiedSql: ", last_checked_at = (now() AT TIME ZONE 'Africa/Kigali')::date",
+router.post('/providers/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  const [row] = await q(
+    `UPDATE providers SET status = 'published', verified_by = $1, verified_at = now(),
+            last_checked_at = (now() AT TIME ZONE 'Africa/Kigali')::date, updated_at = now()
+      WHERE id = $2 AND status <> 'published' RETURNING id, status`,
+    [req.user.id, req.params.id]);
+  if (!row) return res.status(400).json({ error: 'That entry could not be found or is already published' });
+  await recordReview('provider', row.id, req.user.id, 'published');
+  res.json(row);
 });
 
 export default router;

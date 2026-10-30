@@ -9,17 +9,17 @@ const router = Router();
 const OWNERS = ['student', 'staff'];
 
 // GET /api/bookmarks : the caller's saved guides, newest first.
-// Only published guides are listed. When an admin edits a saved guide it goes back to draft and
-// leaves this list. The save is kept so it comes back once an expert verifies the guide again.
-// Only the card fields are returned. This is a list. The full text of every saved guide
-// would be a large download for text nobody is reading yet.
+// A save is kept even when an admin edits the guide and it goes back to draft — the student still
+// sees the row, now with status 'draft', so a save never looks silently deleted. It reappears as
+// 'published' once an admin publishes the guide again. Only the card fields are returned; the full
+// text of a saved guide would be a large download for text nobody is reading yet, and the text of
+// a draft a student cannot read anyway.
 router.get('/bookmarks', requireAuth(...OWNERS), async (req, res) => {
   res.json(await q(
-    `SELECT g.id, g.domain, g.title, g.source_law, g.verified_at,
-            u.name AS verified_by_name, b.created_at AS bookmarked_at
+    `SELECT g.id, g.domain, g.title, g.status, g.source_law, g.verified_at,
+            b.created_at AS bookmarked_at
        FROM bookmarks b
-       JOIN guides g ON g.id = b.guide_id AND g.status = 'published'
-       LEFT JOIN users u ON u.id = g.verified_by
+       JOIN guides g ON g.id = b.guide_id
       WHERE b.user_id = $1
       ORDER BY b.created_at DESC`,
     [req.user.id]));
@@ -27,7 +27,7 @@ router.get('/bookmarks', requireAuth(...OWNERS), async (req, res) => {
 
 // POST /api/guides/:id/bookmark : save a guide.
 // Only a published guide can be saved. The 404 matches what GET /api/guides/:id says for a
-// draft. A different answer would let a caller find out which guides exist but are not verified.
+// draft. A different answer would let a caller find out which guides exist but are not published.
 // Saving twice is not an error. A person who taps the button twice on a slow connection should
 // not have to read about it.
 router.post('/guides/:id/bookmark', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {

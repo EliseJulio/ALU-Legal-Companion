@@ -1,0 +1,103 @@
+{
+  "domain": "immigration",
+  "title": "Renewing Your Student Residence Permit (Class U1)",
+  "situation": "You are a foreign student in Rwanda with a student residence permit (Class U1) that will soon run out, and you want to stay on to keep studying. This guide shows what the permit is, what to bring, what it costs and how to renew it online, step by step.",
+  "law_says": "A student residence permit is Class U1. It is given to a foreigner in Rwanda for study, it lasts one year and it can be renewed according to your admission (Annex II, Ministerial Order N°06/01 of 29/05/2019).\n\nThe fee set for Class U1 is FRW 20,000 (Annex IV, Ministerial Order N°06/01 of 29/05/2019). DGIE's own student-permit page gives the same amount for both a new permit and a renewal.\n\nIf you are late, you pay a fine that grows with the delay: FRW 50,000 for 6 to 15 days, FRW 70,000 for 16 to 30 days, FRW 100,000 for 31 days to 3 months, FRW 300,000 for 3 to 6 months, FRW 500,000 for 6 to 9 months and FRW 1,000,000 beyond 9 months. You can also be expelled (Art. 58, Ministerial Order N°06/01 of 29/05/2019).\n\nThe parent law is Law N°57/2018 of 13/08/2018 on Immigration and Emigration in Rwanda. This guide names it but does not quote its articles.",
+  "your_rights": "While your permit is valid and you are still admitted to study, the Order allows you to renew it (Annex II). The fee set for Class U1 is FRW 20,000 (Annex IV), so check the amount on DGIE's page before you pay. Applying before your permit runs out is what keeps you clear of the Art. 58 fines.",
+  "steps": "1. Check the expiry date on your permit today and write it down. Apply before it, not on the day.\n2. Ask your university for a recommendation letter. Irembo's form calls it a recommendation letter from employer, and DGIE lists a school letter for a student. Also ask the person sponsoring your studies for a sponsorship letter, which DGIE lists for a student renewal.\n3. Check that your passport is valid for at least 6 more months. Scan your previous permit and the biodata page of your passport as PDFs of up to 500 KB each. Take a photo on a white background as a JPEG of up to 200 KB.\n4. Open the service on Irembo (the button at the top of this guide) and choose Request Type \"Renew permit\".\n5. Fill in your details and travel details, upload your documents and submit.\n6. Pay the fee with the billing number Irembo gives you. It starts with 88.\n7. Wait for DGIE's message, then collect your renewed permit in person at the DGIE office.\n8. Keep your billing number, your payment receipt and a copy of what you submitted until the new permit is in your hand.",
+  "get_help": "Directorate General of Immigration and Emigration (DGIE): permit queries +250 726 790 564, general line +250 788 152 222, call centre 9090, info@migration.gov.rw.\n\nYour university's registrar or student services office can issue the recommendation letter.\n\nIf DGIE refuses your renewal or you are unsure what to do, book a lawyer from the Get help page.\n\nThis guide is legal information, not legal advice. Laws change — check the current text or consult a qualified provider for your specific case.",
+  "source_law": "Ministerial Order N°06/01 of 29/05/2019 relating to Immigration and Emigration (Official Gazette Special of 30/05/2019)",
+  "source_url": "https://migration.gov.rw/fileadmin/user_upload/pdf_files/ministerial_order_relating_to_immigration.pdf",
+  "service": {
+    "portal": {
+      "name": "IremboGov",
+      "url": "https://irembo.gov.rw/user/citizen/service/dgie/request_a_permit",
+      "help_url": "https://support.irembo.gov.rw/en/support/home"
+    },
+    "who_can_apply": "A foreign student in Rwanda who holds a student residence permit (Class U1).",
+    "fees": [
+      {
+        "item": "Student residence permit (Class U1)",
+        "amount_rwf": 20000,
+        "note": "DGIE lists the same fee for a new permit and a renewal",
+        "source_url": "https://migration.gov.rw/our-services/permit/study-research"
+      }
+    ],
+    "processing": {
+      "text": "Irembo says permit renewals take 7 days. It gives no separate time for student permits."
+    },
+    "documents": [
+      {
+        "name": "Copy of your previous permit",
+        "notes": "The first attachment on Irembo's form. A PDF of up to 500 KB.",
+        "where_to_get": "Your current permit",
+        "source_url": "https://irembo.gov.rw/user/citizen/service/dgie/request_a_permit"
+      },
+      {
+        "name": "Copy of your passport biodata page",
+        "notes": "The page with your photo and details. DGIE asks for a passport valid for at least 6 more months. Irembo wants a PDF of up to 500 KB.",
+        "where_to_get": "Your home country's passport office",
+        "source_url": "https://migration.gov.rw/our-services/permit/study-research"
+      },
+      {
+        "name": "Photo with a white background",
+        "notes": "Irembo's form says a JPEG or JPG of up to 200 KB.",
+        "source_url": "https://irembo.gov.rw/user/citizen/service/dgie/request_a_permit"
+      },
+      {
+        "name": "Recommendation letter",
+        "notes": "Irembo's form calls it a recommendation letter from employer. DGIE lists a school recommendation letter for a student renewal. A PDF of up to 500 KB.",
+        "where_to_get": "Your university. DGIE does not say which office.",
+        "source_url": "https://migration.gov.rw/our-services/permit/study-research"
+      },
+      {
+        "name": "Sponsorship letter",
+        "notes": "DGIE lists it for a student renewal. Irembo's list of attachments has no separate place for it, so ask DGIE whether to attach it.",
+        "where_to_get": "The person or body sponsoring your studies. DGIE does not say who must issue it.",
+        "source_url": "https://migration.gov.rw/our-services/permit/study-research"
+      },
+      {
+        "name": "A phone number and/or an email address",
+        "notes": "You enter it when you submit, and Irembo sends your messages there.",
+        "source_url": "https://support.irembo.gov.rw/en/support/solutions/articles/47001210651-how-to-apply-for-a-permit-renewal"
+      }
+    ],
+    "offices": [
+      {
+        "name": "DGIE head office (Directorate General of Immigration and Emigration)",
+        "address": "KG 7 Ave, Kigali",
+        "hours": "Monday to Friday, 8am to 5pm",
+        "phone": "+250 788 152 222",
+        "source_url": "https://www.migration.gov.rw/address"
+      }
+    ],
+    "walkthrough": [
+      { "instruction": "Sign in to Irembo. On the services page, under Immigration And Emigration, choose Permits." },
+      { "instruction": "In the window that opens, open the Request Type list and choose Renew permit." },
+      { "instruction": "Read the summary. Irembo says the processing time is 7 days, that the price depends on the case and that DGIE provides the service. Then click Apply." },
+      { "instruction": "The application has three steps: Application, Summary and Payment. In Applicant Details, fill in your demographic details, your province and your contact details. A red star marks a required field." },
+      { "instruction": "Keep going down the same section. Irembo also asks for your civil status, your father's and mother's names, your country and city of birth and your nationality. Other nationality is the only optional field." },
+      { "instruction": "In Request and Travel Details, choose the permit type and class you want. Then give your current travel document: its type, number, issue date and expiry date. Say whether you have dependents." },
+      { "instruction": "In Attachments, use the plus button beside each item. Irembo lists four: a copy of your previous permit, a photo with a white background, a recommendation letter and a copy of your passport biodata page. The photo must be a JPEG or JPG of up to 200 KB. The other files must be PDFs of up to 500 KB." },
+      { "instruction": "Click Next to go on to the Summary. Save Draft lets you finish later." },
+      { "instruction": "On the Summary, confirm that the information is true, enter your phone number and/or email, tick the verification box and click Submit." },
+      { "instruction": "Pay the fee with the billing number Irembo gives you. It starts with 88. Irembo's own support site lists the payment methods." },
+      { "instruction": "Wait for DGIE's message, then collect your renewed permit in person at the DGIE office." }
+    ],
+    "unconfirmed": [
+      "How many days before your permit expires you should apply. Late applications are fined (see \"What the law says\").",
+      "Whether the Irembo renewal form is different for a student (Class U1) permit. The help article describes the general \"Renew permit\" request.",
+      "Whether a cover letter and supporting certificates must also be uploaded for a student renewal. Irembo's FAQ mentions them, but DGIE's student page does not list them.",
+      "How long a student renewal takes. The 7 days is stated for permit renewals in general.",
+      "Which office at your university issues the recommendation letter, and who must issue the sponsorship letter.",
+      "Whether Irembo or your payment provider adds charges on top of the FRW 20,000.",
+      "DGIE's current address. One DGIE page says KG 7 Ave. An older page said Kacyiru, near the US Embassy. Check before you travel.",
+      "The exact Irembo page. The link goes to Irembo's general \"request a permit\" service, where you choose \"Renew permit\".",
+      "Whether a student must also give a sponsorship letter. Irembo's list of attachments has no place for it.",
+      "Irembo's summary says the price depends on the case, so the amount you pay may differ from the FRW 20,000 in this guide.",
+      "Which permit type and class to choose for a student renewal. Irembo's own support site at support.irembo.gov.rw shows the current screens.",
+      "Irembo changes its pages, so a button or a field may have moved since this guide was written. Check Irembo's own support site for the current layout."
+    ],
+    "checked_at": "2026-10-17"
+  }
+}

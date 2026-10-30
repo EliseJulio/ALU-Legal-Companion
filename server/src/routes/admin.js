@@ -38,8 +38,8 @@ router.post('/invites', requireAuth('admin'), async (req, res) => {
       text: [
         'Hello,',
         '',
-        'You have been invited to join ALU Legal Companion as a legal expert.',
-        'You will check the guides and the directory before they are shown to students.',
+        'You have been invited to join ALU Legal Companion as a legal expert and consultant.',
+        'You will answer questions, hold consultations and check documents that people share with you.',
         'Use this link to choose a name and a password:',
         `${appUrl()}/redeem-invite?token=${encodeURIComponent(raw)}`,
         '',
@@ -103,10 +103,10 @@ router.put('/users/:id/role', requireAuth('admin'), requireIntParam('id'), async
   const { role } = req.body || {};
 
   // legal_expert cannot be given here. Only an invitation gives it. The link proves the person
-  // owns the address before they can verify guides. A drop-down would remove that proof.
+  // owns the address before they can answer questions and hold consultations. A drop-down would remove that proof.
   if (role === 'legal_expert') {
     return res.status(400).json({
-      error: 'Legal experts join by invitation only. Send an invitation instead. The link proves they own the address before they can verify guides.',
+      error: 'Legal experts join by invitation only. Send an invitation instead. The link proves they own the address before they can answer questions and hold consultations.',
     });
   }
   if (!ASSIGNABLE_ROLES.includes(role)) {
