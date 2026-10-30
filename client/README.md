@@ -1,6 +1,6 @@
 # ALU Legal Companion: client
 
-The website of the platform. A student or staff member uses it to find a lawyer, consultant or organisation, to see where a legal matter must go first, to track a matter with reminders and to read verified guides. Legal experts and administrators use it to check and manage that content.
+The website of the platform. A student or staff member uses it to find a lawyer, consultant or organisation, to see where a legal matter must go first, to track a matter with reminders and to read guides an administrator has checked. Legal experts and administrators use it to check and manage that content.
 
 - **Built with:** React 19, Vite, Tailwind CSS, React Router
 - **Tests:** Vitest with Testing Library for the components, Playwright for the browser
@@ -37,7 +37,7 @@ The site finds the API at `http://localhost:4000/api`. To use another address co
 | Anyone | `/` front door, `/where-to-go` and `/where-to-go/:id`, `/directory` and `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/ask` and `/ask/check`, `/emergency` |
 | Accounts | `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`, `/redeem-invite` |
 | Student or staff | `/matters`, `/matters/new`, `/matters/:id`, `/saved`, `/my-activity`, `/settings` |
-| Legal expert | `/expert` review queue, `/expert/directory`, `/expert/questions`, `/expert/bookings`, `/expert/matters` |
+| Legal expert | `/expert/questions`, `/expert/bookings`, `/expert/matters` |
 | Admin | `/admin` dashboard, `/admin/guides`, `/admin/providers`, `/admin/routes`, `/admin/users`, `/admin/invites`, `/admin/contacts` |
 
 A page that a person's role cannot use explains why. It does not redirect and it never signs anyone out. The server is the real gate. The pages only avoid sending a request that the server would refuse.
@@ -51,7 +51,7 @@ src/
   lib/                 api.js (calls to the server), auth.js, AuthContext.jsx, useApi.js,
                        ui.js (shared styles), dates.js, directory.js, bookings.js, email.js, url.js
   components/          the parts that pages share: Header, Footer, ProviderCard, TokenDisplay,
-                       MeetLink, StatusPill, ReviewActions, Field, RequireRole, OwnerOnly and more
+                       MeetLink, StatusPill, Field, RequireRole, OwnerOnly and more
   pages/               one file for each page
 tests/                 the component tests, laid out like src/
   e2e/                 the browser tests and the screenshot script
@@ -64,7 +64,7 @@ These come from the research brief and are checked by tests.
 - **Colours.** ALU navy, ALU red and white with a few tints. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. `tests/lib/tokens.test.js` checks the contrast and that no colour is used with an opacity suffix, which Tailwind would silently drop.
 - **Touch targets.** Every link and button is at least 44 by 44 pixels. The browser tests measure the header.
 - **Focus.** Every control shows a ring when it has keyboard focus. The ring styles live in one file, `src/lib/ui.js`, so they cannot drift apart.
-- **Urgent help.** The SOS link is in the header on every page and comes before the menu in the keyboard order. The urgent numbers are written into the page. They show even when the server is down.
+- **Urgent help.** The emergency numbers link is in the header on every page and comes before the menu in the keyboard order. The urgent numbers are written into the page. They show even when the server is down.
 - **Disclaimer.** "Legal information not legal advice." is in the footer of every page.
 - **Anonymous flows.** A one-time code is shown once and the reader must say they saved it. The code is kept in the page and sent in one request. It is never put in the address bar. The page sends an anonymous request without the login, even for a signed-in person.
 - **No AI.** The site has no assistant and no chatbot. A real legal expert answers every question.
@@ -81,8 +81,8 @@ These come from the research brief and are checked by tests.
 ## Tests
 
 ```bash
-npm test        # 426 tests in 54 files
-npm run e2e     # 44 browser tests in 6 files
+npm test        # 968 tests in 82 files
+npm run e2e     # 193 browser tests in 17 files
 ```
 
 The component tests live in `tests/`. The browser tests live in `tests/e2e/`. They run the real pages in Chromium at 390 pixels wide. The API is replaced in each test by fixed replies from `tests/e2e/support.js`, so no server or database is needed and no test can change real data. The first run starts the dev server by itself.

@@ -22,7 +22,7 @@ Rwanda publishes its laws but ordinary people find them hard to use. A student w
 
 ## The rule that matters most
 
-**Nothing is shown to the public until a legal expert has verified it.** That covers every guide, directory entry and route. An administrator can write and edit but cannot publish. If a published guide is edited it leaves the site at once and comes back only when an expert verifies it again. The database refuses a published row that has no verifier. The platform has no AI. A real person answers every question.
+**Nothing is shown to the public until an authorized administrator has checked and published it.** That covers every guide, directory entry and route. Administrators create, edit, publish and withdraw legal-information content; legal experts provide consultations, appointments and matter support. If a published guide is edited it leaves the site at once and comes back only when an administrator publishes it again. The database refuses a published row that has no publisher. The platform has no AI. A real person answers every question.
 
 ## What it looks like
 
@@ -70,7 +70,7 @@ npm run dev
 
 Check the server with `curl http://localhost:4000/api/health`. The full settings are in [`server/README.md`](server/README.md) and [`client/README.md`](client/README.md).
 
-**The demo data starts hidden.** The seed adds 9 directory entries, 8 routes and 1 guide but marks all of them as waiting for review. That is the platform's own rule at work. Sign in as the expert and verify them. Then the public pages fill up.
+**The demo data starts hidden.** The seed adds directory entries, routes and guides as drafts. Sign in as an administrator and publish the records you want to appear publicly.
 
 ### Demo accounts
 
@@ -86,9 +86,9 @@ These are for local use only. Never use them anywhere real. With no mail setting
 
 | Layer | Tool | Count |
 |---|---|---|
-| API and database | Jest and Supertest against a real database | 550 tests in 31 suites |
-| Pages and components | Vitest and Testing Library | 426 tests in 54 files |
-| Browser at phone width | Playwright with the API replaced by fixed replies | 44 tests in 6 files |
+| API and database | Jest and Supertest against a real database | 778 tests in 43 suites |
+| Pages and components | Vitest and Testing Library | 968 tests in 82 files |
+| Browser at phone width | Playwright with the API replaced by fixed replies | 193 tests in 17 files |
 
 ```bash
 cd server && npm test
@@ -97,11 +97,11 @@ cd client && npm test && npm run e2e
 
 ## Designs
 
-The design is plain language, usable on a phone, accessible by default. The built screens are the design record.
+The design is easy to read, usable on a phone and accessible by default. The built screens are the design record.
 
 - ALU navy and red on white. A colour never carries a meaning alone.
 - Every link and button is at least 44 by 44 pixels. Every control shows a focus ring.
-- The SOS link is on every page and the urgent numbers show even when the server is down.
+- The emergency numbers link is on every page and the urgent numbers show even when the server is down.
 - The disclaimer "Legal information not legal advice." is in every footer.
 
 Figma mockups: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
@@ -130,8 +130,8 @@ First release checklist:
 
 1. Create the database and run `npm run migrate`.
 2. Create the first administrator by running the seed once on a private copy and moving the account or by an insert made by hand. The demo passwords must not exist in production.
-3. Invite the real legal experts from the admin pages and link each to their directory entry.
-4. Have the experts verify the guides, entries and routes. The public pages stay empty until they do.
+3. Invite the real legal experts from the admin pages and link each to their directory entry where appropriate.
+4. Have an authorized administrator check and publish the guides, entries and routes. The public pages stay empty until they do.
 5. Send a test verification email and a test reminder.
 6. Check the urgent help page shows the right numbers.
 
