@@ -5,6 +5,9 @@ import './index.css';
 import App from './App.jsx';
 import { AuthProvider } from '@/lib/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { blockAriaDisabledClicks } from '@/lib/ariaDisabled';
+
+blockAriaDisabledClicks();
 
 // ErrorBoundary is outside everything else. A thrown error in any component then shows a
 // message and not a blank page.
