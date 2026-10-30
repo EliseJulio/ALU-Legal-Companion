@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import Breadcrumb from '@/components/Breadcrumb';
 import { apiPost, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import SubmitForReview from '@/components/SubmitForReview';
@@ -11,6 +13,7 @@ import { PANEL, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
 const BLANK = {
   name: '', category: 'lawyer', type: 'pro_bono_lawyer', location: '', contact: '', services: '', languages: '',
   is_free: true, official_source_url: '', bookable: false, meet_link: '', user_id: '',
+  address: '', hours: '', address_note: '',
 };
 
 // The form starts from the saved entry. With these update rules a blank box means "empty this".
@@ -44,11 +47,11 @@ function ProviderForm({ provider, onDone, onCancel }) {
 
   return (
     <form onSubmit={save} className={`mt-4 ${PANEL}`} aria-label={provider ? 'Edit entry' : 'New entry'}>
-      <h2 className="font-head text-lg font-semibold text-primary">{provider ? `Edit ${provider.name}` : 'New entry'}</h2>
+      <h2 className="font-head text-2xl leading-heading text-primary">{provider ? `Edit ${provider.name}` : 'New entry'}</h2>
       {provider?.status === 'published' && (
         <p className="mt-2 rounded border border-warning-border bg-warning-subtle p-3 text-sm font-semibold text-warning-strong">
-          This entry is published. Changing the name, kind, place, contact, services, languages,
-          cost or source sends it back for review. Changing the account, bookings or video room
+          This entry is published. Changing the name, kind, place, address, hours, contact, services,
+          languages, cost or source sends it back for review. Changing the account, bookings or video room
           does not.
         </p>
       )}
@@ -60,6 +63,17 @@ function ProviderForm({ provider, onDone, onCancel }) {
         {PROVIDER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
       </Field>
       <Field id="p-location" label="Place" className="mt-4" value={values.location} onChange={set('location')} />
+      <Field id="p-address" label="Address" hint="As the body publishes it." className="mt-4" value={values.address} onChange={set('address')} />
+      <Field id="p-hours" label="Opening hours" className="mt-4" value={values.hours} onChange={set('hours')} />
+      <Field
+        id="p-address-note"
+        label="What could not be confirmed about the address"
+        as="textarea"
+        rows={2}
+        className="mt-4"
+        value={values.address_note}
+        onChange={set('address_note')}
+      />
       <Field id="p-contact" label="How to reach it" className="mt-4" value={values.contact} onChange={set('contact')} />
       <Field id="p-services" label="What it does" as="textarea" rows={3} className="mt-4" value={values.services} onChange={set('services')} />
       <Field id="p-languages" label="Languages" className="mt-4" value={values.languages} onChange={set('languages')} />
@@ -67,7 +81,7 @@ function ProviderForm({ provider, onDone, onCancel }) {
       <Field
         id="p-source"
         label="The body’s own page"
-        hint="The expert checks the facts against this."
+        hint="The admin checks the facts against this."
         className="mt-4"
         value={values.official_source_url}
         onChange={set('official_source_url')}
@@ -94,15 +108,15 @@ function ProviderForm({ provider, onDone, onCancel }) {
 
       {error && <ErrorNotice error={error} className="mt-4" />}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="submit" disabled={busy} aria-busy={busy} className={BUTTON_PRIMARY}>{busy ? 'Saving…' : 'Save entry'}</button>
+        <button type="submit" aria-disabled={busy || undefined} aria-busy={busy} className={BUTTON_PRIMARY}>{busy ? 'Saving…' : 'Save entry'}</button>
         <button type="button" className={BUTTON_OUTLINE} onClick={onCancel}>Cancel</button>
       </div>
     </form>
   );
 }
 
-// The directory of lawyers, consultants and organisations. The admin writes the entries and sends
-// them for review. A legal expert verifies them. Only then do they show to students.
+// The directory of lawyers, consultants and organisations. The admin writes and publishes
+// entries directly.
 export default function AdminProviders() {
   const { data: providers, error, loading, refetch } = useApi('/directory/providers/all');
   // null means no form. "new" means a blank form. Otherwise it is the entry being edited.
@@ -115,11 +129,16 @@ export default function AdminProviders() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Manage directory</h1>
-      <p className="mt-1 text-muted-foreground">
-        Lawyers, consultants and organisations. Write an entry and send it for review. It shows
-        to students only after a legal expert has verified it.
+      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Directory entries" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Directory entries</h1>
+      <p className="mt-3 max-w-reading text-muted-foreground">
+        Manage provider information and publish entries directly. An entry shows to students only
+        once it is published.
       </p>
+      <Callout title="Every fact is checked" className="mt-6">
+        Check the source, the contact, the check date and the linked expert account before
+        publishing an entry.
+      </Callout>
       {editing === null && (
         <p className="mt-4"><button type="button" className={BUTTON_PRIMARY} 
         onClick={() => setEditing('new')}>Add an entry</button></p>
@@ -137,11 +156,12 @@ export default function AdminProviders() {
       {loading && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
 
-      <ul className="mt-6 space-y-3">
+      <h2 className="mt-8 font-head text-2xl leading-heading text-primary">Provider records</h2>
+      <ul className="mt-3 space-y-3">
         {providers?.map((p) => (
           <li key={p.id} className={PANEL}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-head font-semibold text-primary">{p.name}</h2>
+              <h3 className="font-head text-xl leading-heading text-primary">{p.name}</h3>
               <StatusPill status={p.status} />
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -152,9 +172,6 @@ export default function AdminProviders() {
             {/* If the account is missing the expert's inbox is empty and nothing reports an
                 error. So it is shown on every row. */}
             <p className="mt-1 text-sm">{p.user_id ? `Account ${p.user_id}` : 'No account linked'}</p>
-            {p.status === 'draft' && p.review_comment && (
-              <p className="mt-1 text-sm font-semibold text-warning-strong">Returned by an expert: {p.review_comment}</p>
-            )}
             <div className="mt-3 flex flex-wrap gap-3">
               <button type="button" className={BUTTON_OUTLINE} onClick={() => setEditing(p)}>Edit</button>
               {p.status === 'draft' && <SubmitForReview path={`/directory/providers/${p.id}`} onDone={refetch} />}

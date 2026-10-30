@@ -1,12 +1,14 @@
 import { useState } from 'react';
+import Breadcrumb from '@/components/Breadcrumb';
 import { apiPost, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/AuthContext';
+import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import Field from '@/components/Field';
 import { readableDate } from '@/lib/dates';
-import { PANEL, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
+import { PANEL, BUTTON_PRIMARY, BUTTON_OUTLINE, BUTTON_DANGER_SOLID } from '@/lib/ui';
 
 const ROLE_WORDS = { student: 'Student', staff: 'Staff', legal_expert: 'Legal expert', admin: 'Administrator' };
 // A legal expert is never in this list. They join by invitation only.
@@ -14,7 +16,7 @@ const CHANGEABLE = ['student', 'staff', 'admin'];
 
 // One person. The admin can change the role of a student, staff member or admin. They can
 // switch an account off or on again. An account is never deleted, because guides and directory
-// entries keep the name of the expert who checked them.
+// entries keep the account of the admin who published them.
 function PersonRow({ person, isMe, onDone }) {
   const [role, setRole] = useState(person.role);
   const [busy, setBusy] = useState(false);
@@ -40,7 +42,7 @@ function PersonRow({ person, isMe, onDone }) {
   return (
     <li className={PANEL}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-head font-semibold text-primary">{person.name}</h2>
+        <h3 className="font-head text-xl leading-heading text-primary">{person.name}</h3>
         <StatusPill status={status} />
       </div>
       <p className="mt-1 text-sm">{person.email}</p>
@@ -63,7 +65,7 @@ function PersonRow({ person, isMe, onDone }) {
           </Field>
           <button
             type="button"
-            disabled={busy || role === person.role}
+            aria-disabled={(busy || role === person.role) || undefined}
             className={BUTTON_PRIMARY}
             onClick={() => act(() => apiPut(`/admin/users/${person.id}/role`, { role }))}
           >
@@ -78,13 +80,13 @@ function PersonRow({ person, isMe, onDone }) {
 
       <div className="mt-3">
         {off ? (
-          <button type="button" disabled={busy} className={BUTTON_OUTLINE} onClick={() => act(() => apiPost(`/admin/users/${person.id}/reactivate`))}>
+          <button type="button" aria-disabled={busy || undefined} className={BUTTON_OUTLINE} onClick={() => act(() => apiPost(`/admin/users/${person.id}/reactivate`))}>
             Switch on again
           </button>
         ) : isMe ? (
           <p className="text-sm text-muted-foreground">You cannot switch off your own account. Ask another administrator.</p>
         ) : (
-          <button type="button" disabled={busy} className={BUTTON_OUTLINE} onClick={() => act(() => apiPost(`/admin/users/${person.id}/deactivate`))}>
+          <button type="button" aria-disabled={busy || undefined} className={BUTTON_DANGER_SOLID} onClick={() => act(() => apiPost(`/admin/users/${person.id}/deactivate`))}>
             Switch off
           </button>
         )}
@@ -104,16 +106,22 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">People</h1>
-      <p className="mt-1 text-muted-foreground">
-        Change a role or switch an account off. A switched-off account cannot sign in and its
-        old sessions stay dead. Legal experts join by invitation only.
+      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="People" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">People</h1>
+      <p className="mt-3 max-w-reading text-muted-foreground">
+        Manage role and account state, not private questions, matter text or activity. A
+        switched-off account cannot sign in and its old sessions stay dead.
       </p>
+      <Callout title="Expert roles cannot be changed" className="mt-6">
+        Experts join by invitation. Switch off an expert account instead of changing its role. You
+        cannot switch off your own account.
+      </Callout>
 
       {loading && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
 
-      <ul className="mt-6 space-y-3">
+      <h2 className="mt-8 font-head text-2xl leading-heading text-primary">Account access</h2>
+      <ul className="mt-3 space-y-3">
         {people?.map((person) => (
           <PersonRow key={person.id} person={person} isMe={person.id === me?.id} onDone={refetch} />
         ))}

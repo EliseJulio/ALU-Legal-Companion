@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import Breadcrumb from '@/components/Breadcrumb';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
 import { PANEL, RING } from '@/lib/ui';
@@ -9,7 +10,7 @@ const REVIEW_WORDS = { draft: 'Draft', pending_review: 'Waiting for review', pub
 function Counts({ title, rows, to }) {
   return (
     <section className={PANEL} aria-label={title}>
-      <h2 className="font-head text-base font-semibold text-primary">
+      <h2 className="font-head text-xl leading-heading text-primary">
         {to ? <Link to={to} className={`underline ${RING}`}>{title}</Link> : title}
       </h2>
       <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-sm">
@@ -33,8 +34,12 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Dashboard</h1>
-      <p className="mt-1 text-muted-foreground">Counts only. Nothing here names a person.</p>
+      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Overview" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Overview</h1>
+      <p className="mt-3 max-w-reading text-muted-foreground">
+        Operational totals and management shortcuts. Counts only. No private questions, case
+        details or individual activity.
+      </p>
 
       {loading && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
@@ -90,6 +95,11 @@ export default function AdminDashboard() {
           />
         </div>
       )}
+
+      <p className="mt-8 max-w-reading border-t border-border pt-4 text-sm text-muted-foreground">
+        Admins write, check and publish content. Editing a published item takes it off the site until it is
+        published again. Invitations control expert onboarding.
+      </p>
     </div>
   );
 }

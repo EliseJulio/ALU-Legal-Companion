@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import Breadcrumb from '@/components/Breadcrumb';
 import { apiPost } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import Field from '@/components/Field';
@@ -39,7 +41,7 @@ function InviteForm({ onSent }) {
   }
 
   return (
-    <form onSubmit={send} className={`mt-4 ${PANEL}`}>
+    <form onSubmit={send} className={`mt-3 ${PANEL}`} aria-labelledby="invite-heading">
       <Field id="invite-email" label="Email address" type="email" 
       autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
       <Field
@@ -55,7 +57,7 @@ function InviteForm({ onSent }) {
       />
       {error && <ErrorNotice error={error} className="mt-4" />}
       <div role="status">{message && <p className="mt-4 text-sm">{message}</p>}</div>
-      <button type="submit" disabled={busy} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-4`}>
+      <button type="submit" aria-disabled={busy || undefined} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-4`}>
         {busy ? 'Sending…' : 'Send the invitation'}
       </button>
     </form>
@@ -67,16 +69,26 @@ export default function AdminInvites() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Invitations</h1>
-      <p className="mt-1 text-muted-foreground">
+      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Invitations" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Invitations</h1>
+      <p className="mt-3 max-w-reading text-muted-foreground">
         Legal experts join by invitation only. The email carries a link that works once. After they
-        join, link their account to their directory entry on Manage directory, using the account
+        join, link their account to their directory entry on Directory entries, using the account
         number shown on People. Until then their appointment inbox stays empty.
       </p>
 
+      <div className="mt-6 grid gap-8 xl:grid-cols-[26rem_minmax(0,1fr)] xl:items-start">
+      <div className="min-w-0">
+      <h2 id="invite-heading" className="font-head text-2xl leading-heading text-primary">New expert invitation</h2>
       <InviteForm onSent={refetch} />
+      <Callout title="Validate the recipient first" className="mt-4">
+        Confirm the expert’s eligibility through the institution’s approved process before you send an
+        invitation.
+      </Callout>
+      </div>
 
-      <h2 className="mt-8 font-head text-lg font-semibold text-primary">Sent invitations</h2>
+      <div className="min-w-0">
+      <h2 className="font-head text-2xl leading-heading text-primary">Sent invitations</h2>
       {loading && <p className="mt-3 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-3" />}
       {invites?.length === 0 && <p className={`mt-3 text-muted-foreground ${PANEL}`}>No invitations have been sent.</p>}
@@ -95,6 +107,8 @@ export default function AdminInvites() {
           </li>
         ))}
       </ul>
+      </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import Breadcrumb from '@/components/Breadcrumb';
 import { apiDelete, apiPost, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import Field from '@/components/Field';
 import { PANEL, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
@@ -38,7 +40,7 @@ function ContactForm({ contact, onDone, onCancel }) {
 
   return (
     <form onSubmit={save} className={`mt-4 ${PANEL}`} aria-label={contact ? 'Edit contact' : 'New contact'}>
-      <h2 className="font-head text-lg font-semibold text-primary">{contact ? `Edit ${contact.name}` : 'New contact'}</h2>
+      <h2 className="font-head text-2xl leading-heading text-primary">{contact ? `Edit ${contact.name}` : 'New contact'}</h2>
       <Field id="c-name" label="Name" className="mt-4" value={values.name} onChange={set('name')} />
       <Field
         id="c-contact"
@@ -64,7 +66,7 @@ function ContactForm({ contact, onDone, onCancel }) {
       {error && <ErrorNotice error={error} className="mt-4" />}
       <div className="mt-4 flex flex-wrap gap-3">
         <button type="submit" 
-        disabled={busy} aria-busy={busy} className={BUTTON_PRIMARY}>
+        aria-disabled={busy || undefined} aria-busy={busy} className={BUTTON_PRIMARY}>
           {busy ? 'Saving…' : 'Save contact'}</button>
         <button type="button" className={BUTTON_OUTLINE} onClick={onCancel}>Cancel</button>
       </div>
@@ -100,10 +102,10 @@ function ContactRow({ contact, onEdit, onDone }) {
       </div>
       {asking && (
         <div className="mt-3" role="group" aria-label={`Delete ${contact.name}`}>
-          <p className="text-sm font-semibold">Delete this contact? It disappears from the urgent help page at once.</p>
+          <p className="text-sm font-semibold">Delete this contact? It disappears from the urgent help page at once. The built-in list stays available if you delete every one.</p>
           <div className="mt-2 flex gap-3">
-            <button type="button" disabled={busy} className={BUTTON_PRIMARY} onClick={remove}>Yes, delete it</button>
-            <button type="button" className={BUTTON_OUTLINE} onClick={() => setAsking(false)}>Keep it</button>
+            <button type="button" aria-disabled={busy || undefined} className={BUTTON_PRIMARY} onClick={remove}>Delete contact record</button>
+            <button type="button" className={BUTTON_OUTLINE} onClick={() => setAsking(false)}>Keep contact</button>
           </div>
         </div>
       )}
@@ -126,11 +128,14 @@ export default function AdminContacts() {
 
   return (
     <div>
-      <h1 className="font-head text-2xl text-primary">Crisis contacts</h1>
-      <p className="mt-1 text-muted-foreground">
-        The numbers shown on the urgent help page. If you delete every one, the page shows a
-        built-in list so it is never empty.
+      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Urgent contacts" />
+      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Urgent contacts</h1>
+      <p className="mt-3 max-w-reading text-muted-foreground">
+        Manage the numbers shown on the urgent help page, and where each one comes from.
       </p>
+      <Callout title="The page is never empty" className="mt-6">
+        If you delete every one, the urgent help page shows a built-in list so it is never empty.
+      </Callout>
       {editing === null && (
         <p className="mt-4"><button type="button" 
         className={BUTTON_PRIMARY} onClick={() => setEditing('new')}
@@ -146,7 +151,7 @@ export default function AdminContacts() {
         />
       )}
 
-      {loading && <p className="mt-6 text-muted-foreground">Loading…</p>}
+      {loading && !contacts && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
       {contacts?.length === 0 && (
         <p className={`mt-6 text-muted-foreground ${PANEL}`}>
