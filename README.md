@@ -18,6 +18,8 @@ Live website: https://alu-legal-companion-qu8w.onrender.com
 
 Live API and its documentation: https://alu-legal-companion.onrender.com/api/docs
 
+Figma designs: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
+
 Demo video: 
 
 ## Why it exists
@@ -90,8 +92,8 @@ These are for local use only. Never use them anywhere real. With no mail setting
 
 | Layer | Tool | Count |
 |---|---|---|
-| API and database | Jest and Supertest against a real database | 778 tests in 43 suites |
-| Pages and components | Vitest and Testing Library | 973 tests in 82 files |
+| API and database | Jest and Supertest against a real database | 788 tests in 44 suites |
+| Pages and components | Vitest and Testing Library | 985 tests in 82 files |
 | Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files |
 
 ```bash

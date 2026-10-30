@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiBlob, apiDelete, apiPost, apiPut, apiUpload } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -84,10 +84,52 @@ function CommentForm({ doc, onSave, busy }) {
   );
 }
 
+// A file the person picks and then sends with a button, the way the lawyer saves a check. Choosing a
+// file sends nothing. That matters most for a replacement because a new file wipes the lawyer's
+// check so it must never happen by a slip of the hand. It is a component at module level so that
+// the chosen file survives a redraw of the page.
+function FilePicker({ id, label, sendLabel, sendName, hint, busy, canSend = true, onSend }) {
+  const [file, setFile] = useState(null);
+  // A new key empties the file box once the file has been sent.
+  const [round, setRound] = useState(0);
+  const ready = Boolean(file) && canSend && !busy;
+  return (
+    <div className="mt-2">
+      <label htmlFor={id} className="block text-sm font-medium">{label}</label>
+      <input
+        key={round}
+        id={id}
+        type="file"
+        accept={ACCEPT}
+        disabled={busy}
+        className={FILE_FIELD}
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        aria-disabled={!ready || undefined}
+        aria-busy={busy || undefined}
+        aria-label={sendName}
+        className={`${BUTTON_PRIMARY} mt-2`}
+        onClick={async () => {
+          if (!ready) return;
+          if (await onSend(file)) { setFile(null); setRound((n) => n + 1); }
+        }}
+      >
+        {sendLabel}
+      </button>
+      {hint && !ready && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
 export default function MatterDocuments({ matter, viewer }) {
   const owner = viewer === 'owner';
   const open = matter.status === 'open';
   const base = `/matters/${matter.id}/documents`;
+  // The owner's matter says who it is shared with. The lawyer is told about a file only when there is one.
+  const shared = Boolean(matter.shared_with);
+  const lawyer = matter.shared_with_name || 'your lawyer';
 
   const checklist = useApi(`${base}/checklist`);
   const docs = useApi(base);
@@ -95,9 +137,13 @@ export default function MatterDocuments({ matter, viewer }) {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [otherLabel, setOtherLabel] = useState('');
   const [chosen, setChosen] = useState('');
+  // What was done is said at the top and takes focus so a person far down the page hears it and sees it.
+  const noticeRef = useRef(null);
+  useEffect(() => { if (notice) noticeRef.current?.focus(); }, [notice]);
 
   const reload = () => { checklist.refetch(); docs.refetch(); };
 
@@ -105,15 +151,30 @@ export default function MatterDocuments({ matter, viewer }) {
   async function act(fn) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try { await fn(); reload(); return true; } catch (err) { setError(err); return false; } finally { setBusy(false); }
   }
 
-  const upload = (file, { label, item, replaces }) => {
-    if (!file) return Promise.resolve();
+  const upload = async (file, { label, item, replaces }) => {
+    if (!file) return false;
     const params = new URLSearchParams({ label: label.slice(0, MAX_LABEL) });
     if (item) params.set('item', item);
     if (replaces) params.set('replaces', String(replaces));
-    return act(() => apiUpload(`${base}?${params}`, file));
+    const ok = await act(() => apiUpload(`${base}?${params}`, file));
+    if (ok) {
+      let text;
+      if (replaces) {
+        text = shared
+          ? `Replaced. ${lawyer} has been told by email and will check the new file again.`
+          : 'Replaced. The new file will be checked once you share this matter with a lawyer.';
+      } else {
+        text = shared
+          ? `Added and sent. ${lawyer} can open it now and has been told by email.`
+          : 'Added. It is saved on your matter. No lawyer can see it until you share this matter with one.';
+      }
+      setNotice({ text });
+    }
+    return ok;
   };
 
   async function download(doc) {
@@ -149,6 +210,8 @@ export default function MatterDocuments({ matter, viewer }) {
   const itemKeys = new Set(items.map((i) => i.key));
   const allDocs = Array.isArray(docs.data) ? docs.data : [];
   const others = allDocs.filter((d) => !d.item_key || !itemKeys.has(d.item_key));
+  // Files nobody has checked yet. The lawyer is shown this number so nothing waits unseen.
+  const waiting = allDocs.filter((d) => d.review?.status === 'pending').length;
 
   // A plain render helper and not a component. A component declared inside render is a new type on
   // every render, so React would mount it again and a note a lawyer had half typed would be lost.
@@ -183,13 +246,16 @@ export default function MatterDocuments({ matter, viewer }) {
         </div>
       )}
       {owner && open && (
-        <div className="mt-2">
-          <label htmlFor={`replace-${doc.id}`} className="block text-sm">
-            Replace this file<span className="sr-only"> for {doc.label}</span> (a new file is checked again)
-          </label>
-          <input id={`replace-${doc.id}`} type="file" accept={ACCEPT} disabled={busy} className={FILE_FIELD}
-            onChange={(e) => { upload(e.target.files?.[0], { label: doc.label, replaces: doc.id }); e.target.value = ''; }} />
-        </div>
+        <FilePicker
+          key={`replace-${doc.id}`}
+          id={`replace-${doc.id}`}
+          label={<>Replace this file<span className="sr-only"> for {doc.label}</span> (a new file is checked again)</>}
+          sendLabel="Replace file"
+          sendName={`Replace ${doc.label}`}
+          hint="Choose the new file, then press the button. Nothing is replaced before that. The lawyer's check of the old file is cleared."
+          busy={busy}
+          onSend={(file) => upload(file, { label: doc.label, replaces: doc.id })}
+        />
       )}
       {owner && (removing === doc.id ? (
         <div role="group" aria-label={`Remove ${doc.label}`} className="mt-2">
@@ -218,6 +284,29 @@ export default function MatterDocuments({ matter, viewer }) {
           ? 'Documents are stored encrypted. Only you and the legal expert you share this matter with can open them. You can delete any of them at any time.'
           : 'These are the documents the owner has shared with you. Open each one and then record your check. You can also leave a comment on any document.'}
       </p>
+
+      {owner && (
+        <p className={NOTE}>
+          {shared
+            ? <>Shared with <span className="font-semibold">{lawyer}</span>. They can open every document here and are told by email when you add, replace or remove one.</>
+            : 'This matter is not shared with a lawyer yet, so no lawyer can see these documents. Share the matter with one to send them.'}
+        </p>
+      )}
+      {owner && shared && waiting > 0 && (
+        <p className="mt-2 text-sm">
+          Waiting for {lawyer}’s check: <span className="font-semibold">{waiting}</span>
+        </p>
+      )}
+      {!owner && waiting > 0 && (
+        <p role="status" className="mt-2 text-sm font-semibold">
+          {waiting === 1 ? '1 document is waiting for your check.' : `${waiting} documents are waiting for your check.`}
+        </p>
+      )}
+      {notice && (
+        <p ref={noticeRef} tabIndex={-1} role="status" className={`${NOTE} font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
+          {notice.text}
+        </p>
+      )}
 
       {owner && !list.checklist && (
         <div className="mt-3">
@@ -285,11 +374,15 @@ export default function MatterDocuments({ matter, viewer }) {
               )}
               {item.document && renderFile(item.document, item.name)}
               {!item.document && owner && open && (
-                <div className="mt-2">
-                  <label htmlFor={`upload-${item.key}`} className="block text-sm font-medium">Upload the document for {item.name}</label>
-                  <input id={`upload-${item.key}`} type="file" accept={ACCEPT} disabled={busy} className={FILE_FIELD}
-                    onChange={(e) => { upload(e.target.files?.[0], { label: item.name, item: item.key }); e.target.value = ''; }} />
-                </div>
+                <FilePicker
+                  id={`upload-${item.key}`}
+                  label={`Upload the document for ${item.name}`}
+                  sendLabel={shared ? 'Upload and send to my lawyer' : 'Upload'}
+                  sendName={`${shared ? 'Upload and send to my lawyer' : 'Upload'} for ${item.name}`}
+                  hint="Choose the file, then press the button. Nothing is sent before that."
+                  busy={busy}
+                  onSend={(file) => upload(file, { label: item.name, item: item.key })}
+                />
               )}
             </li>
           ))}
@@ -322,15 +415,21 @@ export default function MatterDocuments({ matter, viewer }) {
           <h3 className="font-head text-xl leading-heading text-primary">Add another document</h3>
           <label htmlFor="other-label" className="mt-2 block text-sm font-medium">What is it? (for example, Rental agreement)</label>
           <input id="other-label" type="text" maxLength={MAX_LABEL} value={otherLabel} onChange={(e) => setOtherLabel(e.target.value)} className={FIELD} />
-          <label htmlFor="other-file" className="mt-2 block text-sm font-medium">Choose the file (PDF, PNG or JPEG, up to 10 MB)</label>
-          <input id="other-file" type="file" accept={ACCEPT} disabled={busy || !otherLabel.trim()} className={FILE_FIELD}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              await upload(file, { label: otherLabel.trim() });
-              setOtherLabel('');
-            }} />
-          {!otherLabel.trim() && <p className="mt-1 text-xs text-muted-foreground">Say what it is first and then choose the file.</p>}
+          <FilePicker
+            id="other-file"
+            label="Choose the file (PDF, PNG or JPEG, up to 10 MB)"
+            sendLabel={shared ? 'Add and send to my lawyer' : 'Add document'}
+            hint={otherLabel.trim()
+              ? 'Choose the file, then press the button. Nothing is sent before that.'
+              : 'Say what it is, choose the file, then press the button. Nothing is sent before that.'}
+            canSend={Boolean(otherLabel.trim())}
+            busy={busy}
+            onSend={async (file) => {
+              const ok = await upload(file, { label: otherLabel.trim() });
+              if (ok) setOtherLabel('');
+              return ok;
+            }}
+          />
         </div>
       )}
       {owner && !open && (
