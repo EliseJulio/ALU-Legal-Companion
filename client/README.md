@@ -82,7 +82,7 @@ These come from the research brief and are checked by tests.
 
 ```bash
 npm test        # 968 tests in 82 files
-npm run e2e     # 193 browser tests in 17 files
+npm run e2e     # 197 browser tests in 17 files
 ```
 
 The component tests live in `tests/`. The browser tests live in `tests/e2e/`. They run the real pages in Chromium at 390 pixels wide. The API is replaced in each test by fixed replies from `tests/e2e/support.js`, so no server or database is needed and no test can change real data. The first run starts the dev server by itself.

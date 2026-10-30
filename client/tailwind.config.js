@@ -56,7 +56,7 @@ export default {
       minWidth: { touch: '44px' },
       // Page widths from the design. Content is 1200 wide inside 48px side padding.
       maxWidth: { content: '81rem', reading: '45rem', form: '40rem' },
-      width: { sidebar: '15.75rem', rail: '5.5rem', pathway: '28.75rem', route: '26.25rem' },
+      width: { sidebar: '15.75rem', rail: '6.5rem', pathway: '28.75rem', route: '26.25rem' },
       // The big heading on the front page is 68 px. Headings use a tighter line height.
       fontSize: { display: ['4.25rem', { lineHeight: '1.17' }] },
       lineHeight: { heading: '1.17' },
