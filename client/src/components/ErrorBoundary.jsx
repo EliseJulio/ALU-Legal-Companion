@@ -35,7 +35,7 @@ export default class ErrorBoundary extends Component {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-4 inline-flex min-h-touch items-center rounded bg-primary px-4 font-head font-semibold text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-strong focus-visible:ring-offset-2"
+              className="mt-4 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
             >
               Reload the page
             </button>

@@ -34,11 +34,12 @@ export function readableDays(days) {
   return n === 1 ? '1 day' : `${n} days`;
 }
 
-// The five areas of law the guides cover. The database and the server have the same list.
+// The six areas of law the guides cover. The database and the server have the same list.
 export const DOMAINS = [
   { value: 'tenancy', label: 'Renting' },
   { value: 'employment', label: 'Work' },
   { value: 'business', label: 'Business' },
   { value: 'immigration', label: 'Immigration' },
   { value: 'harassment', label: 'Harassment' },
+  { value: 'vehicles', label: 'Cars and driving' },
 ];

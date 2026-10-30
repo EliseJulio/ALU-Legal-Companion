@@ -1,4 +1,5 @@
-import { RING } from '@/lib/ui';
+import { useId } from 'react';
+import { RING, BUTTON_DISABLED } from '@/lib/ui';
 import { secureAddress } from '@/lib/url';
 
 // How a confirmed appointment happens. The server sends `meet_link` only for an accepted
@@ -6,6 +7,7 @@ import { secureAddress } from '@/lib/url';
 // where the booking is accepted and the lawyer set up no room. Saying nothing there would leave
 // a confirmed appointment that nobody can attend.
 export default function MeetLink({ booking, className = '' }) {
+  const why = useId();
   if (!booking || booking.status !== 'accepted') return null;
 
   // The server only saves a Google Meet address. The page checks again before it makes a link.
@@ -17,7 +19,9 @@ export default function MeetLink({ booking, className = '' }) {
     return (
       <div className={`rounded border border-warning-border bg-warning-subtle p-4 ${className}`}>
         <p className="font-medium text-warning-strong">No video room has been set up for this appointment yet.</p>
-        <p className="mt-1 text-sm">
+        {/* Off, and still reachable by keyboard, so the reason below is heard with it. */}
+        <button type="button" aria-disabled="true" aria-describedby={why} className={`${BUTTON_DISABLED} mt-3`}>Join consultation</button>
+        <p id={why} className="mt-2 text-sm">
           The time is confirmed but the lawyer has not added a meeting link. Check again shortly
           before the appointment. If there is still nothing, use the contact details in the
           directory.
@@ -33,9 +37,9 @@ export default function MeetLink({ booking, className = '' }) {
         href={room}
         target="_blank"
         rel="noopener noreferrer"
-        className={`mt-2 inline-flex min-h-touch items-center rounded bg-primary px-4 font-head font-semibold text-primary-foreground ${RING}`}
+        className={`mt-2 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`}
       >
-        Join the video call ↗
+        <span>Join the video call<span aria-hidden="true">&nbsp;↗</span>{' '}<span className="sr-only">(opens in a new tab)</span></span>
       </a>
       {/* The full address is shown too. Someone joining from another device needs to copy it. */}
       <p className="mt-3 break-all font-mono text-xs text-muted-foreground">{room}</p>

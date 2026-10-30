@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- Sets the chosen theme before the page paints so there is no flash. Blocked storage is ignored. -->
+    <script>
+      try {
+        var theme = localStorage.getItem('alc.theme');
+        if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme);
+      } catch (error) {}
+    </script>
     <meta
       name="description"
       content="Find the right legal help in Rwanda: lawyers, consultants and organisations 

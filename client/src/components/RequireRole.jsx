@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { signInPath } from '@/lib/url';
 import { useAuth } from '@/lib/AuthContext';
 import { hasRole } from '@/lib/auth';
 import { PANEL, BUTTON_PRIMARY } from '@/lib/ui';
@@ -8,6 +9,7 @@ import { PANEL, BUTTON_PRIMARY } from '@/lib/ui';
 // real gate and refuses the same people.
 export default function RequireRole({ roles, children }) {
   const { user } = useAuth();
+  const here = useLocation();
 
   if (!user) {
     return (
@@ -17,7 +19,7 @@ export default function RequireRole({ roles, children }) {
         <p className="mt-1 text-sm text-muted-foreground">
           This is a staff workspace. The guides and the directory are open to everyone without an account.
         </p>
-        <Link to="/login" className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
+        <Link to={signInPath(here)} className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
       </div>
     );
   }

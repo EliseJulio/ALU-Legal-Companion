@@ -1,0 +1,18 @@
+# Disallow private user workspaces and admin/expert portals from indexing
+User-agent: *
+Disallow: /admin/
+Disallow: /expert/
+Disallow: /matters/
+Disallow: /settings/
+Disallow: /my-activity/
+Disallow: /saved/
+Disallow: /login
+Disallow: /register
+Disallow: /reset-password
+
+# Allow public informational legal resources
+Allow: /
+Allow: /guides/
+Allow: /where-to-go/
+Allow: /directory/
+Allow: /emergency

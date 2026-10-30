@@ -10,6 +10,7 @@ const PHRASES = {
   draft: 'Draft',
   pending_review: 'Pending review',
   published: 'Published',
+  withdrawn: 'Withdrawn',
   // accounts
   active: 'Active',
   deactivated: 'Switched off',
@@ -18,11 +19,20 @@ const PHRASES = {
   pending: 'Waiting',
   used: 'Used',
   expired: 'Expired',
+  // anonymous questions
+  answered: 'Answered',
+  awaiting_response: 'Awaiting response',
   // bookings
   requested: 'Requested',
   accepted: 'Accepted',
   declined: 'Declined',
   completed: 'Completed',
+  // documents on a matter. The plain word pending is already used for invitations.
+  missing: 'Missing',
+  awaiting_check: 'Awaiting check',
+  complete: 'Complete',
+  needs_fix: 'Needs fixing',
+  out_of_date: 'Out of date',
 };
 
 export default function StatusPill({ status }) {
@@ -32,9 +42,9 @@ export default function StatusPill({ status }) {
   const phrase = PHRASES[String(status).toLowerCase()] ?? status;
 
   return (
-    <span className="inline-flex items-center rounded-full border border-border bg-canvas 
+    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-border bg-canvas
     px-3 py-1 text-xs font-semibold text-ink">
-      {phrase}
+      <span className="sr-only">Status: </span>{phrase}
     </span>
   );
 }

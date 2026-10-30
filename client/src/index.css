@@ -1,55 +1,179 @@
+/* Two text fonts only. Lora and Inter are variable fonts. One file for each covers all weights used. */
 @font-face {
-  font-family: 'Montserrat';
-  src: url('/fonts/montserrat-600.woff2') format('woff2');
-  font-weight: 600;
+  font-family: 'Lora';
+  src: url('/fonts/lora-latin-var.woff2') format('woff2');
+  font-weight: 400 700;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Montserrat';
-  src: url('/fonts/montserrat-700.woff2') format('woff2');
-  font-weight: 700;
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin-var.woff2') format('woff2');
+  font-weight: 400 600;
   font-display: swap;
+}
+/* The icons. Only the glyphs the app uses are in this file. It is served from this site. */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  src: url('/fonts/material-symbols-subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
 }
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Design tokens. The palette is navy, red and white, taken from alueducation.com.
-   The contrast numbers were computed. Work them out again before changing a value.
-   Hard rule: red never sits on a navy surface. #d00d2d on #002e6d is 2.34:1 and fails. */
+/* A button that is busy or not ready is aria-disabled so it keeps keyboard focus. This draws it
+   the way a disabled button looks. lib/ariaDisabled.js stops its click. */
+button[aria-disabled='true'] {
+  background-color: var(--disabled);
+  border-color: var(--disabled);
+  color: var(--primary-foreground);
+  cursor: not-allowed;
+}
+
+/* An icon is a box one letter wide. If the font fails the name is clipped and never shows. */
+@layer components {
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: 400;
+    font-style: normal;
+    font-size: 1.25rem;
+    /* Important on purpose. A size class such as text-xl also sets a taller line height. The
+       glyph then sits low in a box one em high and its bottom is cut off by overflow hidden. */
+    line-height: 1 !important;
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    flex-shrink: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    letter-spacing: normal;
+    text-transform: none;
+    direction: ltr;
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+}
+
+/* Headings are Lora at regular weight. This beats any font-semibold left on a heading. */
+h1.font-head, h2.font-head, h3.font-head, h4.font-head {
+  font-weight: 400;
+}
+
+/* Design tokens. This file is the only place a colour is written. Every other file uses a
+   token. Contrast ratios are measured. Work them out again before changing a value.
+   Hard rule: crimson never sits on a navy surface (#a52d40 on #132c43 is 2.08:1 and fails).
+   The light theme is first. The dark theme follows the device unless a person chose one. */
 :root {
-  --primary: #002e6d;          /* 13.03:1 on white */
-  --primary-strong: #012b62;   /* 13.79:1 on white. Used for hover and the focus ring */
-  --primary-subtle: #e8f0fc;   /* citation chips. Primary on it is 11.36:1 */
+  --primary: #132c43;          /* 14.30:1 on white. Buttons and headings */
+  --primary-strong: #1c374f;   /* 12.29:1 on white. Hover */
+  --primary-subtle: #e9f0f5;   /* tinted bands and chips */
   --primary-foreground: #ffffff;
 
-  --ink: #333333;              /* 12.63:1 on white */
-  --muted-foreground: #656565; /* 5.83:1 on white */
-  /* The same value as muted-foreground by coincidence. It is its own token so that
-     changing the disabled colour never changes the colour of body text. */
-  --disabled: #656565;
+  --ink: #213547;              /* 12.61:1 on white. Body text */
+  --muted-foreground: #586672; /* 5.90:1 on white. 5.41:1 on the page grey */
+  /* Disabled controls. Its own token so that muted body text never changes with it. */
+  --disabled: #586672;
 
-  --canvas: #f7f8fa;
-  --surface: #ffffff;
+  --canvas: #f7f5ef;           /* the page */
+  --surface: #ffffff;          /* cards and fields */
 
-  --border: #dfe3e8;           /* 1.29:1. Decorative lines only */
-  --border-input: #7d8794;     /* 3.64:1. Borders of form controls need 3:1 */
+  --border: #d5dad9;           /* decorative lines only */
+  --border-input: #7e8c96;     /* field borders. 3:1 or more on the page and on white */
 
-  /* Warning means "read this carefully": the SOS link, the crisis block and token warnings.
-     It is always outlined and never filled, so asking for help does not look like an error. */
-  --warning: #d00d2d;          /* 5.56:1 on white */
-  --warning-subtle: #fdecee;
-  --warning-border: #f4b8c0;
-  --warning-strong: #a00a22;   /* 7.19:1 on warning-subtle */
+  /* Crimson means "read this carefully". The emergency link is a pale pill with crimson text.
+     Alerts are outlined and never filled so asking for help does not look like an error. */
+  --warning: #a52d40;          /* 6.89:1 on white */
+  --warning-subtle: #f8ecee;
+  --warning-border: #ffd2d8;
+  --warning-strong: #a52d40;
+
+  /* The emergency link. A pale pill with crimson text. It stays pale in the dark theme. */
+  --pill: #ffd2d8;
+  --pill-foreground: #a52d40;  /* 5.07:1 on the pill */
+
+  --info: #345f83;             /* text links and info bars. 6.75:1 on white */
+  --success: #276449;          /* success messages only. 6.99:1 on white */
+  --focus: #397db2;            /* the keyboard focus ring on light surfaces */
+  --badge: #ede9df;            /* the draft badge */
+
+  /* The side navigation, the phone bar, the footer and the home page card. */
+  --chrome: #132c43;
+  --chrome-raised: #1c374f;
+  --chrome-foreground: #ffffff;
+  --on-chrome-muted: #c2d0da;  /* 9.07:1 on the chrome */
 
   --radius: 4px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --primary: #9cc3e8;
+    --primary-strong: #b9d5ee;
+    --primary-subtle: #1a3248;
+    --primary-foreground: #0b1621;
+    --ink: #e6edf3;
+    --muted-foreground: #a9bccb;
+    --disabled: #8da0b0;
+    --canvas: #0b1621;
+    --surface: #112638;
+    --border: #2c4660;
+    --border-input: #7f93a5;
+    --warning: #ff8fa0;
+    --warning-subtle: #3a1a22;
+    --warning-border: #6b2a39;
+    --pill: #ffd2d8;
+    --pill-foreground: #8c1f33;
+    --warning-strong: #ffb3be;
+    --info: #8fb8dd;
+    --success: #7fd1a4;
+    --focus: #6fb0e8;
+    --badge: #1c374f;
+    --chrome: #0a1722;
+    --chrome-raised: #1c374f;
+    --chrome-foreground: #ffffff;
+    --on-chrome-muted: #a9bccb;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --primary: #9cc3e8;
+  --primary-strong: #b9d5ee;
+  --primary-subtle: #1a3248;
+  --primary-foreground: #0b1621;
+  --ink: #e6edf3;
+  --muted-foreground: #a9bccb;
+  --disabled: #8da0b0;
+  --canvas: #0b1621;
+  --surface: #112638;
+  --border: #2c4660;
+  --border-input: #7f93a5;
+  --warning: #ff8fa0;
+  --warning-subtle: #3a1a22;
+  --warning-border: #6b2a39;
+  --pill: #ffd2d8;
+  --pill-foreground: #8c1f33;
+  --warning-strong: #ffb3be;
+  --info: #8fb8dd;
+  --success: #7fd1a4;
+  --focus: #6fb0e8;
+  --badge: #1c374f;
+  --chrome: #0a1722;
+  --chrome-raised: #1c374f;
+  --chrome-foreground: #ffffff;
+  --on-chrome-muted: #a9bccb;
+  color-scheme: dark;
 }
 
 body {
   background-color: var(--canvas);
   color: var(--ink);
-  font-family: -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 @media (prefers-reduced-motion: reduce) {

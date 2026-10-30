@@ -16,7 +16,8 @@ export default function Field({ id, label, hint, as = 'input', className = '', c
 }
 
 // A tick box with its label beside it. The whole row is at least 44 px high.
-export function CheckField({ id, label, checked, onChange, hint, className = '' }) {
+// `describedBy` points at a message such as an error. `invalid` marks the box as the cause of it.
+export function CheckField({ id, label, checked, onChange, hint, className = '', describedBy, invalid = false }) {
   return (
     <div className={className}>
       <label htmlFor={id} className="flex min-h-touch cursor-pointer items-center gap-3 text-sm">
@@ -25,6 +26,8 @@ export function CheckField({ id, label, checked, onChange, hint, className = '' 
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
           className={`h-5 w-5 shrink-0 accent-primary ${RING}`}
         />
         <span>{label}</span>

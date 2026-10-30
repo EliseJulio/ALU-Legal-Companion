@@ -58,9 +58,10 @@ export class ApiError extends Error {
 // `anonymous: true` leaves the login out of the request. An anonymous page must say so itself.
 // The server would ignore the login on those routes. Still the page should never send a
 // credential that an anonymous request does not need.
-async function request(method, path, body, { anonymous = false } = {}) {
+async function request(method, path, body, { anonymous = false, raw = false } = {}) {
   const headers = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  // `raw` sends a file as the body itself. That is how a matter document is uploaded.
+  if (body !== undefined) headers['Content-Type'] = raw ? body.type : 'application/json';
   if (token && !anonymous) headers.Authorization = `Bearer ${token}`;
 
   let res;
@@ -68,7 +69,7 @@ async function request(method, path, body, { anonymous = false } = {}) {
     res = await fetch(`${BASE}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
     });
   } catch {
     // No answer at all. Status 0 lets a page offer "check your connection".
@@ -111,3 +112,29 @@ export const apiGet = (path, options) => request('GET', path, undefined, options
 export const apiPost = (path, body = {}, options) => request('POST', path, body, options);
 export const apiPut = (path, body = {}) => request('PUT', path, body);
 export const apiDelete = (path) => request('DELETE', path);
+export const apiUpload = (path, file) => request('POST', path, file, { raw: true });
+// A full address on the API's origin. For things the browser fetches itself such as an img src.
+// The page and the API are on different origins so a path starting with / would reach the wrong server.
+export const apiUrl = (path) => `${BASE}${path}`;
+
+// A file as a Blob. A document download needs the login and a plain link cannot send it. So the
+// page fetches the file itself and hands the browser the bytes.
+export async function apiBlob(path) {
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { headers });
+  } catch {
+    throw new ApiError(0, 'Could not reach the server. Check your connection and try again.');
+  }
+  if (res.ok) return res.blob();
+  // The same rule as every other request. A 401 means the login is gone.
+  if (res.status === 401) {
+    clearToken();
+    announceSessionExpired();
+  }
+  let payload = null;
+  try { payload = await res.json(); } catch { /* not JSON */ }
+  throw new ApiError(res.status, payload?.error || 'Something went wrong. Please try again.');
+}

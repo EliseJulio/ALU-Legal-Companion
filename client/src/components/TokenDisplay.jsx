@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Copy, TriangleAlert } from 'lucide-react';
-import { RING_ON_WARNING as RING } from '@/lib/ui';
+import Icon from '@/components/Icon';
+import { RING_ON_WARNING as RING, BUTTON_PRIMARY, BUTTON_DISABLED } from '@/lib/ui';
 
 // The warning colours are used here because the code cannot be recovered. An anonymous record
 // has no name or email behind it. So the warning is the message and not decoration.
@@ -28,10 +28,10 @@ export default function TokenDisplay({ token, purpose, onContinue }) {
   }[copyState] ?? '';
 
   return (
-    <div className="rounded border border-warning-border bg-warning-subtle p-4">
-      <h2 className="flex items-center gap-2 font-head text-lg font-bold text-warning-strong">
-        <TriangleAlert aria-hidden="true" className="h-5 w-5" />
-        Save this code now
+    <div className="rounded-card border border-warning-border bg-warning-subtle p-6">
+      <h2 className="flex items-center gap-2 font-head text-2xl leading-heading text-warning-strong">
+        <Icon name="warning" />
+        Save this code before leaving
       </h2>
       <p className="mt-2 text-sm">
         This code is shown once and cannot be recovered. It is the only way to {purpose} because
@@ -39,7 +39,7 @@ export default function TokenDisplay({ token, purpose, onContinue }) {
       </p>
 
       <p className="mt-4 text-xs font-medium text-muted-foreground">Your code</p>
-      <code className="mt-1 block select-all break-all font-mono 
+      <code className="mt-1 block select-all break-all rounded bg-surface px-4 py-3 font-mono
       text-3xl tracking-widest text-primary">
         {token}
       </code>
@@ -48,11 +48,11 @@ export default function TokenDisplay({ token, purpose, onContinue }) {
         type="button"
         onClick={handleCopy}
         className={`mt-3 inline-flex min-h-touch items-center gap-2 
-          rounded border border-primary bg-surface px-4 font-head 
+          rounded border border-primary bg-surface px-4 font-sans
           text-sm font-semibold text-primary ${RING}`}
       >
-        <Copy aria-hidden="true" className="h-4 w-4" />
-        Copy
+        <Icon name="content_copy" className="text-base" />
+        Copy code
       </button>
       {/* The status region is always on the page. Its first message would not be read out
           if it were added later. */}
@@ -67,18 +67,16 @@ export default function TokenDisplay({ token, purpose, onContinue }) {
           onChange={(e) => setSaved(e.target.checked)}
           className={`h-5 w-5 shrink-0 accent-primary ${RING}`}
         />
-        <span>I have saved this code somewhere I can find it again.</span>
+        <span>I have saved my code somewhere private.</span>
       </label>
 
       <button
         type="button"
-        disabled={!saved}
+        aria-disabled={!saved || undefined}
         onClick={() => onContinue()}
-        className={`mt-3 inline-flex min-h-touch items-center rounded px-4 
-          font-head font-semibold text-primary-foreground 
-          ${RING} ${saved ? 'bg-primary' : 'bg-disabled'}`}
+        className={`mt-4 ${saved ? BUTTON_PRIMARY : BUTTON_DISABLED}`}
       >
-        Continue
+        Continue to check my request
       </button>
       {!saved && (
         <p className="mt-2 text-xs text-muted-foreground">
