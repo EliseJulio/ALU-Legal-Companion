@@ -5,6 +5,7 @@ The website of the platform. A student or staff member uses it to find a lawyer,
 - **Built with:** React 19, Vite, Tailwind CSS, React Router
 - **Tests:** Vitest with Testing Library for the components, Playwright for the browser
 - **Talks to:** the API in [`../server`](../server/README.md)
+- **Live:** https://alu-legal-companion-qu8w.onrender.com. It talks to the live API at https://alu-legal-companion.onrender.com
 
 ## Set up
 
@@ -17,6 +18,8 @@ npm run dev        # http://localhost:5173
 ```
 
 The site finds the API at `http://localhost:4000/api`. To use another address copy `.env.example` to `.env` and set `VITE_API_URL`. That address is public so it must never hold a secret.
+
+The live website is built with `VITE_API_URL=https://alu-legal-companion.onrender.com/api`. Vite puts that address into the files when it builds, so changing it on the host does nothing until the site is built again.
 
 ## Scripts
 
@@ -81,7 +84,7 @@ These come from the research brief and are checked by tests.
 ## Tests
 
 ```bash
-npm test        # 968 tests in 82 files
+npm test        # 973 tests in 82 files
 npm run e2e     # 197 browser tests in 17 files
 ```
 
@@ -92,4 +95,4 @@ The browser tests need the browser once: `npx playwright install chromium`.
 ## Notes
 
 - `dist/` is made by the build. It is not kept in git.
-- A static host must send every address to `index.html` so a reload on `/matters/7` works.
+- A static host must send every address to `index.html` so a reload on `/matters/7` works. On Render this is one rewrite rule from `/*` to `/index.html`. Without it a reload or a link from an email, shows "Not Found"..
