@@ -64,6 +64,8 @@ tests/                 the component tests, laid out like src/
 
 These come from the research brief and are checked by tests.
 
+The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
+
 - **Colours.** ALU navy, ALU red and white with a few tints. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. `tests/lib/tokens.test.js` checks the contrast and that no colour is used with an opacity suffix, which Tailwind would silently drop.
 - **Touch targets.** Every link and button is at least 44 by 44 pixels. The browser tests measure the header.
 - **Focus.** Every control shows a ring when it has keyboard focus. The ring styles live in one file, `src/lib/ui.js`, so they cannot drift apart.
@@ -84,7 +86,7 @@ These come from the research brief and are checked by tests.
 ## Tests
 
 ```bash
-npm test        # 973 tests in 82 files
+npm test        # 985 tests in 82 files
 npm run e2e     # 197 browser tests in 17 files
 ```
 

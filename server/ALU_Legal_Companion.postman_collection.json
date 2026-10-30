@@ -8464,7 +8464,8 @@
 									"var body = null;",
 									"try { body = pm.response.json(); } catch (e) { body = null; }",
 									"pm.test('listed', function () { pm.expect(body.some(function (m) { return m.id === Number(pm.collectionVariables.get('matterId')); })).to.be.true; });",
-									"pm.test('no owner identity', function () { pm.expect(body.every(function (m) { return !(\"user_id\" in m) && !(\"email\" in m); })).to.be.true; });"
+									"pm.test('no owner identity', function () { pm.expect(body.every(function (m) { return !(\"user_id\" in m) && !(\"email\" in m); })).to.be.true; });",
+									"pm.test('says how many documents wait for the check and only a number', function () { pm.expect(body.every(function (m) { return Number.isInteger(m.documents_waiting) && m.documents_waiting >= 0; })).to.be.true; });"
 								]
 							}
 						}

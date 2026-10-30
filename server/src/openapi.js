@@ -228,6 +228,7 @@ const schemas = {
   SharedMatter: obj({
     id: whole(''), title: text(''), status: oneOf(['open', 'closed']), next_action: text('', { nullable: true }), next_due: day(''),
     shared_at: moment(''), updated_at: moment(''), route_title: text('', { nullable: true }), shared_with_name: text('The office the matter was shared with.'),
+    documents_waiting: whole('How many documents on this matter wait for the lawyer’s check. A count only. It names nobody.'),
   }),
   MatterInput: obj({
     title: text('At most 200 characters. Left out when route_id is given.'), next_action: text('At most 2000 characters.'),

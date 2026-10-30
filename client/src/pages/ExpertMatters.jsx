@@ -33,6 +33,12 @@ export default function ExpertMatters() {
                 <StatusPill status={matter.status} />
               </span>
               <span className="mt-2 block text-sm">Shared record only. No member name or email.</span>
+              {/* Said in words and in the card, so the lawyer knows without opening each matter. */}
+              {matter.documents_waiting > 0 && (
+                <span className="mt-2 inline-block rounded border border-primary px-2 py-0.5 text-sm font-semibold text-primary">
+                  {matter.documents_waiting === 1 ? '1 document waiting for your check' : `${matter.documents_waiting} documents waiting for your check`}
+                </span>
+              )}
               {matter.route_title && <span className="mt-1 block text-sm text-muted-foreground">{matter.route_title}</span>}
               {matter.next_due && (
                 <span className="mt-1 block text-sm font-semibold">

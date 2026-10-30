@@ -126,10 +126,14 @@ router.get('/share-targets', requireAuth(...OWNERS), async (_req, res) => {
 
 // GET /api/matters/shared: the expert's list. These are the matters shared with an entry linked
 // to their account. The owner is not named. The owner shares the matter and not their identity.
+// documents_waiting says how many files wait for the lawyer's check. Without it the lawyer would have
+// to open every matter to find out that something new arrived.
 router.get('/shared', requireAuth('legal_expert'), async (req, res) => {
   res.json(await q(
     `SELECT m.id, m.title, m.status, m.next_action, m.next_due, m.shared_at, m.updated_at,
-            r.title AS route_title, p.name AS shared_with_name
+            r.title AS route_title, p.name AS shared_with_name,
+            (SELECT count(*)::int FROM matter_documents d
+              WHERE d.matter_id = m.id AND d.review_status = 'pending') AS documents_waiting
        FROM matters m
        JOIN providers p ON p.id = m.shared_with AND p.user_id = $1
        LEFT JOIN matter_routes r ON r.id = m.route_id
