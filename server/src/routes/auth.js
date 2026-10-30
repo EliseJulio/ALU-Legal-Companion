@@ -23,6 +23,23 @@ function publicUser(u) {
 // The default is the Vite dev server.
 const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
 
+// A person may move the account to another address. The new one waits in pending_email until its
+// link is used. Students and staff must stay inside the ALU domains, as at sign-up. Legal experts
+// and admins join from outside the university, so they may use any address.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ALU_ONLY_ROLES = ['student', 'staff'];
+
+// The only answer change-email gives for an address that passes the checks. It is the same whether
+// the address is free or already has an account. A different answer would show which addresses
+// are registered.
+const CHANGE_EMAIL_REPLY = 'If that address can be used, a confirmation link is on its way to it. Your address does not change until you use the link.';
+
+// a***@example.org. Enough for the owner to recognise it and not enough for anyone else to read it.
+const maskEmail = (email) => {
+  const [local, domain] = String(email).split('@');
+  return `${local.slice(0, 1)}${'*'.repeat(Math.max(local.length - 1, 2))}@${domain}`;
+};
+
 // The three things that can happen to a verification email, in words the person needs.
 // Each one says what to do next. An apology with no next step leaves someone stuck.
 function verificationSentMessage(email, delivery) {
@@ -196,13 +213,15 @@ router.post('/login', authIpLimiter, loginEmailLimiter, async (req, res) => {
 // Fields are listed one by one and never copied from the row. The row has the password hash.
 router.get('/me', requireAuth(), async (req, res) => {
   const [user] = await q(
-    'SELECT id, name, email, role, email_verified_at, created_at FROM users WHERE id = $1',
+    'SELECT id, name, email, role, email_verified_at, pending_email, created_at FROM users WHERE id = $1',
     [req.user.id],
   );
   if (!user) return res.status(401).json({ error: 'Invalid or expired session' });
   res.json({
     ...publicUser(user),
     email_verified_at: user.email_verified_at,
+    // An address that is waiting for its link to be used. Empty when no change is under way.
+    pending_email: user.pending_email,
     created_at: user.created_at,
   });
 });
@@ -261,6 +280,140 @@ router.post('/change-password', authIpLimiter, requireAuth(), async (req, res) =
     [await hashPassword(newPassword), me.id],
   );
   res.json({ token: signToken(updated), user: publicUser(updated) });
+});
+
+// POST /api/auth/change-email { email, current_password }: ask to move the account to another address.
+// Nothing changes yet. The new address waits in pending_email and a link goes to it. The account keeps
+// working with the old address until the link is used, so a typo can never lock anyone out.
+// The current password is needed so that a stolen session alone cannot send an account somewhere else.
+router.post('/change-email', authIpLimiter, requireAuth(), emailLimiter, async (req, res) => {
+  const { email: typed, current_password: currentPassword } = req.body || {};
+  const email = normalizeEmail(typed);
+  // The address is checked first so the caller learns the rule without having to get the password right.
+  if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    return res.status(400).json({ error: 'That is not a valid email address.' });
+  }
+
+  const [me] = await q('SELECT id, name, email, role, password_hash FROM users WHERE id = $1', [req.user.id]);
+  // This is 400 and not 401. The session is fine. The caller typed a wrong password. The website
+  // signs a person out on every 401 and a typo must not do that.
+  if (!me || !(await checkPassword(String(currentPassword ?? ''), me.password_hash))) {
+    return res.status(400).json({ error: 'That password is not correct.' });
+  }
+  if (email === me.email) return res.status(400).json({ error: 'That is already the address of your account.' });
+  if (ALU_ONLY_ROLES.includes(me.role) && !isAllowedEmail(email)) {
+    return res.status(400).json({
+      error: `Students and staff must use an address from the ALU community: ${ALLOWED_DOMAINS.map((d) => '@' + d).join(' or ')}`,
+    });
+  }
+
+  // An address that already has an account gets the same answer as a free one. Nothing is stored and
+  // nothing is sent.
+  const [taken] = await q('SELECT id FROM users WHERE email = $1', [email]);
+  if (!taken) {
+    await q('UPDATE users SET pending_email = $1 WHERE id = $2', [email, me.id]);
+    // An older link is cancelled so only the newest request can be used.
+    await q(`UPDATE auth_tokens SET used_at = now() WHERE user_id = $1 AND purpose = 'change_email' AND used_at IS NULL`, [me.id]);
+    const raw = await issueToken(me.id, 'change_email');
+    const link = `${appUrl()}/confirm-email-change?token=${encodeURIComponent(raw)}`;
+
+    // The old address is told first and the link goes last. A failed send must not change the answer.
+    // The log never holds an address.
+    try {
+      await sendMail({
+        to: me.email,
+        subject: 'A request to change your email address',
+        text: [
+          `Hi ${me.name},`,
+          '',
+          `Someone asked to change the email address of your ALU Legal Companion account to ${maskEmail(email)}.`,
+          'Nothing has changed yet. If it was you, use the link that was sent to the new address.',
+          'If it was not you, sign in and change your password in Account settings.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error(`Could not send the change notice for user ${me.id}: ${err.message}`);
+    }
+    try {
+      await sendMail({
+        to: email,
+        subject: 'Confirm your new email address',
+        text: [
+          `Hi ${me.name},`,
+          '',
+          'Confirm this address for your ALU Legal Companion account:',
+          link,
+          '',
+          'The link works once and expires in 24 hours.',
+          'Until you use it the account keeps its old address.',
+          'If you did not ask for this you can ignore this message.',
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error(`Could not send the confirmation link for user ${me.id}: ${err.message}`);
+    }
+  }
+  res.json({ message: CHANGE_EMAIL_REPLY });
+});
+
+// POST /api/auth/confirm-email-change { token }: use the link sent to the new address.
+// The link works on any device because reading it proves the mailbox is the person's. It switches the
+// address, counts it as verified, ends every older session and signs the person in again.
+// Like verify-email it may say why a link was refused because the caller already holds the token.
+router.post('/confirm-email-change', authIpLimiter, async (req, res) => {
+  const { token } = req.body || {};
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  const consumed = await consumeToken(token, 'change_email');
+  if (!consumed) {
+    const why = await tokenStatus(token, 'change_email');
+    const message = {
+      used: 'This link has already been used. Sign in with your new address. If that does not work, ask for a new link in Account settings.',
+      expired: 'This link has expired. Ask for a new one in Account settings and use it within 24 hours.',
+    }[why] || 'That link is not valid. Ask for a new one in Account settings.';
+    return res.status(400).json({ error: message });
+  }
+
+  const [before] = await q('SELECT email FROM users WHERE id = $1', [consumed.user_id]);
+  let user;
+  try {
+    // One statement does it all so no half-done state can be seen. session_version goes up so every
+    // older login ends. The new token that comes back carries the new number.
+    [user] = await q(
+      `UPDATE users
+          SET email = pending_email, pending_email = NULL,
+              email_verified_at = now(), session_version = session_version + 1
+        WHERE id = $1 AND pending_email IS NOT NULL AND deactivated_at IS NULL
+        RETURNING id, name, email, role, session_version`,
+      [consumed.user_id],
+    );
+  } catch (err) {
+    // Someone made an account with that address after the link was sent. The unique rule stops the switch.
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'That address now belongs to another account. Ask for the change again with a different address.' });
+    }
+    throw err;
+  }
+  if (!user) {
+    return res.status(400).json({ error: 'No new address is waiting for this account. Ask for the change again in Account settings.' });
+  }
+
+  // The old address is told that the account moved. It is the early warning if the change was not wanted.
+  try {
+    await sendMail({
+      to: before.email,
+      subject: 'Your email address was changed',
+      text: [
+        `Hi ${user.name},`,
+        '',
+        `The email address of your ALU Legal Companion account was changed to ${maskEmail(user.email)}.`,
+        'If you did not do this, contact the ALU Legal Companion team at once.',
+      ].join('\n'),
+    });
+  } catch (err) {
+    console.error(`Could not send the change notice for user ${user.id}: ${err.message}`);
+  }
+  res.json({ token: signToken(user), user: publicUser(user) });
 });
 
 // Makes a reset_password token and mails the link. The raw token exists only inside this

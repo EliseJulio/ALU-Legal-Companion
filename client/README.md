@@ -38,7 +38,7 @@ The live website is built with `VITE_API_URL=https://alu-legal-companion.onrende
 | Who | Pages |
 |---|---|
 | Anyone | `/` front door, `/where-to-go` and `/where-to-go/:id`, `/directory` and `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/ask` and `/ask/check`, `/emergency` |
-| Accounts | `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`, `/redeem-invite` |
+| Accounts | `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`, `/confirm-email-change`, `/redeem-invite` |
 | Student or staff | `/matters`, `/matters/new`, `/matters/:id`, `/saved`, `/my-activity`, `/settings` |
 | Legal expert | `/expert/questions`, `/expert/bookings`, `/expert/matters` |
 | Admin | `/admin` dashboard, `/admin/guides`, `/admin/providers`, `/admin/routes`, `/admin/users`, `/admin/invites`, `/admin/contacts` |
@@ -86,7 +86,7 @@ The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPj
 ## Tests
 
 ```bash
-npm test        # 985 tests in 82 files
+npm test        # 996 tests in 83 files
 npm run e2e     # 197 browser tests in 17 files
 ```
 

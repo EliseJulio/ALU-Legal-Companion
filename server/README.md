@@ -107,6 +107,8 @@ They go in `server/.env`. The template is `.env.example`.
 
 **Email in development.** With no `SMTP_URL` the server prints verification links, reset links and invitations in its terminal. Copy the link from there. This lets you try every flow with no mail account. The printing code refuses to run when `SMTP_URL` is set, so a live link is never written to a production log.
 
+**Changing your email address.** A signed-in person sends the new address and their current password to `POST /api/auth/change-email`. The new address waits in `users.pending_email` and the account keeps its old address until the link sent to the new one is used at `POST /api/auth/confirm-email-change`. A typo therefore cannot lock anyone out. Students and staff must stay on the ALU domains, legal experts can use any address. The reply is the same whether or not the new address already has an account, so nobody can use it to find out who is registered. The old address gets a short notice with no link and the new address is only partly shown in it. Using the link makes the new address the account's address, counts it as verified, ends every older session and signs this one in again. Asking again cancels the earlier link. A wrong password answers 400, not 401, so the website does not sign the person out over a typo.
+
 **Email that says something changed.** A signed-in person gets an email when a lawyer accepts their consultation, with the time and the meeting link. A lawyer gets one when the owner adds, replaces or removes a document on a matter shared with them, and the owner gets one when the lawyer comments on or checks a document. Each says only that something changed and where to look. It never carries a comment, a document name, a matter title or who the owner is. A person who booked anonymously has no address and gets nothing. A burst of uploads sends the lawyer one email in five minutes. A failed send is logged without the address and never fails the request. The code is `src/services/notify.js`. Nothing depends on an email arriving. The lawyer's list of shared matters (`GET /api/matters/shared`) also carries `documents_waiting`, the number of files on each matter that wait for a check and the page shows it.
 
 ## How the code is organised
@@ -136,7 +138,7 @@ tests/
 
 **Postman.** Two collections sit next to this file.
 
-- `ALU_Legal_Companion.postman_collection.json` runs every route in an order that builds on itself and checks each answer. Import it with `ALU_Legal_Companion.local.postman_environment.json`, or run it with Newman: `npx newman run ALU_Legal_Companion.postman_collection.json -e ALU_Legal_Companion.local.postman_environment.json`. Run it on a development database only. It creates records named "Postman" and it signs in with the default demo passwords, so seed without `SEED_*_PASSWORD` set. Set `DOCUMENT_KEY` on the server first, or the upload checks say they were skipped.
+- `ALU_Legal_Companion.postman_collection.json` runs every route in an order that builds on itself and checks each answer. Import it with `ALU_Legal_Companion.local.postman_environment.json`, or run it with Newman: `npx newman run ALU_Legal_Companion.postman_collection.json -e ALU_Legal_Companion.local.postman_environment.json`. Run it on a development database only. It creates records named "Postman" and it signs in with the default demo passwords, so seed without `SEED_*_PASSWORD` set. Set `DOCUMENT_KEY` on the server first, or the upload checks say they were skipped. The email change has refusal checks only. Its success path needs the link from the email, so the collection never sends one.
 - `ALU_Legal_Companion.admin-content-workflow.postman_collection.json` is the short administrator workflow: create, publish and withdraw.
 
 ## The API
@@ -146,7 +148,7 @@ All routes are under `/api`. Every error is `{ "error": "message" }`. Login is a
 | Area | Routes | Who |
 |---|---|---|
 | Health | `GET /health` | anyone |
-| Accounts | `POST /auth/register` `/verify-email` `/resend-verification` `/login` `/logout` `/forgot-password` `/reset-password` `/change-password` `/redeem-invite`, `GET` and `PUT /auth/me` | see below |
+| Accounts | `POST /auth/register` `/verify-email` `/resend-verification` `/login` `/logout` `/forgot-password` `/reset-password` `/change-password` `/change-email` `/confirm-email-change` `/redeem-invite`, `GET` and `PUT /auth/me` | see below |
 | Directory | `GET /directory/providers`, staff list at `/providers/all`, `POST` and `PUT /providers`, then `/providers/:id/publish` | public to read; administrator writes and publishes |
 | Where to go | `GET /directory/routes` (search with `?q=`), `/routes/:id`, staff list at `/routes/all`, `POST` and `PUT /routes`, then `/routes/:id/publish` | public to read; administrator writes and publishes |
 | Crisis contacts | `GET /emergency-contacts` | anyone |

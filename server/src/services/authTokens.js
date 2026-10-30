@@ -1,4 +1,4 @@
-// One-time tokens for email links: verify an address and reset a password.
+// One-time tokens for email links: verify an address, reset a password and change an address.
 //
 // Two rules are enforced here so no caller can forget them.
 // 1. Only a hash is stored. A leaked reset token would let someone take over an account.
@@ -10,7 +10,7 @@ import { q } from '../db.js';
 
 // The purposes the database allows. They are listed here too, so a typo fails in JavaScript
 // with a clear message and not as a database error.
-export const TOKEN_PURPOSES = ['verify_email', 'reset_password'];
+export const TOKEN_PURPOSES = ['verify_email', 'reset_password', 'change_email'];
 
 // SHA-256 and not bcrypt. The input is 32 random bytes, not a password a person chose,
 // so there is nothing for a slow hash to protect and the lookup stays a fast exact match.
