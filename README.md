@@ -88,7 +88,7 @@ These are for local use only. Never use them anywhere real. With no mail setting
 |---|---|---|
 | API and database | Jest and Supertest against a real database | 778 tests in 43 suites |
 | Pages and components | Vitest and Testing Library | 968 tests in 82 files |
-| Browser at phone width | Playwright with the API replaced by fixed replies | 193 tests in 17 files |
+| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files |
 
 ```bash
 cd server && npm test
