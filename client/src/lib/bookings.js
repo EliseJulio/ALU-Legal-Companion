@@ -4,7 +4,7 @@
 export function readableSlot(raw) {
   const when = new Date(raw);
   if (Number.isNaN(when.getTime())) return null;
-  return when.toLocaleString(undefined, {
+  return when.toLocaleString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }

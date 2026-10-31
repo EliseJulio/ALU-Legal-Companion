@@ -117,7 +117,7 @@ These are for local use only. Never use them anywhere real. With no mail setting
 |---|---|---|
 | API and database | Jest and Supertest against a real database | 810 tests in 45 suites |
 | Pages and components | Vitest and Testing Library | 996 tests in 83 files |
-| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files. Run in Chromium (197 pass), Firefox (197 pass) and WebKit (193 pass, 4 known failures) |
+| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files. Run in Chromium (197 pass), Firefox (197 pass) and WebKit (195 pass, 2 known failures) |
 
 ```bash
 cd server && npm test

@@ -73,7 +73,7 @@ Being clear about this matters.
 
 - **Load.** No test checks how the platform behaves with many people at once.
 - **Real email.** The tests check the email text and that a mail is sent. They do not send one through a real provider. A real send must be tried at deployment.
-- **Other browsers.** The browser tests were run on 30 October 2026 in Chromium (197 pass), Firefox (197 pass) and WebKit, the Safari engine (193 pass). Four tests fail on WebKit every time: two check keyboard focus and two check the requests the page recorded. The cause is not yet found. They have not been run on Safari itself or on a real phone.
+- **Other browsers.** The browser tests were run on 30 October 2026 in Chromium (197 pass), Firefox (197 pass) and WebKit, the Safari engine (195 pass). Two tests fail on WebKit every time. Both check keyboard focus. The cause is not yet investigated. Two other WebKit failures were a timing race in the tests and are fixed. They have not been run on Safari itself or on a real phone.
 - **Screen readers.** The pages use labels, headings and live regions that the tests check by role. A person using a screen reader has not tried them.
 - **Security by an outside party.** The code has been reviewed by its author and checked with a linter. No independent penetration test has been done.
 - **The legal content.** The tests cannot say a guide is correct. The admin publishes the sample content directly; the platform itself does not enforce a lawyer's review before publication. A legal expert's role here is holding consultations and reading shared matters, not checking guide text.
