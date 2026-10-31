@@ -20,7 +20,7 @@ Live API and its documentation: https://alu-legal-companion.onrender.com/api/doc
 
 Figma designs: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
 
-Demo video:
+Demo video: https://docs.google.com/document/d/1uJ3P1m0gzIfPTzAp2jOerD2FcY8s8pMm5xwarBX27TU/edit?usp=sharing
 
 Technical report (PDF, 4 pages): [docs1/ALU_Legal_Companion_Technical_Report.pdf](docs1/ALU_Legal_Companion_Technical_Report.pdf)
 
