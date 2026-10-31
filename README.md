@@ -20,7 +20,9 @@ Live API and its documentation: https://alu-legal-companion.onrender.com/api/doc
 
 Figma designs: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
 
-Demo video: 
+Demo video:
+
+Technical report (PDF, 4 pages): [docs1/ALU_Legal_Companion_Technical_Report.pdf](docs1/ALU_Legal_Companion_Technical_Report.pdf)
 
 ## Why it exists
 
@@ -30,12 +32,6 @@ Rwanda publishes its laws but ordinary people find them hard to use. A student w
 
 **Nothing is shown to the public until an authorized administrator has checked and published it.** That covers every guide, directory entry and route. Administrators create, edit, publish and withdraw legal-information content; legal experts provide consultations, appointments and matter support. If a published guide is edited it leaves the site at once and comes back only when an administrator publishes it again. The database refuses a published row that has no publisher. The platform has no AI. A real person answers every question.
 
-## What it looks like
-
-| Front door | Where to go | Directory | Track a matter |
-|---|---|---|---|
-| <img src="docs/screenshots/phone/01-home.png" width="170" alt="The front door with the five things the platform is for"> | <img src="docs/screenshots/phone/03-route.png" width="170" alt="A route with the office, the law, the steps and the deadline"> | <img src="docs/screenshots/phone/04-directory.png" width="170" alt="The directory of lawyers, consultants and organisations"> | <img src="docs/screenshots/phone/12-matter.png" width="170" alt="A tracked matter with its deadline and reminders"> |
-
 ## Stack
 
 - **Backend:** Node.js 20 or newer, Express 4 (ES modules), REST under `/api`
@@ -43,11 +39,38 @@ Rwanda publishes its laws but ordinary people find them hard to use. A student w
 - **Frontend:** React, Vite and Tailwind CSS
 - **Tests:** Jest and Supertest for the API, Vitest and Testing Library for the pages, Playwright for the browser
 
+## Technical requirements
+
+| Part | Version used | Notes |
+|---|---|---|
+| Node.js | 20 or newer (built and tested on 24) | Both `server` and `client` need it |
+| PostgreSQL | 16 | Any 14 or newer should work. Tested on 16 |
+| Express | 4.19 | With `helmet`, `cors`, `express-rate-limit`, `jsonwebtoken`, `bcryptjs`, `nodemailer`, `swagger-ui-express` |
+| React | 19.2 | With React Router 7, Vite 8 and Tailwind CSS 3.4 |
+| Test tools | Jest 29, Vitest 4, Playwright 1.64 | Playwright needs its browsers: `npx playwright install` |
+| Hardware | Any computer that runs Node 20 | 4 GB of memory is enough. No GPU needed |
+| Browsers | Chrome, Firefox and Safari engines | The browser tests run in all three |
+
 ## Repository layout
 
 ```
-server/   Express API and database      (see server/README.md)
-client/   React frontend                (see client/README.md)
+server/
+  src/
+    routes/       one file for each part of the API (auth, directory, guides, matters, documents, ...)
+    services/     the rules: routing, reminders, anonymous code, document encryption, email, search
+    middleware/   login and roles, rate limits, input checks
+    migrations/   26 numbered SQL files that build the 17 tables
+    openapi.js    the Swagger description of every route
+  tests/          integration and unit tests against a real database
+client/
+  src/
+    pages/        one file for each screen (41)
+    components/   parts used by many screens (34)
+    lib/          the API caller, login state, dates and small helpers
+  tests/          component tests and browser tests
+docs1/            API specification, database design, test plan and the technical report
+.github/          the CI workflow that runs the tests on every push
+render.yaml       how the live version is deployed
 ```
 
 ## Run it
@@ -94,7 +117,7 @@ These are for local use only. Never use them anywhere real. With no mail setting
 |---|---|---|
 | API and database | Jest and Supertest against a real database | 810 tests in 45 suites |
 | Pages and components | Vitest and Testing Library | 996 tests in 83 files |
-| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files |
+| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files. Run in Chromium (197 pass), Firefox (197 pass) and WebKit (193 pass, 4 known failures) |
 
 ```bash
 cd server && npm test
@@ -165,6 +188,10 @@ First release checklist:
 
 ## Documentation
 
+- [`docs1/ALU_Legal_Companion_Technical_Report.pdf`](docs1/ALU_Legal_Companion_Technical_Report.pdf): scope against the proposal, how it works, testing and code quality
+- [`docs1/API_SPEC.md`](docs1/API_SPEC.md): who may call each route and what it returns
+- [`docs1/ERD.md`](docs1/ERD.md): the 17 tables and the rules the database enforces itself
+- [`docs1/TEST_PLAN.md`](docs1/TEST_PLAN.md): what is tested, what the tests found and what is not tested
 - [`server/README.md`](server/README.md): the API, its settings and the eight rules it enforces
 - [`client/README.md`](client/README.md): the website, its pages and its design rules
 - [Live API documentation](https://alu-legal-companion.onrender.com/api/docs): every route in Swagger. The same description is in `server/src/openapi.js`
