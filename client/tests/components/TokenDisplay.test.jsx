@@ -6,13 +6,13 @@ import MeetLink from '@/components/MeetLink';
 
 describe('TokenDisplay', () => {
   const show = (onContinue = vi.fn()) => {
-    render(<TokenDisplay token="K7F2-9QMD-31XZ-84HC" purpose="check your booking" onContinue={onContinue} />);
+    render(<TokenDisplay token="1234-5678-9ABC-DEFG" purpose="check your booking" onContinue={onContinue} />);
     return onContinue;
   };
 
   it('shows the code and says it cannot be recovered', () => {
     show();
-    expect(screen.getByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(screen.getByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
     expect(screen.getByText(/shown once and cannot be recovered/)).toBeInTheDocument();
     expect(screen.getByText(/the only way to check your booking/)).toBeInTheDocument();
   });

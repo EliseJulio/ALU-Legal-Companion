@@ -9,7 +9,7 @@ The website of the platform. A student or staff member uses it to find a lawyer,
 
 ## Set up
 
-You need Node.js 20 or newer. The server should be running for real data. See the [server README](../server/README.md).
+You need a recent Node.js. Node.js 24 is what the tests and CI use. The server should be running for real data. See the [server README](../server/README.md).
 
 ```bash
 cd client

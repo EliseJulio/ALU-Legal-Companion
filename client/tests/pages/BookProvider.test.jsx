@@ -31,7 +31,7 @@ function show({ role = null, id = '5' } = {}) {
 }
 
 const PROVIDER = { id: 5, name: 'Example Pro Bono Lawyer', type: 'pro_bono_lawyer', bookable: true };
-const TOKEN_REPLY = { id: 1, anon_token: 'K7F2-9QMD-31XZ-84HC' };
+const TOKEN_REPLY = { id: 1, anon_token: '1234-5678-9ABC-DEFG' };
 const posted = () => global.fetch.mock.calls.filter(([, options]) => options?.method === 'POST');
 
 const fillSlot = (value = FUTURE) => fireEvent.change(screen.getByLabelText('Date and time'), { target: { value } });
@@ -77,7 +77,7 @@ describe('Booking a lawyer as a visitor', () => {
     fillSlot();
     fireEvent.change(screen.getByLabelText(/What is it about/), { target: { value: '  My deposit  ' } });
     await send();
-    expect(await screen.findByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(await screen.findByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
     const [url, options] = call();
     expect(String(url)).toMatch(/\/bookings\/anonymous$/);
     expect(options.headers).not.toHaveProperty('Authorization');
@@ -92,7 +92,7 @@ describe('Booking a lawyer as a visitor', () => {
     show();
     fillSlot();
     await send();
-    await screen.findByText('K7F2-9QMD-31XZ-84HC');
+    await screen.findByText('1234-5678-9ABC-DEFG');
     await user.click(screen.getByLabelText(/I have saved my code/));
     await user.click(screen.getByRole('button', { name: 'Continue to check my request' }));
     expect(await screen.findByText('Check page')).toBeInTheDocument();
@@ -160,7 +160,7 @@ describe('Booking a lawyer as a student', () => {
     const [url, options] = call();
     expect(String(url)).toMatch(/\/bookings\/anonymous$/);
     expect(options.headers).not.toHaveProperty('Authorization');
-    expect(await screen.findByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(await screen.findByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
   });
 });
 
@@ -245,7 +245,7 @@ describe('Request consultation: saving the one-time code', () => {
     show();
     fillSlot();
     await send();
-    expect(await screen.findByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(await screen.findByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
     expect(posted()).toHaveLength(1);
   });
 
@@ -295,7 +295,7 @@ describe('Request consultation: saving the one-time code', () => {
     show();
     fillSlot();
     await send();
-    const code = await screen.findByText('K7F2-9QMD-31XZ-84HC');
+    const code = await screen.findByText('1234-5678-9ABC-DEFG');
     expect(code.closest('[tabindex="-1"]')).toHaveFocus();
   });
 

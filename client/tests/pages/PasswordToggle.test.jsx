@@ -11,10 +11,10 @@ import { AuthProvider } from '@/lib/AuthContext';
 // Every page that asks for a password offers one "Show password" switch (the design's account
 // entry frames). The reset page has two boxes and one switch that controls both.
 const PAGES = [
-  ['Login', '/login', <Login />, ['Password']],
-  ['Register', '/register', <Register />, ['Password']],
-  ['RedeemInvite', '/redeem-invite?token=abc', <RedeemInvite />, ['Password']],
-  ['ResetPassword', '/reset-password?token=abc', <ResetPassword />, ['New password', 'Confirm new password']],
+  ['Login', '/login', <Login key="Login" />, ['Password']],
+  ['Register', '/register', <Register key="Register" />, ['Password']],
+  ['RedeemInvite', '/redeem-invite?token=abc', <RedeemInvite key="RedeemInvite" />, ['Password']],
+  ['ResetPassword', '/reset-password?token=abc', <ResetPassword key="ResetPassword" />, ['New password', 'Confirm new password']],
 ];
 
 describe.each(PAGES)('%s', (_name, path, element, labels) => {

@@ -38,23 +38,23 @@ describe('Check for your answer', () => {
 
   it('puts the code in the path of one request and never in the address bar', async () => {
     show();
-    await lookUp('k7f2-9qmd-31xz-84hc');
+    await lookUp('1234-5678-9abc-defg');
     await screen.findByText('Awaiting a response');
-    expect(String(global.fetch.mock.calls[0][0])).toMatch(/\/questions\/anon\/k7f2-9qmd-31xz-84hc$/);
-    expect(window.location.href).not.toMatch(/k7f2/i);
+    expect(String(global.fetch.mock.calls[0][0])).toMatch(/\/questions\/anon\/1234-5678-9abc-defg$/);
+    expect(window.location.href).not.toMatch(/1234/i);
   });
 
   it('sends the request without a login even when someone is signed in', async () => {
     saveSession({ token: 'tok-1', user: { id: 1, name: 'Test Student', email: 'a@example.org', role: 'student' } });
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     await screen.findByText('Awaiting a response');
     expect(global.fetch.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
   });
 
   it('shows the question and says it is still waiting when there is no answer', async () => {
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByRole('heading', { name: 'Awaiting a response' })).toBeInTheDocument();
     expect(screen.getByText('Can my landlord keep my deposit?')).toBeInTheDocument();
     expect(screen.getByText(/you do not need to send it again/)).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('Check for your answer', () => {
 
   it('while waiting, can look again with the same code and points to emergency help', async () => {
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     await screen.findByRole('heading', { name: 'Awaiting a response' });
     expect(screen.getByText('Waiting')).toBeInTheDocument();
     expect(screen.getByText(/A response is not guaranteed/)).toBeInTheDocument();
@@ -71,12 +71,12 @@ describe('Check for your answer', () => {
     await userEvent.setup({ delay: null }).click(screen.getByRole('button', { name: 'Check again' }));
     expect(await screen.findByText('Write to the landlord first.')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(String(global.fetch.mock.calls[1][0])).toMatch(/\/questions\/anon\/K7F2-9QMD-31XZ-84HC$/);
+    expect(String(global.fetch.mock.calls[1][0])).toMatch(/\/questions\/anon\/1234-5678-9ABC-DEFG$/);
   });
 
   it('keeps focus on Check again and drops an old result when the code is edited', async () => {
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     await screen.findByRole('heading', { name: 'Awaiting a response' });
     const again = screen.getByRole('button', { name: 'Check again' });
     again.focus();
@@ -90,7 +90,7 @@ describe('Check for your answer', () => {
   it('drops an old result when the box is emptied and checked again', async () => {
     show();
     const u = userEvent.setup({ delay: null });
-    await lookUp('K7F2');
+    await lookUp('1234');
     await screen.findByRole('heading', { name: 'Awaiting a response' });
     await u.clear(screen.getByLabelText('Your question code'));
     await u.click(screen.getByRole('button', { name: 'Check for answer' }));
@@ -101,7 +101,7 @@ describe('Check for your answer', () => {
   it('tells a reader with no connection to keep the code and try again', async () => {
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByText(/Try again when you have a connection/)).toBeInTheDocument();
     expect(screen.getByText(/Keep the code you already saved/)).toBeInTheDocument();
   });
@@ -115,7 +115,7 @@ describe('Check for your answer', () => {
   it('shows the answer with the disclaimer when an expert has answered', async () => {
     global.fetch.mockResolvedValue(reply(200, { ...QUESTION, answer: 'Write to the landlord first.', status: 'answered' }));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByRole('heading', { name: 'A legal expert has answered' })).toBeInTheDocument();
     expect(screen.getByText('Write to the landlord first.')).toBeInTheDocument();
     expect(screen.getByText('Legal information not legal advice.')).toBeInTheDocument();
@@ -133,7 +133,7 @@ describe('Check for your answer', () => {
   it('shows only the server message for an error that is not a missing code', async () => {
     global.fetch.mockResolvedValue(reply(429, { error: 'Too many attempts. Please wait.' }));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByText('Too many attempts. Please wait.')).toBeInTheDocument();
     expect(screen.queryByText('What to try next')).not.toBeInTheDocument();
   });

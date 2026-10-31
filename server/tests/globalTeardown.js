@@ -10,7 +10,7 @@ export default async function globalTeardown() {
   if (!schema) return;
 
   const connectionString = process.env.TEST_DATABASE_URL
-    || 'postgres://alu:alu_dev@localhost:5432/alu_legal_test';
+    || `postgres://alu:${process.env.PGPASSWORD || 'alu_dev'}@localhost:5432/alu_legal_test`;
   let client;
   try {
     client = new pg.Client({ connectionString });

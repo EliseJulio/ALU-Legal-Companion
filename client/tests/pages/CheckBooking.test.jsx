@@ -41,36 +41,36 @@ describe('Check a booking', () => {
 
   it('puts the code in the path of one request and never in the address bar', async () => {
     show();
-    await lookUp('k7f2-9qmd-31xz-84hc');
+    await lookUp('1234-5678-9abc-defg');
     await screen.findByText('Example Pro Bono Lawyer');
-    expect(String(global.fetch.mock.calls[0][0])).toMatch(/\/bookings\/anon\/k7f2-9qmd-31xz-84hc$/);
-    expect(window.location.href).not.toMatch(/k7f2/i);
+    expect(String(global.fetch.mock.calls[0][0])).toMatch(/\/bookings\/anon\/1234-5678-9abc-defg$/);
+    expect(window.location.href).not.toMatch(/1234/i);
   });
 
   it('shows the status as a word beside the heading', async () => {
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByText('Accepted')).toBeInTheDocument();
   });
 
   it('tells a reader with no connection to keep the code and try again', async () => {
     global.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByText(/Try again when you have a connection/)).toBeInTheDocument();
   });
 
   it('sends the request without a login even when someone is signed in', async () => {
     saveSession({ token: 'tok-1', user: { id: 1, name: 'Test Student', email: 'a@example.org', role: 'student' } });
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     await screen.findByText('Example Pro Bono Lawyer');
     expect(global.fetch.mock.calls[0][1].headers).not.toHaveProperty('Authorization');
   });
 
   it('explains an accepted booking and shows how to join', async () => {
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByRole('heading', { name: 'The lawyer agreed to this time' })).toBeInTheDocument();
     expect(screen.getByText('My deposit')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Join the video call/ })).toHaveAttribute('href', 'https://meet.example.org/abc');
@@ -79,7 +79,7 @@ describe('Check a booking', () => {
   it('explains a request that is still waiting and shows no room', async () => {
     global.fetch.mockResolvedValue(reply(200, { ...BOOKING, status: 'requested', meet_link: null }));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByRole('heading', { name: 'Waiting for the lawyer to reply' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Join the video call/ })).not.toBeInTheDocument();
   });
@@ -87,7 +87,7 @@ describe('Check a booking', () => {
   it('offers another lawyer after a declined booking', async () => {
     global.fetch.mockResolvedValue(reply(200, { ...BOOKING, status: 'declined', meet_link: null }));
     show();
-    await lookUp('K7F2-9QMD-31XZ-84HC');
+    await lookUp('1234-5678-9ABC-DEFG');
     expect(await screen.findByRole('link', { name: 'Ask another lawyer in the directory' })).toHaveAttribute('href', '/directory');
   });
 

@@ -42,6 +42,6 @@ describe('signInPath', () => {
 
   it('never carries a one-time code', () => {
     expect(signInPath({ pathname: '/reset-password', search: '?token=abc' })).toBe('/login');
-    expect(signInPath({ pathname: '/ask/check', search: '?code=K7F2' })).not.toContain('K7F2');
+    expect(signInPath({ pathname: '/ask/check', search: '?code=1234' })).not.toContain('1234');
   });
 });

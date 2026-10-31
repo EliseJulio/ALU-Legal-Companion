@@ -108,7 +108,7 @@ describe('reading my own questions', () => {
   });
 
   it('answers 404 for an unknown token and for text that cannot be a token', async () => {
-    for (const bad of ['K7F2-9QMD-31XZ-84H0', 'short', 'AAAA-BBBB-CCCC']) {
+    for (const bad of ['1234-5678-9ABC-DEF0', 'short', 'AAAA-BBBB-CCCC']) {
       const res = await request(app).get(`/api/questions/anon/${bad}`);
       expect(res.status).toBe(404);
       expect(res.body.error).toMatch(/No question found/);

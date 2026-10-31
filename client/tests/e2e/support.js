@@ -75,7 +75,7 @@ export async function signInAs(page, role) {
 
 // Fixed example data. Every name, address and code here is made up.
 export const DATA = {
-  code: 'K7F2-9QMD-31XZ-84HC',
+  code: '1234-5678-9ABC-DEFG',
   contacts: [
     { name: 'Police', contact: '112', when: 'Immediate danger' },
     { name: 'Isange One Stop Centre', contact: '3029', when: 'Abuse or harassment' },

@@ -41,7 +41,7 @@ const send = async (user) => {
 
 beforeEach(() => {
   localStorage.clear();
-  global.fetch = vi.fn().mockResolvedValue(reply(201, { id: 1, anon_token: 'K7F2-9QMD-31XZ-84HC' }));
+  global.fetch = vi.fn().mockResolvedValue(reply(201, { id: 1, anon_token: '1234-5678-9ABC-DEFG' }));
 });
 
 describe('Ask a lawyer as a visitor', () => {
@@ -71,7 +71,7 @@ describe('Ask a lawyer as a visitor', () => {
     show();
     await user.type(screen.getByLabelText('Your question'), '  Can my landlord keep my deposit? ');
     await send(user);
-    expect(await screen.findByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(await screen.findByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
     const [url, options] = call();
     expect(String(url)).toMatch(/\/questions\/anonymous$/);
     expect(options.headers).not.toHaveProperty('Authorization');
@@ -84,7 +84,7 @@ describe('Ask a lawyer as a visitor', () => {
     show();
     await user.type(screen.getByLabelText('Your question'), 'A question');
     await send(user);
-    await screen.findByText('K7F2-9QMD-31XZ-84HC');
+    await screen.findByText('1234-5678-9ABC-DEFG');
     await user.click(screen.getByLabelText(/I have saved my code/));
     await user.click(screen.getByRole('button', { name: 'Continue to check my request' }));
     expect(await screen.findByText('Check page')).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('Ask a lawyer as a student', () => {
     await user.type(screen.getByLabelText('Your question'), 'A question');
     await user.click(screen.getByRole('radio', { name: 'Without my name' }));
     await send(user);
-    expect(await screen.findByText('K7F2-9QMD-31XZ-84HC')).toBeInTheDocument();
+    expect(await screen.findByText('1234-5678-9ABC-DEFG')).toBeInTheDocument();
     const [url, options] = call();
     expect(String(url)).toMatch(/\/questions\/anonymous$/);
     expect(options.headers).not.toHaveProperty('Authorization');
@@ -229,7 +229,7 @@ describe('Ask an expert: saving the one-time code', () => {
     show();
     await user.type(screen.getByLabelText('Your question'), 'A question');
     await send(user);
-    const code = await screen.findByText('K7F2-9QMD-31XZ-84HC');
+    const code = await screen.findByText('1234-5678-9ABC-DEFG');
     expect(code.closest('[tabindex="-1"]')).toHaveFocus();
   });
 

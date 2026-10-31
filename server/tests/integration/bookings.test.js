@@ -159,15 +159,15 @@ describe('GET /api/bookings/anon/:token', () => {
 
   it('accepts the token without hyphens and with look-alike letters', async () => {
     await q(`INSERT INTO bookings (anon_token, provider_id, slot) VALUES ($1, $2, now())`,
-      [hashAnonToken('K7F2-9QMD-31XZ-84H0'), provider.id]);
-    for (const typed of ['K7F29QMD31XZ84H0', 'k7f2-9qmd-3lxz-84ho', 'K7F2%209QMD%2031XZ%2084H0']) {
+      [hashAnonToken('1234-5678-9ABC-DEF0'), provider.id]);
+    for (const typed of ['123456789ABCDEF0', 'l234-5678-9abc-defo', '1234%205678%209ABC%20DEF0']) {
       const res = await request(app).get(`/api/bookings/anon/${typed}`);
       expect(res.status).toBe(200);
     }
   });
 
   it('answers 404 for text that cannot be a token without asking the database', async () => {
-    for (const bad of ['short', 'K7F2-9QMD-31XZ-84HU', 'AAAA-BBBB-CCCC']) {
+    for (const bad of ['short', '1234-5678-9ABC-DEFU', 'AAAA-BBBB-CCCC']) {
       const res = await request(app).get(`/api/bookings/anon/${bad}`);
       expect(res.status).toBe(404);
       expect(res.body.error).toMatch(/No booking found/);
@@ -175,7 +175,7 @@ describe('GET /api/bookings/anon/:token', () => {
   });
 
   it('answers 404 for an unknown token', async () => {
-    const res = await request(app).get('/api/bookings/anon/K7F2-9QMD-31XZ-84H0');
+    const res = await request(app).get('/api/bookings/anon/1234-5678-9ABC-DEF0');
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/No booking found/);
   });

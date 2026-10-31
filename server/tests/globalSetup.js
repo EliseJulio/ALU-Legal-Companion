@@ -8,7 +8,7 @@ import { applyMigrations } from '../src/migrator.js';
 
 export default async function globalSetup() {
   const connectionString = process.env.TEST_DATABASE_URL
-    || 'postgres://alu:alu_dev@localhost:5432/alu_legal_test';
+    || `postgres://alu:${process.env.PGPASSWORD || 'alu_dev'}@localhost:5432/alu_legal_test`;
 
   // The name is used as an SQL identifier. It is built only from our own process id and the
   // time, never from anything a caller supplies.

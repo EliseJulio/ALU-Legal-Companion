@@ -21,9 +21,9 @@ describe('the limits on anonymous questions', () => {
 
   it('stops the 101st token lookup from one address in 15 minutes', async () => {
     for (let i = 0; i < 100; i += 1) {
-      expect((await request(app).get('/api/questions/anon/K7F2-9QMD-31XZ-84H0')).status).toBe(404);
+      expect((await request(app).get('/api/questions/anon/1234-5678-9ABC-DEF0')).status).toBe(404);
     }
-    const blocked = await request(app).get('/api/questions/anon/K7F2-9QMD-31XZ-84H0');
+    const blocked = await request(app).get('/api/questions/anon/1234-5678-9ABC-DEF0');
     expect(blocked.status).toBe(429);
     expect(blocked.body.error).toMatch(/Too many lookups/);
   });
@@ -32,7 +32,7 @@ describe('the limits on anonymous questions', () => {
     for (let i = 0; i < 30; i += 1) {
       await request(app).post('/api/questions/anonymous').send({ text: `Question ${i}` });
     }
-    const res = await request(app).get('/api/bookings/anon/K7F2-9QMD-31XZ-84H0');
+    const res = await request(app).get('/api/bookings/anon/1234-5678-9ABC-DEF0');
     expect(res.status).toBe(404);
   });
 });

@@ -292,7 +292,7 @@ describe('SideNav: narrow and hide on a wide screen', () => {
     for (const name of ['Where to Go', 'Directory', 'Legal Guides', 'Ask a legal expert']) {
       const link = screen.getByRole('link', { name });
       expect(link).toHaveTextContent(name);
-      expect(link.querySelector('.lg\:sr-only')).toBeNull();
+      expect(link.querySelector('.lg\\:sr-only')).toBeNull();
       expect(link).not.toHaveAttribute('title');
     }
   });

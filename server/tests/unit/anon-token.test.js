@@ -24,25 +24,25 @@ describe('makeAnonToken', () => {
 });
 
 describe('normalizeAnonToken', () => {
-  const TOKEN = 'K7F2-9QMD-31XZ-84H0';
+  const TOKEN = '1234-5678-9ABC-DEF0';
 
   it('leaves a good token as it is', () => {
     expect(normalizeAnonToken(TOKEN)).toBe(TOKEN);
   });
 
   it('ignores case and spaces and missing hyphens', () => {
-    expect(normalizeAnonToken('k7f2 9qmd 31xz 84h0')).toBe(TOKEN);
-    expect(normalizeAnonToken('  K7F29QMD31XZ84H0  ')).toBe(TOKEN);
+    expect(normalizeAnonToken('1234 5678 9abc def0')).toBe(TOKEN);
+    expect(normalizeAnonToken('  123456789ABCDEF0  ')).toBe(TOKEN);
   });
 
   it('reads O as 0 and I or L as 1', () => {
-    expect(normalizeAnonToken('K7F2-9QMD-3lXZ-84HO')).toBe(TOKEN);
-    expect(normalizeAnonToken('K7F2-9QMD-3IXZ-84HO')).toBe(TOKEN);
+    expect(normalizeAnonToken('l234-5678-9ABC-DEFO')).toBe(TOKEN);
+    expect(normalizeAnonToken('I234-5678-9ABC-DEFO')).toBe(TOKEN);
   });
 
   it('refuses anything that cannot be a token', () => {
-    for (const bad of ['', '   ', 'AAAA-BBBB-CCCC', 'K7F2-9QMD-31XZ-84H', 'K7F2-9QMD-31XZ-84H00', 'K7F2-9QMD-31XZ-84HU',
-      'K7F2-9QMD-31XZ-84H!', null, undefined, 42]) {
+    for (const bad of ['', '   ', 'AAAA-BBBB-CCCC', '1234-5678-9ABC-DEF', '1234-5678-9ABC-DEF00', '1234-5678-9ABC-DEFU',
+      '1234-5678-9ABC-DEF!', null, undefined, 42]) {
       expect(normalizeAnonToken(bad)).toBeNull();
     }
   });
@@ -57,13 +57,13 @@ describe('normalizeAnonToken', () => {
 
 describe('hashAnonToken', () => {
   it('makes a fixed 64 character hash that is not the token', () => {
-    const hash = hashAnonToken('K7F2-9QMD-31XZ-84H0');
+    const hash = hashAnonToken('1234-5678-9ABC-DEF0');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(hash).not.toContain('K7F2');
+    expect(hash).not.toContain('1234');
   });
 
   it('gives the same hash for the same token and a different hash for another', () => {
-    expect(hashAnonToken('K7F2-9QMD-31XZ-84H0')).toBe(hashAnonToken('K7F2-9QMD-31XZ-84H0'));
-    expect(hashAnonToken('K7F2-9QMD-31XZ-84H0')).not.toBe(hashAnonToken('K7F2-9QMD-31XZ-84H1'));
+    expect(hashAnonToken('1234-5678-9ABC-DEF0')).toBe(hashAnonToken('1234-5678-9ABC-DEF0'));
+    expect(hashAnonToken('1234-5678-9ABC-DEF0')).not.toBe(hashAnonToken('1234-5678-9ABC-DEF1'));
   });
 });

@@ -16,7 +16,7 @@ describe('EmergencyLink', () => {
     const link = screen.getByRole('link', { name: 'Emergency numbers' });
     expect(link).toHaveClass('lg:flex-col');
     expect(link).not.toHaveClass('lg:sr-only');
-    expect(link.querySelector('.lg\:sr-only')).toBeNull();
+    expect(link.querySelector('.lg\\:sr-only')).toBeNull();
   });
 
   it('is a pill at every size when it is not compact', () => {

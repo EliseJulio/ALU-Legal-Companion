@@ -30,7 +30,7 @@ describe('mailer mode', () => {
   it('switches to real mode when SMTP_URL is set', () => {
     const original = process.env.SMTP_URL;
     try {
-      process.env.SMTP_URL = 'smtp://user:pass@mail.example.org:587';
+      process.env.SMTP_URL = 'smtp://mail.example.org:587';
       expect(isRealTransport()).toBe(true);
     } finally {
       process.env.SMTP_URL = original;
