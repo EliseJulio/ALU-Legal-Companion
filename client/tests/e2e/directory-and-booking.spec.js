@@ -19,7 +19,7 @@ test('the directory can be narrowed to one group', async ({ page }) => {
   await expect(page).toHaveURL(/category=lawyer/);
   await expect(page.getByRole('heading', { name: 'Example Pro Bono Lawyer' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Example Legal Aid Office' })).toHaveCount(0);
-  expect(api.calls.some((c) => c.path === '/directory/providers' && c.query.get('category') === 'lawyer')).toBe(true);
+  await expect.poll(() => api.calls.some((c) => c.path === '/directory/providers' && c.query.get('category') === 'lawyer')).toBe(true);
 });
 
 test('a link to the directory with a group in it opens already narrowed', async ({ page }) => {
@@ -28,7 +28,7 @@ test('a link to the directory with a group in it opens already narrowed', async 
   await expect(page.getByRole('navigation', { name: 'Category' }).getByRole('link', { name: 'Lawyers' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('heading', { name: 'Example Pro Bono Lawyer' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Example Legal Aid Office' })).toHaveCount(0);
-  expect(api.calls.some((c) => c.path === '/directory/providers' && c.query.get('category') === 'lawyer')).toBe(true);
+  await expect.poll(() => api.calls.some((c) => c.path === '/directory/providers' && c.query.get('category') === 'lawyer')).toBe(true);
 });
 
 test('an office that takes no bookings offers no booking link', async ({ page }) => {

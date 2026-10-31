@@ -27,7 +27,7 @@ test('a visitor searches from the menu on a desktop and opens a guide', async ({
   await expect(page.getByRole('link', { name: 'Getting your deposit back' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'My landlord kept my deposit' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Kigali Tenancy Clinic' })).toBeVisible();
-  expect(api.calls.some((c) => c.path === '/search' && c.query.get('q') === 'landlord deposit' && c.query.get('library') === 'all')).toBe(true);
+  await expect.poll(() => api.calls.some((c) => c.path === '/search' && c.query.get('q') === 'landlord deposit' && c.query.get('library') === 'all')).toBe(true);
   await page.getByRole('link', { name: 'Getting your deposit back' }).click();
   await expect(page).toHaveURL(/\/guides\/1$/);
 });
@@ -66,7 +66,7 @@ test('a library can be chosen on the results page and the address keeps both cho
   await expect(page).toHaveURL(/\/search\?q=deposit&library=guides$/);
   await expect(page.getByRole('link', { name: 'Getting your deposit back' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Kigali Tenancy Clinic' })).toHaveCount(0);
-  expect(api.calls.some((c) => c.path === '/search' && c.query.get('library') === 'guides')).toBe(true);
+  await expect.poll(() => api.calls.some((c) => c.path === '/search' && c.query.get('library') === 'guides')).toBe(true);
 });
 
 test('nothing found says so in words and leads on', async ({ page }) => {
