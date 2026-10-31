@@ -1,0 +1,110 @@
+name: CI
+
+# Runs all three test suites on every push and pull request.
+# A broken change is caught here and not by someone remembering to run the tests.
+on:
+  push:
+  pull_request:
+
+jobs:
+  server:
+    name: Server — Jest + Supertest
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: alu
+          POSTGRES_PASSWORD: alu_dev
+          POSTGRES_DB: alu_legal_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run tests
+        working-directory: server
+        env:
+          TEST_DATABASE_URL: postgres://alu:alu_dev@localhost:5432/alu_legal_test
+        run: npm test
+
+  client:
+    name: Client — Vitest + build + lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Component tests
+        working-directory: client
+        run: npm test
+
+      # Catches unresolved @/ aliases, Tailwind config errors and broken imports.
+      - name: Build
+        working-directory: client
+        run: npm run build
+
+      - name: Lint
+        working-directory: client
+        run: npm run lint
+
+  e2e:
+    name: Client — Playwright
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      # The specs stub /api/** (see tests/e2e/support.js), so only the Vite dev server is
+      # needed — no backend, no database. playwright.config.js starts it itself.
+      - name: Install Chromium
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        working-directory: client
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: client/playwright-report/
+          retention-days: 7

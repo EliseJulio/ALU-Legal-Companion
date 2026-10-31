@@ -30,7 +30,7 @@ The live website is built with `VITE_API_URL=https://alu-legal-companion.onrende
 | `npm run preview` | Serves the built files to check them |
 | `npm test` | Runs the component and unit tests |
 | `npm run e2e` | Runs the browser tests at the width of a phone |
-| `npm run screenshots` | Takes the pictures used in `docs/screenshots` |
+| `npm run screenshots` | Takes new screenshots of the pages into `docs1/screenshots`. The folder is not kept in the repository |
 | `npm run lint` | Checks the code with oxlint |
 
 ## The pages
