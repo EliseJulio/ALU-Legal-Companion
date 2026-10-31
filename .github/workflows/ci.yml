@@ -16,7 +16,7 @@ jobs:
         image: postgres:16
         env:
           POSTGRES_USER: alu
-          POSTGRES_PASSWORD: alu_dev
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: alu_legal_test
         ports:
           - 5432:5432
@@ -31,7 +31,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: server/package-lock.json
 
@@ -42,7 +42,7 @@ jobs:
       - name: Run tests
         working-directory: server
         env:
-          TEST_DATABASE_URL: postgres://alu:alu_dev@localhost:5432/alu_legal_test
+          TEST_DATABASE_URL: postgres://alu@localhost:5432/alu_legal_test
         run: npm test
 
   client:
@@ -54,7 +54,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
 
@@ -84,7 +84,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
 

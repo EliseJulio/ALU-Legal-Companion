@@ -43,7 +43,7 @@ Rwanda publishes its laws but ordinary people find them hard to use. A student w
 
 | Part | Version used | Notes |
 |---|---|---|
-| Node.js | 20 or newer (built and tested on 24) | Both `server` and `client` need it |
+| Node.js | 24 (used for every test run and for CI) | The server runs on 20 or newer. The client tests need a recent Node. They failed on an older Node 20 build |
 | PostgreSQL | 16 | Any 14 or newer should work. Tested on 16 |
 | Express | 4.19 | With `helmet`, `cors`, `express-rate-limit`, `jsonwebtoken`, `bcryptjs`, `nodemailer`, `swagger-ui-express` |
 | React | 19.2 | With React Router 7, Vite 8 and Tailwind CSS 3.4 |
@@ -75,7 +75,7 @@ render.yaml       how the live version is deployed
 
 ## Run it
 
-You need Node.js 20 or newer and PostgreSQL 16.
+You need Node.js 24 (20 or newer is enough to run the server) and PostgreSQL 16.
 
 ```bash
 # 1. the database (once)

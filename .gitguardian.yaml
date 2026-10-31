@@ -1,0 +1,7 @@
+# Settings for the GitGuardian secret scanner.
+# The test folders hold made-up fixtures such as fake passwords and fake access codes.
+version: 2
+secret:
+  ignored-paths:
+    - "server/tests/**"
+    - "client/tests/**"

@@ -2,7 +2,7 @@
 // It is the only key to that record. It holds no personal information.
 //
 // It has 80 bits of randomness. It is written as 16 characters in four groups, for example
-// K7F2-9QMD-31XZ-84HC, so a person can copy it by hand. 128 bits would be 26 characters and
+// 1234-5678-9ABC-DEFG, so a person can copy it by hand. 128 bits would be 26 characters and
 // too long to write down.
 //
 // Only a hash of the token is stored. If the database leaks the tokens in it cannot be used
