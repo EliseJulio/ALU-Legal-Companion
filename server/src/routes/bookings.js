@@ -3,12 +3,13 @@
 // Anyone can also book anonymously. That booking stores no name and no account. It stores a
 // random token that is shown once.
 import { Router } from 'express';
-import { q } from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { q, pool } from '../db.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { newSubmitLimiter, newTokenLookupLimiter } from '../middleware/rateLimit.js';
 import { makeAnonToken, normalizeAnonToken, hashAnonToken } from '../services/anonToken.js';
 import { bookingAccepted } from '../services/notify.js';
+import { dailyAvailable, roomsPerDay, createRoom, createToken, roomUrl } from '../services/dailyRooms.js';
 
 const router = Router();
 
@@ -108,11 +109,12 @@ router.get('/anon/:token', tokenLimiter, async (req, res) => {
 });
 
 // GET /api/bookings/expert: the bookings for the entry linked to this expert account.
-// An anonymous requester is shown as "Anonymous". No part of the token is shown.
+// An anonymous requester gets a fixed neutral label. No part of the token or its hash is shown.
+// The expert acts on a booking by its id, so the label is never needed for that.
 router.get('/expert', requireAuth('legal_expert'), async (req, res) => {
   res.json(await q(
     `SELECT ${BOOKING_COLUMNS}, ${ROOM_WHEN_ACCEPTED},
-            CASE WHEN b.user_id IS NULL THEN 'Anonymous' ELSE u.name END AS requester
+            CASE WHEN b.user_id IS NULL THEN 'Anonymous requester' ELSE u.name END AS requester
        FROM bookings b
        JOIN providers p ON p.id = b.provider_id AND p.user_id = $1
        LEFT JOIN users u ON u.id = b.user_id
@@ -152,6 +154,112 @@ router.post('/:id/status', requireAuth('legal_expert'), requireIntParam('id'), a
     }
     throw err;
   }
+});
+
+// Joining a call. Each accepted booking gets one private video room, made the first time someone
+// joins and then reused. A limit per day stops the free minutes running out.
+const joinLimiter = newTokenLookupLimiter();
+const DAILY_LOCK = 'daily-rooms';
+const NO_ROOM = 'No video room has been set up for this appointment yet.';
+
+// The Google Meet link, only when it is a full https address on meet.google.com.
+function meetLinkOf(value) {
+  try {
+    const url = new URL(String(value));
+    return url.protocol === 'https:' && url.hostname === 'meet.google.com' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Makes the room for a booking or reuses it.
+// The booking row is locked while the room is made so two people joining at once share one room.
+// The count for the day and the new room are checked under one lock too.
+// So two bookings cannot both take the last place in the day. Returns { name } or { reason }.
+async function claimRoom(bookingId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [booking] } = await client.query(
+      'SELECT room_name FROM bookings WHERE id = $1 FOR UPDATE', [bookingId]);
+    if (booking.room_name) {
+      await client.query('COMMIT');
+      return { name: booking.room_name };
+    }
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [DAILY_LOCK]);
+    // The day starts at midnight in Kigali, not in UTC.
+    const { rows: [{ made }] } = await client.query(
+      `SELECT count(*)::int AS made FROM bookings
+        WHERE room_created_at >= (date_trunc('day', now() AT TIME ZONE 'Africa/Kigali') AT TIME ZONE 'Africa/Kigali')`);
+    if (made >= roomsPerDay()) {
+      await client.query('ROLLBACK');
+      return { reason: 'daily_cap' };
+    }
+    let name;
+    try {
+      name = await createRoom();
+    } catch (err) {
+      // Only the error type is logged. Nothing from the request or the reply is written down.
+      console.error('[video] room not made:', err.name);
+      await client.query('ROLLBACK');
+      return { reason: 'daily_failed' };
+    }
+    await client.query(
+      'UPDATE bookings SET room_name = $1, room_created_at = now() WHERE id = $2', [name, bookingId]);
+    await client.query('COMMIT');
+    return { name };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// The answer when the call cannot start in the platform.
+// The Meet link is given only for an accepted booking. The caller checks that before it gets here.
+function fallbackReply(res, meetLink, reason) {
+  const meet = meetLinkOf(meetLink);
+  if (meet) return res.json({ provider: 'meet', url: meet, reason });
+  return res.json({ provider: 'none', message: NO_ROOM, reason });
+}
+
+// POST /api/bookings/:id/join: the signed-in owner or the lawyer or the anonymous booker with the code.
+// The code goes in the body and never in the address. Anyone else gets 404.
+router.post('/:id/join', joinLimiter, optionalAuth, requireIntParam('id'), async (req, res) => {
+  const NOT_FOUND = { error: 'Not found' };
+  const typed = typeof req.body?.anon_token === 'string' ? normalizeAnonToken(req.body.anon_token) : null;
+  const audioOnly = req.body?.audio_only === true;
+  // The code is matched in SQL against the stored hash. Nothing is returned about the code.
+  const [row] = await q(
+    `SELECT b.id, b.status, b.user_id, p.user_id AS expert_user_id, p.meet_link,
+            (b.anon_token IS NOT NULL AND b.anon_token = $2) AS anon_match
+       FROM bookings b JOIN providers p ON p.id = b.provider_id
+      WHERE b.id = $1`,
+    [req.params.id, typed ? hashAnonToken(typed) : null]);
+  if (!row) return res.status(404).json(NOT_FOUND);
+
+  // The lawyer must still hold the legal_expert role. The role is read from the database.
+  const expert = req.user?.role === 'legal_expert' && row.expert_user_id === req.user.id;
+  const owner = Boolean(req.user) && row.user_id === req.user.id;
+  if (!expert && !owner && !row.anon_match) return res.status(404).json(NOT_FOUND);
+
+  // A request that is not accepted has no call. Its Meet link is never sent.
+  if (row.status !== 'accepted') {
+    return res.status(409).json({ error: 'This consultation has not been accepted yet, so there is no call to join.' });
+  }
+
+  const room = dailyAvailable() ? await claimRoom(row.id) : { reason: 'daily_unavailable' };
+  if (room.name) {
+    try {
+      const token = await createToken(room.name, { owner: expert, audioOnly });
+      return res.json({ provider: 'daily', url: roomUrl(room.name), token, audioOnlyAllowed: true });
+    } catch (err) {
+      console.error('[video] token not made:', err.name);
+      return fallbackReply(res, row.meet_link, 'daily_failed');
+    }
+  }
+  return fallbackReply(res, row.meet_link, room.reason);
 });
 
 export default router;
