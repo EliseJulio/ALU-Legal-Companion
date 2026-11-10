@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 
-export const SITE_NAME = 'ALU Legal Companion';
+const SITE_NAME = 'ALU Legal Companion';
 
-// Sets the title of the browser tab from the heading of the page. The tab title is the first thing a
-// screen reader says when a page opens, and a different page needs a different title. The heading
-// is read from the main area and watched, so a page that loads its name later is covered, and no page
-// has to set a title of its own. The front page and a page with no heading yet use the name of the site.
+// Sets the title of the browser tab from the heading of the page.
+// A screen reader says the tab title first when a page opens. A different page needs a different title.
+// The heading is read from the main area and watched. A page that loads its name later is covered.
+// No page has to set a title of its own.
+// The front page and a page with no heading yet use the name of the site.
 export function usePageTitle(mainRef, isFrontPage) {
   useEffect(() => {
     const main = mainRef.current;

@@ -4,7 +4,7 @@ const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 const STORAGE_KEY = 'alc.token';
 
 // The login token is kept in memory and in localStorage so a reload keeps the login.
-// The text "undefined" or "null" is not a token. It is what an old bug could leave behind.
+// The text "undefined" or "null" is not a token and is ignored.
 let token = null;
 try {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -58,10 +58,11 @@ export class ApiError extends Error {
 // `anonymous: true` leaves the login out of the request. An anonymous page must say so itself.
 // The server would ignore the login on those routes. Still the page should never send a
 // credential that an anonymous request does not need.
-async function request(method, path, body, { anonymous = false, raw = false } = {}) {
+async function request(method, path, body, { anonymous = false, raw = false, form = false } = {}) {
   const headers = { Accept: 'application/json' };
   // `raw` sends a file as the body itself. That is how a matter document is uploaded.
-  if (body !== undefined) headers['Content-Type'] = raw ? body.type : 'application/json';
+  // `form` sends a FormData. The browser writes the Content-Type itself, with the boundary.
+  if (body !== undefined && !form) headers['Content-Type'] = raw ? body.type : 'application/json';
   if (token && !anonymous) headers.Authorization = `Bearer ${token}`;
 
   let res;
@@ -69,7 +70,7 @@ async function request(method, path, body, { anonymous = false, raw = false } = 
     res = await fetch(`${BASE}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : raw ? body : JSON.stringify(body),
+      body: body === undefined ? undefined : (raw || form) ? body : JSON.stringify(body),
     });
   } catch {
     // No answer at all. Status 0 lets a page offer "check your connection".
@@ -113,9 +114,7 @@ export const apiPost = (path, body = {}, options) => request('POST', path, body,
 export const apiPut = (path, body = {}) => request('PUT', path, body);
 export const apiDelete = (path) => request('DELETE', path);
 export const apiUpload = (path, file) => request('POST', path, file, { raw: true });
-// A full address on the API's origin. For things the browser fetches itself such as an img src.
-// The page and the API are on different origins so a path starting with / would reach the wrong server.
-export const apiUrl = (path) => `${BASE}${path}`;
+export const apiPostForm = (path, formData) => request('POST', path, formData, { form: true });
 
 // A file as a Blob. A document download needs the login and a plain link cannot send it. So the
 // page fetches the file itself and hands the browser the bytes.

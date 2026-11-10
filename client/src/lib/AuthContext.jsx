@@ -13,19 +13,24 @@ export function AuthProvider({ children }) {
     setUser(session.user);
   }, []);
 
+  // Resolves true when the server answered the sign-out. It resolves false when no answer came (status 0).
+  // The browser is signed out either way. The caller decides what to tell the person.
   const signOut = useCallback(async () => {
     // The server is told first, while the token is still there. The server ends the session
     // on its side. Clearing the browser alone would leave the same token working for days.
     // The local clear is in `finally`. If the request fails the person must still end up
     // signed out here. This app runs on shared campus machines.
+    let reached = true;
     try {
       await apiPost('/auth/logout');
-    } catch {
-      /* The session ends here either way. */
+    } catch (error) {
+      // Status 0 is "no answer at all". Any HTTP answer means the server was reached.
+      reached = error?.status !== 0;
     } finally {
       clearSession();
       setUser(null);
     }
+    return reached;
   }, []);
 
   // A session can also end without anyone choosing it. The token lasts 7 days and the server
@@ -45,4 +50,12 @@ export function useAuth() {
   // failure to notice so it fails loudly.
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
+}
+
+// The signed-in user or null with no provider.
+// It is for a small part of a page that only needs to know who is signed in (the breadcrumb).
+// A page that needs the session uses useAuth.
+// oxlint-disable-next-line react/only-export-components
+export function useOptionalUser() {
+  return useContext(AuthContext)?.user ?? null;
 }
