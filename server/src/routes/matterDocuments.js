@@ -1,5 +1,4 @@
-// Documents attached to a matter. A passport. A sale agreement. A TIN certificate. The things a
-// lawyer checks before an application goes in.
+// Documents attached to a matter, such as a passport or a sale agreement.
 //
 // ACCESS is exactly the access to the matter. It goes through loadMatter and nothing is added to it.
 // The owner can upload and read and replace and delete. The legal expert the matter is shared with
@@ -19,18 +18,15 @@ import { documentChanged, lawyerRespondedOnDocument } from '../services/notify.j
 import { loadMatter } from './matters.js';
 import {
   documentsEnabled, detectType, storeDocument, readDocument, removeDocumentFile,
-  MAX_BYTES, MAX_PER_MATTER, MIME_TYPES, EXTENSION,
+  countFiles, MAX_BYTES, MAX_PER_MATTER, MAX_PER_PERSON, MIME_TYPES, EXTENSION,
 } from '../services/documentStore.js';
 
 // mergeParams because the matter id is in the path this router is mounted on.
 const router = Router({ mergeParams: true });
 const ROLES = ['student', 'staff', 'legal_expert'];
 const MAX_LABEL = 120;
-// Across all the matters of one person. A few dozen files is real use. It limits what one account
-// can store. Without it the cap for one matter would only mean make more matters.
-const MAX_PER_PERSON = 100;
 
-// A refusal decided inside the upload transaction. It carries the status and the message.
+// A refusal found inside the upload transaction. It carries the status and the message.
 class Refusal extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
@@ -39,8 +35,9 @@ class Refusal extends Error {
 // handler refuses it.
 const rawFile = express.raw({ type: MIME_TYPES, limit: MAX_BYTES });
 
-// The columns are listed one by one. stored_name, iv, auth_tag and sha256 are how the server finds
-// and decrypts the file. None of them is ever sent to a browser.
+// The columns are listed one by one.
+// stored_name and iv and auth_tag and sha256 are how the server finds and decrypts the file.
+// None of them is ever sent to a browser.
 const VIEW = 'id, label, mime, size_bytes, uploaded_at, item_key, review_status, review_note, reviewed_at';
 
 function view(r) {
@@ -90,9 +87,9 @@ router.get('/', requireAuth(...ROLES), requireIntParam('matterId'), async (req, 
          FROM matter_document_comments c JOIN users u ON u.id = c.author_id
         WHERE c.document_id = ANY($1::int[]) ORDER BY c.id`, [rows.map((r) => r.id)])
     : [];
-  // The owner sees which lawyer wrote a comment. They chose to share with that office. A lawyer is
-  // never shown another lawyer's name because comments outlive a change of who the matter is shared
-  // with. They are told only which ones are their own.
+  // The owner sees the lawyer's name on a comment. A lawyer is never shown another lawyer's name,
+  // because comments outlive a change of who the matter is shared with. They see only which
+  // comments are their own.
   res.json(rows.map((r) => ({
     ...view(r),
     comments: comments.filter((c) => c.document_id === r.id).map((c) => ({
@@ -148,10 +145,10 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
   const explicitItem = req.query.item !== undefined;
   const stored = await storeDocument(req.body);
 
-  // Is there room, is the swap still valid and the insert are one decision. It is made under a lock
-  // on the matter in one transaction. As separate steps a burst of parallel uploads all saw room and
-  // all went in. Two parallel replaces of one document both succeeded. The lock is held only for
-  // these few statements. The slow work of encrypting and writing the file was done above.
+  // The room check and the swap check and the insert run under a lock on the matter in one transaction.
+  // As separate steps a burst of parallel uploads would all see room and all go in.
+  // Two parallel replaces of one document would both succeed.
+  // The lock is held only for these few statements. The slow work of encrypting and writing the file is done above.
   const client = await pool.connect();
   let row;
   let oldName = null;
@@ -170,13 +167,10 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
       oldName = gone.rows[0].stored_name;
       inheritedItem = gone.rows[0].item_key;
     } else {
-      const { rows: [{ n }] } = await client.query('SELECT count(*)::int AS n FROM matter_documents WHERE matter_id = $1', [access.matter.id]);
-      if (n >= MAX_PER_MATTER) {
+      const { inMatter, total } = await countFiles(client, access.matter.id, req.user.id);
+      if (inMatter >= MAX_PER_MATTER) {
         throw new Refusal(400, `A matter can hold up to ${MAX_PER_MATTER} documents. Delete one to add another.`);
       }
-      const { rows: [{ total }] } = await client.query(
-        'SELECT count(*)::int AS total FROM matter_documents d JOIN matters m ON m.id = d.matter_id WHERE m.user_id = $1',
-        [req.user.id]);
       if (total >= MAX_PER_PERSON) {
         throw new Refusal(400, `You can keep up to ${MAX_PER_PERSON} documents in total. Delete some to add more.`);
       }
@@ -201,8 +195,8 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
     client.release();
   }
 
-  // The old file goes only now that the new row is committed. It was a new row and not an update. So
-  // a verdict on the old bytes cannot follow the new ones. The check starts again.
+  // The old file is removed only after the new row is committed. The new row is a new check, so
+  // a verdict on the old bytes cannot follow the new ones.
   if (oldName) await removeDocumentFile(oldName);
   documentChanged(access.matter.id); // tells the lawyer the matter is shared with, if any
   res.status(201).json(view(row));
@@ -210,12 +204,12 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
 
 const VERDICTS = ['complete', 'needs_fix', 'out_of_date'];
 const MAX_NOTE = 1000;
-// How a verdict reads in the history of the matter. In the words of the owner.
+// The wording of each verdict in the matter history.
 const PHRASE = { complete: 'looks complete', needs_fix: 'needs fixing', out_of_date: 'is out of date' };
 
-// PUT /api/matters/:matterId/documents/:docId/review { status, note } : the legal expert this matter
-// is shared with at this moment and nobody else. The owner cannot check their own documents. The point
-// is an independent look. Stopping the share ends this on the next request.
+// PUT /api/matters/:matterId/documents/:docId/review { status, note } : only the legal expert the
+// matter is shared with at this moment. The owner cannot check their own documents. Stopping the
+// share ends this on the next request.
 router.put('/:docId/review', requireAuth(...ROLES), requireIntParam('matterId'), requireIntParam('docId'), async (req, res) => {
   const access = await loadMatter(req.params.matterId, req.user);
   if (!access || access.as !== 'expert') return res.status(404).json({ error: 'Document not found' });

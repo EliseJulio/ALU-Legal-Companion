@@ -2,7 +2,7 @@
 // The server replaces the checklist on every save. So every field must survive the trip. A source
 // link or an "only if" condition dropped here is dropped from the checklist and nobody is told.
 
-export const ITEM_TEXT = ['key', 'name', 'notes', 'where_to_get', 'required_if', 'source_url'];
+const ITEM_TEXT = ['key', 'name', 'notes', 'where_to_get', 'required_if', 'source_url'];
 
 const str = (v) => (v === null || v === undefined ? '' : String(v));
 

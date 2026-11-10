@@ -5,7 +5,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import Field from '@/components/Field';
 import { secureAddress } from '@/lib/url';
-import { PANEL, RING, FIELD, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
+import { CARD, RING, FIELD, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
 
 // The documents on a matter. One component for the two people who may see them. The owner uploads
 // and replaces and removes. The legal expert the matter is shared with reads each file and gives a
@@ -17,7 +17,7 @@ const FILE_FIELD = 'mt-1 block min-h-touch w-full text-sm';
 const ACCEPT = 'application/pdf,image/png,image/jpeg';
 const EXTENSION = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg' };
 const MAX_LABEL = 120;
-const NOTE = 'mt-2 rounded border border-border bg-canvas p-2 text-sm';
+const NOTE = 'mt-2 rounded-card border border-border bg-canvas p-2 text-sm';
 
 const VERDICTS = [
   ['complete', 'Complete'],
@@ -41,9 +41,27 @@ function ReviewForm({ doc, onSave, busy }) {
       className="mt-3 border-t border-border pt-3"
       onSubmit={(event) => { event.preventDefault(); onSave(doc, { status, note: note.trim() }); }}
     >
-      <Field id={`verdict-${doc.id}`} label="Your check of this file" as="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-        {VERDICTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </Field>
+      {/* The verdict is a group of radio buttons. Each is a word in a 44 px box. The chosen one is inverted. */}
+      <fieldset>
+        <legend className="text-sm font-medium">Your check of this file</legend>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {VERDICTS.map(([value, label]) => (
+            <label key={value} className="cursor-pointer">
+              <input
+                type="radio"
+                name={`verdict-${doc.id}`}
+                value={value}
+                checked={status === value}
+                onChange={() => setStatus(value)}
+                className="peer sr-only"
+              />
+              <span className="inline-flex min-h-touch items-center rounded-control border border-control px-4 text-sm font-medium text-ink peer-checked:border-primary peer-checked:bg-primary-subtle peer-checked:font-semibold peer-checked:text-primary-text peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-surface">
+                {label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <Field
         id={`note-${doc.id}`}
         label={`Note ${needsNote ? '(required. Say what is wrong so the owner knows what to fix)' : '(optional)'}`}
@@ -235,7 +253,7 @@ export default function MatterDocuments({ matter, viewer }) {
           <p className="text-sm font-semibold">Comments</p>
           <ul className="mt-1 space-y-2">
             {doc.comments.map((c) => (
-              <li key={c.id} className="rounded border border-border p-2 text-sm">
+              <li key={c.id} className="rounded-card border border-border p-2 text-sm">
                 <span className="block text-xs text-muted-foreground">
                   {c.by_you ? 'You' : (c.author_name ?? 'Another lawyer')} · {c.created_at?.slice(0, 10)}
                 </span>
@@ -277,8 +295,8 @@ export default function MatterDocuments({ matter, viewer }) {
   );
 
   return (
-    <section className={`mt-6 ${PANEL}`} aria-labelledby="docs-heading">
-      <h2 id="docs-heading" className="font-head text-2xl leading-heading text-primary">Documents</h2>
+    <section className={`mt-6 ${CARD}`} aria-labelledby="docs-heading">
+      <h2 id="docs-heading" className="font-head text-base font-semibold leading-[1.3] text-ink">Documents</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {owner
           ? 'Documents are stored encrypted. Only you and the legal expert you share this matter with can open them. You can delete any of them at any time.'
@@ -355,7 +373,7 @@ export default function MatterDocuments({ matter, viewer }) {
       {items.length > 0 && (
         <ul className="mt-4 space-y-3">
           {items.map((item) => (
-            <li key={item.key} className="rounded border border-border p-3">
+            <li key={item.key} className="rounded-card border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-sans font-semibold">{item.name}</span>
                 <StatusPill status={shown(item.state)} />
@@ -368,7 +386,7 @@ export default function MatterDocuments({ matter, viewer }) {
               {secureAddress(item.source_url) && (
                 <a href={secureAddress(item.source_url)} target="_blank" rel="noopener noreferrer"
                   aria-label={`Source for ${item.name} (opens in a new tab)`}
-                  className={`inline-flex min-h-touch items-center text-sm font-semibold text-primary underline ${RING}`}>
+                  className={`inline-flex min-h-touch items-center text-sm font-semibold text-primary-text underline ${RING}`}>
                   Source ↗
                 </a>
               )}
@@ -391,10 +409,10 @@ export default function MatterDocuments({ matter, viewer }) {
 
       {others.length > 0 && (
         <div className="mt-4">
-          <h3 className="font-head text-xl leading-heading text-primary">{items.length > 0 ? 'Other documents' : 'Documents on this matter'}</h3>
+          <h3 className="font-head text-[17px] leading-[1.25] text-ink">{items.length > 0 ? 'Other documents' : 'Documents on this matter'}</h3>
           <ul className="mt-2 space-y-3">
             {others.map((doc) => (
-              <li key={doc.id} className="rounded border border-border p-3">
+              <li key={doc.id} className="rounded-card border border-border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">Added {doc.uploaded_at?.slice(0, 10)}</span>
                   <StatusPill status={shown(doc.review.status)} />
@@ -412,7 +430,7 @@ export default function MatterDocuments({ matter, viewer }) {
 
       {owner && open && (
         <div className="mt-4 border-t border-border pt-3">
-          <h3 className="font-head text-xl leading-heading text-primary">Add another document</h3>
+          <h3 className="font-head text-[17px] leading-[1.25] text-ink">Add another document</h3>
           <label htmlFor="other-label" className="mt-2 block text-sm font-medium">What is it? (for example, Rental agreement)</label>
           <input id="other-label" type="text" maxLength={MAX_LABEL} value={otherLabel} onChange={(e) => setOtherLabel(e.target.value)} className={FIELD} />
           <FilePicker
