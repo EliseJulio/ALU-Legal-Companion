@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
 
-// A small hook that loads a path when the page opens. It is not react-query on purpose. No
-// server data is shared between pages here so a cache would be unused weight.
+// A small hook that loads a path when the page opens. No server data is shared between pages,
+// so there is no cache.
 export function useApi(path) {
   // `path` is kept with the answer. When the path changes the old answer is not the answer to
   // the new question. So it is not handed out for even one render.

@@ -1,24 +1,25 @@
 import { Link } from 'react-router-dom';
 import Icon from '@/components/Icon';
-import { RING_ON_CHROME } from '@/lib/ui';
+import { RING_ON_CANVAS } from '@/lib/ui';
 
-// The link to the emergency numbers. It is a pale pill with crimson text so it stands out on
-// the dark side bar. Crimson text on the navy itself would fail. It is always in the side bar
-// or the phone bar. It is never inside a menu.
-// `compact` is for the narrow side bar. The words stay on the screen, small and under the icon,
-// because not everyone knows the symbol. On a phone the pill is small and its words take two lines,
-// so the brand, this link and Menu fit on one row. From 640 px up it is the full pill.
-export default function EmergencyLink({ className = '', compact = false }) {
-  const shape = compact
-    ? 'rounded-pill lg:flex-col lg:gap-0.5 lg:rounded-xl lg:px-1 lg:py-1.5 lg:text-center lg:text-[11px] lg:leading-tight'
-    : 'rounded-pill';
+// The link to the emergency numbers. It is the one red thing in the app.
+// It is on every page for every person. It sits in the top bar and never inside a menu.
+// The words are always shown because not everyone knows the warning sign.
+// On a phone the words may take two lines so the pill stays one touch target tall or taller.
+// `roomy` is the wide top bar with 18 px either side. Elsewhere it stays compact.
+// `short` is the phone bar. "Numbers" is read out only so the pill stays on one line.
+// The link keeps its full name for a screen reader.
+export default function EmergencyLink({ className = '', roomy = false, short = false }) {
+  const padding = roomy ? 'px-[18px]' : 'px-3 sm:px-4';
   return (
     <Link
       to="/emergency"
-      className={`inline-flex min-h-touch max-w-[7.5rem] items-center justify-center gap-1.5 bg-pill px-2.5 text-xs font-semibold leading-tight text-pill-foreground sm:max-w-none sm:px-4 sm:text-sm sm:leading-normal ${shape} ${RING_ON_CHROME} ${className}`}
+      // The short form names itself in full, so a screen reader hears "Emergency numbers".
+      aria-label={short ? 'Emergency numbers' : undefined}
+      className={`inline-flex min-h-touch min-w-touch items-center justify-center gap-2 rounded-control bg-alert py-2 text-left text-sm font-semibold leading-tight text-alert-foreground sm:whitespace-nowrap ${padding} ${RING_ON_CANVAS} ${className}`}
     >
-      <Icon name="warning" className={compact ? 'text-base lg:text-xl' : 'text-base'} />
-      Emergency numbers
+      <Icon name="warning" />
+      {short ? 'Emergency' : 'Emergency numbers'}
     </Link>
   );
 }

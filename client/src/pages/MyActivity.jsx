@@ -11,12 +11,11 @@ import MeetLink from '@/components/MeetLink';
 import StatusPill from '@/components/StatusPill';
 import { bookingStatusStep, readableSlot } from '@/lib/bookings';
 import { readableDate } from '@/lib/dates';
-import { BUTTON_PRIMARY, BUTTON_OUTLINE, BUTTON_TEXT } from '@/lib/ui';
+import { BUTTON_PRIMARY, BUTTON_OUTLINE, BUTTON_TEXT, CARD } from '@/lib/ui';
 
-const PANEL = 'rounded-card border border-border bg-surface p-6';
-const H2 = 'font-head text-2xl leading-heading text-primary';
+const H2 = 'font-head text-base font-semibold leading-[1.3] text-ink';
 const CELL = 'px-4 py-4 align-top text-sm';
-const HEAD = 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const HEAD = 'px-4 py-3 text-sm font-semibold text-muted-foreground';
 
 // The answer decides the status, not the status word the server keeps.
 const questionStatus = (question) => (question.answer ? 'answered' : 'awaiting_response');
@@ -31,11 +30,11 @@ function Answer({ question }) {
   );
 }
 
-// Questions on a wide screen: one row each. The answer, or the plain fact that there is none yet,
-// is in the Detail column so the reader never has to open anything.
+// Questions on a wide screen: one row each.
+// The answer is in the Detail column. If there is none yet the column says so. The reader never has to open anything.
 function QuestionTable({ questions }) {
   return (
-    <div className="mt-3 overflow-x-auto rounded-card border border-border bg-surface">
+    <div data-scroll="intended" className="mt-3 overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full min-w-[48rem] text-left">
         <caption className="sr-only">Your questions with their status and the reply if there is one</caption>
         <thead className="border-b border-border bg-canvas">
@@ -44,7 +43,7 @@ function QuestionTable({ questions }) {
         <tbody className="divide-y divide-border">
           {questions.map((q) => (
             <tr key={q.id}>
-              <td className={`${CELL} w-[18rem]`}><p className="whitespace-pre-line font-semibold text-primary">{q.text}</p></td>
+              <td className={`${CELL} w-[18rem]`}><p className="whitespace-pre-line font-semibold text-primary-text">{q.text}</p></td>
               <td className={CELL}><StatusPill status={questionStatus(q)} /></td>
               <td className={CELL}>
                 {q.answer ? (
@@ -71,7 +70,7 @@ function QuestionCards({ questions }) {
       {questions.map((question) => {
         const sent = readableDate(question.created_at);
         return (
-          <li key={question.id} className={PANEL}>
+          <li key={question.id} className={CARD}>
             <StatusPill status={questionStatus(question)} />
             <p className="mt-2 text-xs font-medium text-muted-foreground">You asked</p>
             <p className="mt-1 whitespace-pre-line">{question.text}</p>
@@ -109,7 +108,7 @@ function BookingDetail({ booking, step }) {
 
 function BookingTable({ bookings }) {
   return (
-    <div className="mt-3 overflow-x-auto rounded-card border border-border bg-surface">
+    <div data-scroll="intended" className="mt-3 overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full min-w-[52rem] text-left">
         <caption className="sr-only">Your consultation requests with their status and what to do next</caption>
         <thead className="border-b border-border bg-canvas">
@@ -120,7 +119,7 @@ function BookingTable({ bookings }) {
             const step = bookingStatusStep(booking.status);
             return (
               <tr key={booking.id}>
-                <th scope="row" className={`${CELL} w-[14rem] font-normal`}><p className="font-semibold text-primary">{booking.provider_name}</p></th>
+                <th scope="row" className={`${CELL} w-[14rem] font-normal`}><p className="font-semibold text-primary-text">{booking.provider_name}</p></th>
                 <td className={CELL}><StatusPill status={booking.status} /></td>
                 <td className={CELL}><BookingDetail booking={booking} step={step} /></td>
                 <td className={`${CELL} w-[20rem]`}>
@@ -142,9 +141,9 @@ function BookingCards({ bookings }) {
       {bookings.map((booking) => {
         const step = bookingStatusStep(booking.status);
         return (
-          <li key={booking.id} className={PANEL}>
+          <li key={booking.id} className={CARD}>
             <StatusPill status={booking.status} />
-            <h3 className="mt-2 font-head font-semibold text-primary">{step.heading}</h3>
+            <h3 className="mt-2 font-head font-semibold text-ink">{step.heading}</h3>
             <p className="mt-1 text-sm">{step.body}</p>
             <dl className="mt-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
               <dt className="text-muted-foreground">With</dt>
@@ -162,9 +161,9 @@ function BookingCards({ bookings }) {
   );
 }
 
-// The questions and bookings kept with a student or staff account. An anonymous question or
-// booking stores no account, so it can never appear here. The page says so, because an empty
-// list would otherwise look like a lost question.
+// The questions and bookings kept with a student or staff account.
+// An anonymous question or booking stores no account so it never appears here.
+// The page says so because an empty list would otherwise look like a lost question.
 export default function MyActivity() {
   const { user } = useAuth();
   const here = useLocation();
@@ -179,11 +178,11 @@ export default function MyActivity() {
 
   return (
     <div>
-      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="My Activity" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">My Activity</h1>
+      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="My activity" />
+      <h1 className="mt-6 font-head text-[length:clamp(24px,2.7vw,30px)] leading-[1.15] tracking-[-0.01em] text-ink">My activity</h1>
 
       {!user ? (
-        <div className={`mt-6 ${PANEL}`}>
+        <div className={`mt-6 ${CARD}`}>
           <p className="font-medium">Sign in to see what you have asked for.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             This page lists the questions and appointments kept with your account. Asking
@@ -192,7 +191,7 @@ export default function MyActivity() {
           <Link to={signInPath(here)} className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
         </div>
       ) : !canTrack ? (
-        <div className={`mt-6 ${PANEL}`}>
+        <div className={`mt-6 ${CARD}`}>
           <p className="font-medium">This page tracks student and staff accounts.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             You are signed in as {user.name}. Questions and appointments are kept with the account
@@ -214,7 +213,7 @@ export default function MyActivity() {
                 not say which half of the page is empty because it failed. */}
             {questionsError && <ErrorNotice error={questionsError} className="mt-3" />}
             {questions?.length === 0 && (
-              <div className={`mt-3 ${PANEL}`}>
+              <div className={`mt-3 ${CARD}`}>
                 <p className="font-medium">You have not asked a legal expert anything yet.</p>
                 <Link to="/ask" className={`${BUTTON_PRIMARY} mt-3`}>Ask a lawyer</Link>
               </div>
@@ -225,11 +224,14 @@ export default function MyActivity() {
 
           <section aria-labelledby="bookings-heading" className="mt-10">
             <h2 id="bookings-heading" className={H2}>Consultation requests</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Appointments you requested with this account.</p>
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Appointments you requested with this account. They are on your Calendar.</p>
+              <Link to="/calendar" className={BUTTON_OUTLINE}>Open Calendar</Link>
+            </div>
             {bookingsLoading && <p className="mt-3 text-muted-foreground">Loading your appointments…</p>}
             {bookingsError && <ErrorNotice error={bookingsError} className="mt-3" />}
             {bookings?.length === 0 && (
-              <div className={`mt-3 ${PANEL}`}>
+              <div className={`mt-3 ${CARD}`}>
                 <p className="font-medium">You have not requested an appointment yet.</p>
                 <Link to="/directory" className={`${BUTTON_PRIMARY} mt-3`}>Find a lawyer</Link>
               </div>
@@ -243,7 +245,7 @@ export default function MyActivity() {
             </Callout>
             {/* This sentence matters most when a list is empty. Someone who asked anonymously
                 and finds nothing here would think the question was lost. */}
-            <section className={PANEL} aria-labelledby="anon-heading">
+            <section className={CARD} aria-labelledby="anon-heading">
               <h2 id="anon-heading" className={H2}>Asked anonymously?</h2>
               <p className="mt-2 text-sm">
                 Anything you sent anonymously is never listed here. It is stored with no account

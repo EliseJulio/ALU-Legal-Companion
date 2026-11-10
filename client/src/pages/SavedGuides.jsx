@@ -11,18 +11,18 @@ import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import { DOMAINS } from '@/lib/directory';
-import { BUTTON_PRIMARY, BUTTON_TEXT } from '@/lib/ui';
+import { BUTTON_PRIMARY, BUTTON_TEXT, CARD } from '@/lib/ui';
 
 const CELL = 'px-4 py-4 align-top text-sm';
-const HEAD = 'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+const HEAD = 'px-4 py-3 text-sm font-semibold text-muted-foreground';
 const subjectOf = (domain) => DOMAINS.find((d) => d.value === domain)?.label ?? 'Not recorded';
 
-// The saved guides in one table for a wide screen. Each row has the one link to read the guide
-// and the button to take it off the list. The guide's name is the row heading, not a link, so
-// the page does not read as two links to the same place.
+// The saved guides in one table for a wide screen.
+// Each row has the one link to read the guide and the button to take it off the list.
+// The guide's name is the row heading and not a link. The page does not read as two links to the same place.
 function SavedTable({ guides, onRemoved }) {
   return (
-    <div className="mt-6 overflow-x-auto rounded-card border border-border bg-surface">
+    <div data-scroll="intended" className="mt-6 overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full min-w-[52rem] text-left">
         <caption className="sr-only">Your saved guides with their subject, who checked them and what you can do</caption>
         <thead className="border-b border-border bg-canvas">
@@ -35,19 +35,19 @@ function SavedTable({ guides, onRemoved }) {
         <tbody className="divide-y divide-border">
           {guides.map((g) => {
             const withdrawn = g.status === 'withdrawn';
-            const underReview = !withdrawn && g.status !== 'published';
+            const unavailable = !withdrawn && g.status !== 'published';
             return (
               <tr key={g.id}>
                 <th scope="row" className={`${CELL} w-[22rem] font-normal`}>
-                  <p className="font-head text-xl leading-heading text-primary">{g.title}</p>
-                  <p className="mt-1 w-fit rounded bg-primary-subtle px-2 py-0.5 font-mono text-xs text-primary">{g.source_law}</p>
+                  <p className="font-head text-[17px] leading-[1.25] text-ink">{g.title}</p>
+                  <p className="mt-1 w-fit rounded-control bg-primary-subtle px-2 py-0.5 font-mono text-xs text-primary-text">{g.source_law}</p>
                 </th>
                 <td className={CELL}>{subjectOf(g.domain)}</td>
                 <td className={CELL}>
                   {withdrawn ? (
                     <p className="text-sm text-muted-foreground">Withdrawn</p>
-                  ) : underReview ? (
-                    <p className="text-sm text-muted-foreground">Under review</p>
+                  ) : unavailable ? (
+                    <p className="text-sm text-muted-foreground">Not available</p>
                   ) : (
                     <p className="text-xs text-muted-foreground">Private save</p>
                   )}
@@ -55,9 +55,9 @@ function SavedTable({ guides, onRemoved }) {
                 <td className={`${CELL} w-[14rem]`}>
                   {withdrawn ? (
                     <p className="text-sm text-muted-foreground">This guide has been withdrawn.</p>
-                  ) : underReview ? (
+                  ) : unavailable ? (
                     <p className="text-sm text-muted-foreground">
-                      This guide is currently under review and will be visible again shortly.
+                      This guide is not available right now. Your save is kept, and it comes back when the guide is published again.
                     </p>
                   ) : (
                     <Link to={`/guides/${g.id}`} className={`${BUTTON_PRIMARY} w-full`}>
@@ -77,16 +77,16 @@ function SavedTable({ guides, onRemoved }) {
 
 // A saved guide that is not currently published. No link to read it: GET /api/guides/:id 404s for
 // anything unpublished, the same as a guide this reader never saved. The save itself is kept and
-// the row comes back once an administrator republishes the guide.
-function UnderReviewCard({ guide, action }) {
+// the row comes back once an administrator publishes the guide again.
+function UnavailableCard({ guide, action }) {
   const withdrawn = guide.status === 'withdrawn';
   return (
     <li className="flex flex-col gap-3 rounded-card border border-border bg-canvas p-6">
-      <p className="font-head text-xl leading-heading text-primary">{guide.title}</p>
+      <p className="font-head text-[17px] leading-[1.25] text-ink">{guide.title}</p>
       <p className="text-sm text-muted-foreground">
         {withdrawn
           ? 'This guide has been withdrawn.'
-          : 'This guide is currently under review and will be visible again shortly.'}
+          : 'This guide is not available right now. Your save is kept, and it comes back when the guide is published again.'}
       </p>
       {action}
     </li>
@@ -126,11 +126,11 @@ export default function SavedGuides() {
 
   return (
     <div>
-      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Saved Resources" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Saved Resources</h1>
+      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Saved resources" />
+      <h1 className="mt-6 font-head text-[length:clamp(24px,2.7vw,30px)] leading-[1.15] tracking-[-0.01em] text-ink">Saved resources</h1>
 
       {!user ? (
-        <div className="mt-6 rounded-card border border-border bg-surface p-6">
+        <div className={`mt-6 ${CARD}`}>
           <p className="font-medium">Sign in to see your saved guides.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Saving a guide keeps it with your account. Reading the guides never needs one.
@@ -139,7 +139,7 @@ export default function SavedGuides() {
         </div>
       ) : !canSave ? (
         // Not an error box. Nothing failed. This account type just keeps no saved list.
-        <div className="mt-6 rounded-card border border-border bg-surface p-6">
+        <div className={`mt-6 ${CARD}`}>
           <p className="font-medium">Saved guides are for student and staff accounts.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             You are signed in as {user.name}. Nothing is missing and nothing has gone wrong. Every
@@ -165,7 +165,7 @@ export default function SavedGuides() {
           {error && <ErrorNotice error={error} className="mt-6" />}
 
           {shown?.length === 0 && (
-            <div className="mt-6 rounded-card border border-border bg-surface p-6">
+            <div className={`mt-6 ${CARD}`}>
               <p className="font-medium">You have not saved any guides yet.</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Open a guide and choose “Save guide” to keep it here for later.
@@ -182,7 +182,7 @@ export default function SavedGuides() {
               {shown.map((g) => {
                 const action = <SaveGuideButton guideId={g.id} initiallySaved title={g.title} onChange={(saved) => !saved && onRemoved(g)} />;
                 return g.status !== 'published'
-                  ? <UnderReviewCard key={g.id} guide={g} action={action} />
+                  ? <UnavailableCard key={g.id} guide={g} action={action} />
                   : <GuideCard key={g.id} guide={g} action={action} />;
               })}
             </ul>
@@ -192,7 +192,7 @@ export default function SavedGuides() {
             Check the source each time you use a guide. Saving keeps your
             reference, not a legal guarantee.
           </Callout>
-          <p className="mt-4"><Link to="/guides" className={BUTTON_TEXT}>Explore Legal Guides →</Link></p>
+          <p className="mt-4"><Link to="/guides" className={BUTTON_TEXT}>Explore Legal guides →</Link></p>
         </>
       )}
     </div>
