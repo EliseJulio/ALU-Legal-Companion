@@ -5,7 +5,7 @@ import { apiPost } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
 import { readableDate } from '@/lib/dates';
-import { PANEL, FIELD, RING, BUTTON_PRIMARY } from '@/lib/ui';
+import { CARD, FORM_TEXTAREA, RING, BUTTON_PRIMARY, PAGE_TITLE, pillClass } from '@/lib/ui';
 
 // The words for `kind`. The server says only whether a question is anonymous. It sends nothing
 // else about who asked. This page adds nothing.
@@ -46,7 +46,7 @@ function AnswerForm({ question, onDone }) {
         aria-describedby="answer-note"
         aria-required="true"
         placeholder="Provide clear legal information and name any source limits…"
-        className={FIELD}
+        className={FORM_TEXTAREA}
       />
       <p id="answer-note" className="mt-2 text-sm text-muted-foreground">
         Required. Legal information, not legal advice. Use confirmed references only.
@@ -63,12 +63,12 @@ function AnswerForm({ question, onDone }) {
 // written answer never moves to another question.
 function QuestionPane({ question, headingRef, onDone }) {
   return (
-    <article className={PANEL} aria-labelledby="question-heading">
-      <h2 id="question-heading" ref={headingRef} tabIndex={-1} className="font-head text-3xl leading-heading text-primary focus:outline-none">The question<span className="sr-only"> from {KIND_WORDS[question.kind]?.toLowerCase() ?? 'a reader'}, {readableDate(question.created_at)}</span></h2>
-      <p className="mt-1 text-xs font-medium text-muted-foreground">
+    <article className={CARD} aria-labelledby="question-heading">
+      <h2 id="question-heading" ref={headingRef} tabIndex={-1} className="font-head text-base leading-[1.3] text-ink focus:outline-none">The question<span className="sr-only"> from {KIND_WORDS[question.kind]?.toLowerCase() ?? 'a reader'}, {readableDate(question.created_at)}</span></h2>
+      <p className="mt-1 text-xs text-muted-foreground">
         {KIND_WORDS[question.kind] ?? 'Question'} · {readableDate(question.created_at)}
       </p>
-      <p className="mt-3 whitespace-pre-line">{question.text}</p>
+      <p className="mt-3.5 whitespace-pre-line text-[15px] leading-relaxed">{question.text}</p>
       <Callout title="Minimise identifying information" className="mt-4">
         Account identity is not shown. Free text can still identify a person, so do not repeat
         unnecessary sensitive details in your answer.
@@ -78,8 +78,8 @@ function QuestionPane({ question, headingRef, onDone }) {
   );
 }
 
-// Open questions, oldest first, with the chosen one beside them. Anonymous questions have no name
-// and no account behind them.
+// Open questions with the oldest first and the chosen one beside them.
+// Anonymous questions have no name and no account behind them.
 export default function ExpertQuestions() {
   const { data: questions, error, loading, refetch } = useApi('/questions/open');
   const [chosen, setChosen] = useState(null);
@@ -112,8 +112,8 @@ export default function ExpertQuestions() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Expert workspace' }]} current="Questions" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Questions from the community.</h1>
-      <p className="mt-3 max-w-reading text-muted-foreground">
+      <h1 className={`mt-6 ${PAGE_TITLE}`}>Questions from the community</h1>
+      <p className="mt-2.5 max-w-reading text-sm text-muted-foreground">
         Oldest first. Anonymous and signed-in questions do not disclose account identity to the
         expert. Answer in simple words.
       </p>
@@ -123,23 +123,30 @@ export default function ExpertQuestions() {
 
       {loading && !questions && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
-      {questions?.length === 0 && <p className={`mt-6 text-muted-foreground ${PANEL}`}>No questions are waiting.</p>}
+      {questions?.length === 0 && <p className={`mt-6 text-muted-foreground ${CARD}`}>No questions are waiting.</p>}
 
       {questions?.length > 0 && (
         <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-          <ul aria-label="Open questions" className="min-w-0 space-y-3">
+          {/* One card with a row per question. The chosen row gets a soft blue tint. */}
+          {/* No overflow clip here: it would cut off the focus ring of the first and last row. Each row takes
+              the card's corners instead, so its own colour stops at the card's edge. */}
+          <ul aria-label="Open questions" className="min-w-0 rounded-card border border-border bg-surface">
             {questions.map((question) => (
-              <li key={question.id}>
+              <li key={question.id} className="relative border-t border-border first:border-t-0 focus-within:z-10 first:[&>button]:rounded-t-card last:[&>button]:rounded-b-card">
                 <button
                   type="button"
                   aria-current={current?.id === question.id ? 'true' : undefined}
                   onClick={() => choose(question)}
-                  className={`block w-full rounded-card border p-4 text-left ${RING} ${current?.id === question.id ? 'border-primary border-l-8 bg-surface' : 'border-border bg-surface hover:border-primary'}`}
+                  className={`flex w-full min-h-touch flex-wrap items-start justify-between gap-2 p-[18px] text-left ${RING} focus-visible:ring-offset-surface ${current?.id === question.id ? 'bg-primary-subtle font-semibold' : 'hover:bg-chrome-raised'}`}
                 >
-                  <span className="block text-xs font-medium text-muted-foreground">
-                    {KIND_WORDS[question.kind] ?? 'Question'} · {readableDate(question.created_at)}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-xs text-muted-foreground">
+                      {KIND_WORDS[question.kind] ?? 'Question'} · {readableDate(question.created_at)}
+                    </span>
+                    <span className="mt-1 line-clamp-3 block text-sm font-semibold text-ink">{question.text}</span>
                   </span>
-                  <span className="mt-2 line-clamp-3 block font-head text-xl leading-heading text-primary">{question.text}</span>
+                  {/* A question with no answer yet is waiting. The word says it, not the colour. */}
+                  <span className={pillClass('neutral')}>Waiting</span>
                 </button>
               </li>
             ))}
