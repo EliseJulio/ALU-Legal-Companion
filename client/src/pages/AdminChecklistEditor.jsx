@@ -1,14 +1,27 @@
 import { useState } from 'react';
-import Breadcrumb from '@/components/Breadcrumb';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiPost, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
-import StatusPill from '@/components/StatusPill';
-import Field, { CheckField } from '@/components/Field';
+import AdminEditorPage from '@/components/AdminEditorPage';
 import RowEditor from '@/components/RowEditor';
+import Wizard from '@/components/wizard/Wizard';
+import { WizField } from '@/components/wizard/WizardField';
 import { blankItem, slugify, toApiChecklist, toFormChecklist } from '@/lib/checklistForm';
-import { PANEL, RING_ON_CANVAS, BUTTON_PRIMARY } from '@/lib/ui';
+import { collect, keyName, requiredText, httpsLink } from '@/lib/wizard';
+
+const LIST = '/admin/checklists';
+
+// The help card under the form, in the admin's own terms.
+const CHECKLIST_HELP = {
+  title: 'Before you publish',
+  intro: 'A matter cannot be ready without its required documents, so mark each one with care.',
+  items: [
+    'Tick required only for a document a matter cannot be ready without.',
+    'Say where each fact comes from: the official page, not a summary of it.',
+    'Use the document names the official page uses.',
+  ],
+};
 
 // The labels for the document rows. The keys are the ones the server uses. The words are for the
 // person typing.
@@ -22,6 +35,11 @@ const ITEM_FIELDS = [
   { key: 'required', label: 'Required (untick for an optional or conditional document)', checkbox: true },
 ];
 
+const ITEM_TEXT_KEYS = ['key', 'name', 'notes', 'where_to_get', 'required_if', 'source_url'];
+
+// A row with any text is a document someone meant to add. Its name is then required.
+const hasText = (row) => ITEM_TEXT_KEYS.some((k) => String(row[k] ?? '').trim() !== '');
+
 // Like the guide editor this is a place where a verified fact can be taken off the site. Saving a
 // published checklist sends it back to draft and clears the stamp. So no request is made until the
 // admin says they understand. The warning shows only for a published checklist. A warning shown on
@@ -32,33 +50,60 @@ function ChecklistForm({ list, onSaved }) {
   const [understood, setUnderstood] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [saved, setSaved] = useState(false);
   const published = list?.status === 'published';
 
-  const set = (field) => (event) => { setForm((f) => ({ ...f, [field]: event.target.value })); setSaved(false); };
-  const setItems = (items) => { setForm((f) => ({ ...f, items })); setSaved(false); };
+  const set = (field) => (event) => setForm((f) => ({ ...f, [field]: event.target.value }));
+  const setItems = (items) => setForm((f) => ({ ...f, items }));
 
-  const missing = [!form.title.trim() && 'a title', form.items.every((i) => !i.name.trim()) && 'at least one document'].filter(Boolean);
+  const basicsErrors = () => collect([
+    ['cl-title', requiredText(form.title, 'Give the checklist a title.')],
+    ['cl-slug', keyName(form.slug)],
+  ]);
+  const documentsErrors = () => {
+    const rows = form.items;
+    const checks = [];
+    if (!rows.some((r) => String(r.name ?? '').trim() !== '')) checks.push(['cl-item-add', 'Add at least one document.']);
+    rows.forEach((row, i) => {
+      if (hasText(row)) checks.push([`cl-item-${i}-name`, requiredText(row.name, 'Name the document.')]);
+      if (row.key && keyName(row.key)) checks.push([`cl-item-${i}-key`, keyName(row.key)]);
+      if (row.source_url) checks.push([`cl-item-${i}-source_url`, httpsLink(row.source_url)]);
+    });
+    return collect(checks);
+  };
 
-  async function save(event) {
-    event.preventDefault();
-    if (published && !understood) {
-      setError({ message: 'Tick the box to say you understand this checklist leaves the site until it is published again.' });
-      return;
-    }
+  // Publishing is a save followed by a publish. A draft is published with the save.
+  // A published list is saved as a draft and published again from the list once it has been read.
+  // A save returns to the list. If the publish is refused the page stays so the message is read.
+  // A new checklist that was saved but not published goes to its own page.
+  // It exists now and a second save from this form would create a copy.
+  async function save(publishAfter) {
+    if (busy) return;
     setBusy(true);
     setError(null);
-    setSaved(false);
     try {
       const body = toApiChecklist({ ...form, slug: form.slug.trim() || slugify(form.title) });
       if (list) {
-        await apiPut(`/checklists/${list.id}`, body);
-        setSaved(true);
+        const updated = await apiPut(`/checklists/${list.id}`, body);
         setUnderstood(false);
-        onSaved();
+        if (publishAfter && updated?.status !== 'published') {
+          const refusal = await publishOrSay(list.id);
+          if (refusal) {
+            setError({ message: refusal });
+            onSaved();
+            return;
+          }
+        }
+        navigate(LIST);
       } else {
         const created = await apiPost('/checklists', body);
-        navigate(`/admin/checklists/${created.id}`);
+        if (publishAfter && created?.status !== 'published') {
+          const refusal = await publishOrSay(created.id);
+          if (refusal) {
+            navigate(`/admin/checklists/${created.id}`, { state: { notice: refusal } });
+            return;
+          }
+        }
+        navigate(LIST);
       }
     } catch (err) {
       setError(err);
@@ -67,50 +112,99 @@ function ChecklistForm({ list, onSaved }) {
     }
   }
 
+  // The message when the publish was refused. It is null when it went through.
+  async function publishOrSay(id) {
+    try {
+      await apiPost(`/checklists/${id}/publish`);
+      return null;
+    } catch (err) {
+      return `Saved as a draft. It is not published yet: ${err.message}`;
+    }
+  }
+
+  const steps = [
+    {
+      id: 'basics',
+      label: 'Basics',
+      title: 'Basics',
+      lede: 'Name the task the checklist is for, in the words a student would use.',
+      validate: basicsErrors,
+      facts: () => [
+        { label: 'Title', value: form.title },
+        { label: 'Short name for the system', value: form.slug },
+        { label: 'What this checklist is for', value: form.description },
+      ],
+      render: () => (
+        <>
+          <WizField id="cl-title" label="Title" value={form.title} onChange={set('title')} />
+          <WizField
+            id="cl-slug"
+            label="Short name for the system"
+            hint="Lower-case letters, digits and hyphens. Made from the title if empty."
+            className="mt-4"
+            value={form.slug}
+            onChange={set('slug')}
+          />
+          <WizField id="cl-description" label="What this checklist is for" as="textarea" rows={3} className="mt-4" value={form.description} onChange={set('description')} />
+        </>
+      ),
+    },
+    {
+      id: 'documents',
+      label: 'Documents',
+      title: 'Documents',
+      lede: 'One row for each document. Tick required for the ones a matter cannot be ready without. Say where each fact comes from.',
+      validate: documentsErrors,
+      facts: () => form.items.map((row, i) => ({
+        label: `${i + 1}. ${row.name || 'Unnamed document'}`,
+        value: [row.required === false ? 'Optional' : 'Required', row.required_if && `Only if ${row.required_if}`, row.where_to_get && `From ${row.where_to_get}`].filter(Boolean).join(' · '),
+      })),
+      render: () => (
+        <RowEditor
+          idBase="cl-item"
+          legend="Documents"
+          itemName="Document"
+          rows={form.items}
+          columns={ITEM_FIELDS}
+          blank={blankItem}
+          onChange={setItems}
+          addLabel="Add a document"
+        />
+      ),
+    },
+    {
+      id: 'review',
+      label: 'Review and publish',
+      title: 'Review and publish',
+      review: true,
+      render: () => null,
+    },
+  ];
+
+  const gate = published ? {
+    id: 'cl-understood',
+    label: 'I understand',
+    sub: 'Saving changes takes this checklist off until it is published again.',
+    message: 'Tick the box to say you understand this checklist leaves the site until it is published again.',
+    required: true,
+    checked: understood,
+    onChange: setUnderstood,
+  } : null;
+
   return (
-    <form onSubmit={save} className={`mt-4 ${PANEL}`}>
-      <Field id="cl-title" label="Title" value={form.title} onChange={set('title')} />
-      <Field
-        id="cl-slug"
-        label="Short name for the system"
-        hint="Lower-case letters, digits and hyphens. Made from the title if empty."
-        className="mt-4"
-        value={form.slug}
-        onChange={set('slug')}
-      />
-      <Field id="cl-description" label="What this checklist is for" as="textarea" rows={3} className="mt-4" value={form.description} onChange={set('description')} />
-
-      <RowEditor
-        idBase="cl-item"
-        legend="Documents"
-        hint="One row for each document. Say where each fact comes from. Leave out anything you could not confirm and say so in the description."
-        itemName="Document"
-        rows={form.items}
-        columns={ITEM_FIELDS}
-        blank={blankItem}
-        onChange={setItems}
-        addLabel="Add a document"
-      />
-
-      {published && (
-        <div className="mt-4 rounded border border-warning-border bg-warning-subtle p-3">
-          <p className="text-sm font-semibold text-warning-strong">
-            This checklist is published. Saving any change takes it back to draft. It leaves the
-            site until it is published again.
-          </p>
-          <CheckField id="cl-understood" label="I understand" checked={understood} onChange={setUnderstood} />
-        </div>
-      )}
-
-      {missing.length > 0 && <p className="mt-4 text-sm text-muted-foreground">Still needed before this can be saved: {missing.join(' and ')}.</p>}
-      {error && <ErrorNotice error={error} className="mt-4" />}
-      <div role="status">
-        {saved && <p className="mt-4 text-sm">Saved. The checklist is now a draft. Publish it from the checklist list when it is ready.</p>}
-      </div>
-      <button type="submit" aria-disabled={(busy || missing.length > 0) || undefined} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-4`}>
-        {busy ? 'Saving…' : list ? 'Save changes' : 'Create this draft'}
-      </button>
-    </form>
+    <Wizard
+      steps={steps}
+      finalLabel={published ? 'Save changes' : 'Publish checklist'}
+      saveLabel="Save draft"
+      busy={busy}
+      gate={gate}
+      label="Checklist steps"
+      help={CHECKLIST_HELP}
+      variant="plain"
+      onSaveDraft={() => save(false)}
+      onFinish={() => save(!published)}
+      notice={error ? <ErrorNotice error={error} className="mb-4" /> : null}
+    />
   );
 }
 
@@ -118,31 +212,28 @@ function ChecklistForm({ list, onSaved }) {
 // public route answers 404 for anything that is not published.
 export default function AdminChecklistEditor() {
   const { id } = useParams();
+  const location = useLocation();
   const isNew = !id || id === 'new';
   const { data: lists, error, loading, refetch } = useApi(isNew ? null : '/checklists/all');
   const list = isNew ? null : lists?.find((c) => String(c.id) === id);
 
+  // Set when a new checklist was saved but could not be published. See ChecklistForm.save.
+  const notice = location.state?.notice;
+
   return (
-    <div>
-      <p className="text-sm">
-        <Link to="/admin/checklists" className={`inline-flex min-h-touch items-center font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-          ← All checklists
-        </Link>
-      </p>
-      <Breadcrumb trail={[{ label: 'Admin workspace' }]} current={isNew ? 'Write a new checklist' : 'Edit checklist'} />
-      <h1 className="mt-6 font-head text-3xl leading-heading text-primary md:text-4xl">{isNew ? 'Write a new checklist' : 'Edit checklist'}</h1>
+    <AdminEditorPage
+      title={isNew ? 'Write a new checklist' : 'Edit checklist'}
+      status={list?.status}
+      backTo={LIST}
+      backLabel="All checklists"
+    >
+      {!isNew && loading && <p className="text-muted-foreground">Loading…</p>}
+      {error && <ErrorNotice error={error} />}
+      {notice && <ErrorNotice error={{ message: notice }} className="mb-4" />}
+      {!isNew && lists && !list && <p>That checklist does not exist. <Link to={LIST} className="font-semibold text-primary-text underline">Back to all checklists</Link></p>}
 
-      {!isNew && loading && <p className="mt-4 text-muted-foreground">Loading…</p>}
-      {error && <ErrorNotice error={error} className="mt-4" />}
-      {!isNew && lists && !list && <p className={`mt-4 ${PANEL}`}>That checklist does not exist.</p>}
-
-      {list && (
-        <>
-          <p className="mt-2 flex items-center gap-2 text-sm">Status: <StatusPill status={list.status} /></p>
-        </>
-      )}
-
-      {(isNew || list) && <ChecklistForm key={list?.updated_at ?? 'new'} list={list} onSaved={refetch} />}
-    </div>
+      {/* Keyed by the checklist, so a refresh after a refused publish keeps what was typed. */}
+      {(isNew || list) && <ChecklistForm key={list?.id ?? 'new'} list={list} onSaved={refetch} />}
+    </AdminEditorPage>
   );
 }
