@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import { apiPost } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import ErrorNotice from '@/components/ErrorNotice';
 import { readableDate } from '@/lib/dates';
 import { CARD, FORM_TEXTAREA, RING, BUTTON_PRIMARY, PAGE_TITLE, pillClass } from '@/lib/ui';
@@ -81,8 +83,10 @@ function QuestionPane({ question, headingRef, onDone }) {
 // Open questions with the oldest first and the chosen one beside them.
 // Anonymous questions have no name and no account behind them.
 export default function ExpertQuestions() {
-  const { data: questions, error, loading, refetch } = useApi('/questions/open');
-  const [chosen, setChosen] = useState(null);
+  const { data: questions, error, loading, refetch } = useApi('/questions/open', LIVE);
+  // A link from the bell can name the question: ?question=ID. That one is open when the page loads.
+  const [params] = useSearchParams();
+  const [chosen, setChosen] = useState(() => Number(params.get('question')) || null);
   // A new object each time, so the same words twice still move focus to the message again.
   const [notice, setNotice] = useState(null);
   const heading = useRef(null);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadNotifications, readIds, saveReadIds } from '@/lib/notifications';
+import { LIVE, useLiveTick } from '@/lib/live';
 
 // The bell's data for one signed in person. It loads when the person is known and again on
 // `reload`. The read items are kept per person on this device, so a shared machine does not
@@ -10,6 +11,8 @@ export function useNotifications(user) {
   // Every reload changes the key, so the answer to an old request is never shown for a new one.
   const [nonce, setNonce] = useState(0);
   const key = `${userId}:${role}:${nonce}`;
+  // The bell asks again in the background. That does not change the key so the list is not blanked.
+  const tick = useLiveTick(userId === null ? 0 : LIVE.every, { onChange: true });
   const [loaded, setLoaded] = useState({ key: '', items: [], partial: false, error: null });
   const [readState, setReadState] = useState(() => ({ userId, ids: readIds(userId) }));
 
@@ -18,10 +21,11 @@ export function useNotifications(user) {
     let cancelled = false;
     loadNotifications({ id: userId, role }).then(
       ({ items, partial }) => { if (!cancelled) setLoaded({ key, items, partial, error: null }); },
-      (error) => { if (!cancelled) setLoaded({ key, items: [], partial: false, error }); },
+      // A failed background refresh keeps the list that is already shown.
+      (error) => { if (!cancelled) setLoaded((prev) => (prev.key === key && !prev.error ? prev : { key, items: [], partial: false, error })); },
     );
     return () => { cancelled = true; };
-  }, [key, userId, role]);
+  }, [key, userId, role, tick]);
 
   // While a reload runs the last list stays on the screen. It is not blanked for a moment.
   const pending = loaded.key !== key;

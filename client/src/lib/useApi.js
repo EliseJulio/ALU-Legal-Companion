@@ -1,12 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
+import { useLiveTick } from '@/lib/live';
 
 // A small hook that loads a path when the page opens. No server data is shared between pages,
 // so there is no cache.
-export function useApi(path) {
+// `options.every` asks again in the background every so many milliseconds (see lib/live.js).
+export function useApi(path, options = {}) {
   // `path` is kept with the answer. When the path changes the old answer is not the answer to
   // the new question. So it is not handed out for even one render.
   const [state, setState] = useState({ path, data: null, error: null, loading: Boolean(path) });
+
+  // A background refresh keeps what is on screen. It never shows loading and a failure is ignored.
+  const tick = useLiveTick(path ? options.every : 0);
+  useEffect(() => {
+    if (!tick || !path) return undefined;
+    let cancelled = false;
+    apiGet(path)
+      .then((data) => {
+        if (cancelled) return;
+        setState((s) => (s.path === path && JSON.stringify(s.data) !== JSON.stringify(data)
+          ? { path, data, error: null, loading: false }
+          : s));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [tick, path]);
 
   // `refetch` changes this number and the effect reads it. A page that acts on something
   // (publishes a guide for example) reloads the list from the server. It does not patch the row

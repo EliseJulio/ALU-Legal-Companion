@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { signInPath } from '@/lib/url';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity } from '@/lib/auth';
 import { useMediaQuery } from '@/lib/useMediaQuery';
@@ -11,6 +12,7 @@ import MeetLink from '@/components/MeetLink';
 import StatusPill from '@/components/StatusPill';
 import { bookingStatusStep, readableSlot } from '@/lib/bookings';
 import { readableDate } from '@/lib/dates';
+import { useScrollToHash } from '@/lib/useScrollToHash';
 import { BUTTON_PRIMARY, BUTTON_OUTLINE, BUTTON_TEXT, CARD } from '@/lib/ui';
 
 const H2 = 'font-head text-base font-semibold leading-[1.3] text-ink';
@@ -42,7 +44,7 @@ function QuestionTable({ questions }) {
         </thead>
         <tbody className="divide-y divide-border">
           {questions.map((q) => (
-            <tr key={q.id}>
+            <tr key={q.id} data-anchor={`question-${q.id}`} tabIndex={-1} className="focus:outline-none">
               <td className={`${CELL} w-[18rem]`}><p className="whitespace-pre-line font-semibold text-primary-text">{q.text}</p></td>
               <td className={CELL}><StatusPill status={questionStatus(q)} /></td>
               <td className={CELL}>
@@ -70,7 +72,7 @@ function QuestionCards({ questions }) {
       {questions.map((question) => {
         const sent = readableDate(question.created_at);
         return (
-          <li key={question.id} className={CARD}>
+          <li key={question.id} data-anchor={`question-${question.id}`} tabIndex={-1} className={`${CARD} focus:outline-none`}>
             <StatusPill status={questionStatus(question)} />
             <p className="mt-2 text-xs font-medium text-muted-foreground">You asked</p>
             <p className="mt-1 whitespace-pre-line">{question.text}</p>
@@ -172,9 +174,10 @@ export default function MyActivity() {
   // refuses an expert or an admin. A visitor who asked would get a 401 and that clears a login
   // that may still be good.
   const canTrack = canOwnActivity(user);
-  const { data: questions, error: questionsError, loading: questionsLoading } = useApi(canTrack ? '/questions/mine' : null);
-  const { data: bookings, error: bookingsError, loading: bookingsLoading } = useApi(canTrack ? '/bookings/mine' : null);
+  const { data: questions, error: questionsError, loading: questionsLoading } = useApi(canTrack ? '/questions/mine' : null, LIVE);
+  const { data: bookings, error: bookingsError, loading: bookingsLoading } = useApi(canTrack ? '/bookings/mine' : null, LIVE);
   const wide = useMediaQuery('(min-width: 1280px)');
+  useScrollToHash(Boolean(questions));
 
   return (
     <div>

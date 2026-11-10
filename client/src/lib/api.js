@@ -1,3 +1,5 @@
+import { announceChange } from '@/lib/live';
+
 // The only door to the API. Every answer the server can give is turned into a result or an
 // ApiError here so a page never has to read a raw fetch response.
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -90,6 +92,8 @@ async function request(method, path, body, { anonymous = false, raw = false, for
     if (!parsed) {
       throw new ApiError(res.status, 'The server sent a reply we could not read. Please try again.');
     }
+    // A request that changed something tells the open pages and the bell to ask again now.
+    if (method !== 'GET') announceChange();
     return payload;
   }
 

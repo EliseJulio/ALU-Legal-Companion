@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useScrollToHash } from '@/lib/useScrollToHash';
 import Icon from '@/components/Icon';
 import ScheduleGrid from '@/components/ScheduleGrid';
 import { ScheduleMark, ScheduleRow } from '@/components/ScheduleItem';
@@ -27,7 +29,11 @@ function nextLine(item) {
 // So an admin row never offers an action that is not there.
 export default function ScheduleCalendar({ items, today, legend = LEGEND, renderRow = (item) => <ScheduleRow item={item} /> }) {
   const todayKey = todayIso(today);
-  const [selected, setSelected] = useState(todayKey);
+  // A link can end in #consult-ID. The calendar then opens on the day of that item and shows its row.
+  const { hash } = useLocation();
+  const target = hash ? items.find((item) => item.key === hash.slice(1)) : undefined;
+  useScrollToHash(Boolean(target));
+  const [selected, setSelected] = useState(target?.date ?? todayKey);
   const [view, setView] = useState('month');
   // The grid moves the focus to the day the arrow keys reached. The focus is set after the grid has
   // drawn that day, so the id of the day is kept here until then.
@@ -126,7 +132,7 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, render
         ) : (
           <ul className="mt-4 divide-y divide-border-soft">
             {dayItems.map((item) => (
-              <li key={item.key} className="py-4 first:pt-0 last:pb-0">
+              <li key={item.key} data-anchor={item.key} tabIndex={-1} className="rounded-control py-4 first:pt-0 last:pb-0 focus:outline-none">
                 {renderRow(item)}
               </li>
             ))}
@@ -149,7 +155,7 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, render
               </h3>
               <ul className="mt-2 divide-y divide-border-soft">
                 {(byDay.get(iso) ?? []).map((item) => (
-                  <li key={item.key} className="py-4 first:pt-0 last:pb-0">
+                  <li key={item.key} data-anchor={item.key} tabIndex={-1} className="rounded-control py-4 first:pt-0 last:pb-0 focus:outline-none">
                     {renderRow(item)}
                   </li>
                 ))}

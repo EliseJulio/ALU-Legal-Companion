@@ -70,8 +70,8 @@ export function bookingItems(rows) {
     .map((b) => ({
       id: `booking-${b.id}`,
       title: 'Appointment accepted',
-      text: `${b.provider_name}. Open My activity for the details.`,
-      to: '/my-activity',
+      text: `${b.provider_name}. Open Appointments for the details.`,
+      to: `/appointments#consult-${b.id}`,
       at: null,
     }));
 }
@@ -83,7 +83,7 @@ export function questionItems(rows) {
       id: `question-${q.id}`,
       title: 'Your question was answered',
       text: truncate(q.text),
-      to: '/my-activity',
+      to: `/my-activity#question-${q.id}`,
       at: q.created_at ?? null,
     }));
 }
@@ -96,7 +96,7 @@ export function checkItems(matter) {
       id: `check-${e.id}`,
       title: 'A lawyer checked a document',
       text: `${matter.title}. ${e.description}.`,
-      to: `/matters/${matter.id}`,
+      to: `/matters/${matter.id}#event-${e.id}`,
       at: e.created_at ?? null,
     }));
 }
@@ -110,7 +110,7 @@ export function requestItems(rows) {
       id: `request-${b.id}`,
       title: 'A consultation was requested',
       text: 'Open the calendar to accept or decline it.',
-      to: '/expert/calendar',
+      to: `/expert/calendar#consult-${b.id}`,
       at: b.created_at ?? null,
     }));
 }
@@ -120,7 +120,7 @@ export function openQuestionItems(rows) {
     id: `open-${q.id}`,
     title: 'A question is waiting for an answer',
     text: truncate(q.text),
-    to: '/expert/questions',
+    to: `/expert/questions?question=${q.id}`,
     at: q.created_at ?? null,
   }));
 }

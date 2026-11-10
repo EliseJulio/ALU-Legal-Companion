@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity } from '@/lib/auth';
 import { useMediaQuery } from '@/lib/useMediaQuery';
@@ -111,7 +112,7 @@ function MatterCards({ matters }) {
 // A person's own matters. The server sends open ones first, the soonest deadline first and the
 // ones with no deadline last. The page filters that one list into Open and Finished.
 function MatterList() {
-  const { data: matters, error, loading } = useApi('/matters');
+  const { data: matters, error, loading } = useApi('/matters', LIVE);
   const wide = useMediaQuery('(min-width: 1280px)');
   const [view, setView] = useState('open');
   // The server's order is the soonest deadline first. Name order is done here.

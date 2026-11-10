@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { signInPath } from '@/lib/url';
 import { apiDelete, apiPost, apiPostForm, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useAuth } from '@/lib/AuthContext';
 import { hasRole } from '@/lib/auth';
 import Breadcrumb from '@/components/Breadcrumb';
@@ -15,6 +16,7 @@ import MatterDocuments from '@/components/MatterDocuments';
 import { ShareCard, AccessCard } from '@/components/ShareMatter';
 import RecordAttachment, { RecordFileLink } from '@/components/RecordAttachment';
 import { readableDay, todayIso } from '@/lib/dates';
+import { useScrollToHash } from '@/lib/useScrollToHash';
 import { matterDeadline } from '@/lib/overview';
 import StatusWord from '@/components/overview/StatusWord';
 import {
@@ -155,7 +157,8 @@ export default function MatterDetail() {
   const here = useLocation();
   const navigate = useNavigate();
   const allowed = hasRole(user, ['student', 'staff', 'legal_expert']);
-  const { data: m, error, loading, refetch } = useApi(allowed ? `/matters/${id}` : null);
+  const { data: m, error, loading, refetch } = useApi(allowed ? `/matters/${id}` : null, LIVE);
+  useScrollToHash(Boolean(m));
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [actionError, setActionError] = useState(null);
@@ -283,7 +286,7 @@ export default function MatterDetail() {
               {m.events.length === 0 && <p className="mt-2 text-muted-foreground">Nothing recorded yet.</p>}
               <ol className="mt-3 space-y-4">
                 {m.events.map((e) => (
-                  <li key={e.id}>
+                  <li key={e.id} data-anchor={`event-${e.id}`} tabIndex={-1} className="rounded-control focus:outline-none">
                     <p className="text-sm font-semibold text-muted-foreground">
                       {readableDay(e.occurred_on)} ·{' '}
                       {e.author_is_owner ? (owner ? 'You' : 'The person who shared this') : `Note from ${e.author_name ?? 'a legal expert'}`}

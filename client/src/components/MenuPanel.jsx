@@ -98,15 +98,15 @@ export function MenuPanel({ user, narrow = false, onToggle, onSignOut, className
     // The foot with the theme and Narrow menu and Sign out stays on screen at any height.
     <aside
       aria-label="Menu"
-      className={`sticky flex shrink-0 ${narrow ? 'top-2 h-[calc(100vh-1rem)]' : 'top-3 h-[calc(100vh-1.5rem)]'} flex-col overflow-hidden no-scrollbar rounded-card border border-border bg-chrome text-chrome-foreground ${narrow ? 'w-rail items-center px-1.5 py-1.5' : 'w-sidebar px-3 py-4 short:py-2'} ${className}`}
+      className={`sticky flex shrink-0 ${narrow ? 'top-2 h-[calc(100vh-1rem)]' : 'top-3 h-[calc(100vh-1.5rem)]'} flex-col overflow-hidden no-scrollbar rounded-card border border-border bg-chrome text-chrome-foreground ${narrow ? 'w-rail items-center px-1.5 py-1.5' : 'w-sidebar px-3 py-3 short:py-2'} ${className}`}
     >
-      <div className={`shrink-0 ${narrow ? 'mb-1 flex w-full justify-center pb-2' : 'mb-1.5 px-1.5 pb-3.5 short:mb-0 short:pb-1.5'}`}>
+      <div className={`shrink-0 ${narrow ? 'mb-1 flex w-full justify-center pb-2' : 'mb-1 px-1.5 pb-2 short:mb-0 short:pb-1.5'}`}>
         <Brand tone="chrome" compact={narrow} stacked />
       </div>
       {user && (
         // Only the full name, under the divider. It wraps; it is never cut short. In the narrow
         // sidebar it stays for a screen reader only: the space is for the icons.
-        <p className={narrow ? 'sr-only' : 'shrink-0 break-words px-1.5 pt-3 text-sm font-semibold leading-[1.6] text-chrome-foreground short:pt-1 short:leading-5'}>
+        <p className={narrow ? 'sr-only' : 'shrink-0 break-words px-1.5 pt-2 text-sm font-semibold leading-[1.6] text-chrome-foreground short:pt-1 short:leading-5'}>
           {user.name}
         </p>
       )}
@@ -114,17 +114,17 @@ export function MenuPanel({ user, narrow = false, onToggle, onSignOut, className
       <nav
         aria-label="Main"
         onScroll={tips.hide}
-        className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden no-scrollbar ${narrow ? 'mt-1 flex w-full flex-col items-center' : 'flex flex-col'}`}
+        className={`min-h-0 flex-1 overflow-y-auto overflow-x-hidden ${narrow ? 'no-scrollbar mt-1 flex w-full flex-col items-center' : 'flex flex-col'}`}
       >
         {groups.map((group, index) => {
           const id = `menu-${group.title.toLowerCase().replace(/[^a-z]+/g, '-')}`;
           return (
             <Fragment key={group.title}>
               <div className={narrow ? `flex w-full flex-col items-center${index > 0 ? ' mt-3' : ''}` : undefined}>
-                <p id={id} className={narrow ? 'sr-only' : 'mx-3 mb-1 mt-[18px] text-xs leading-[19px] text-faint short:mb-0 short:mt-1 short:leading-4'}>
+                <p id={id} className={narrow ? 'sr-only' : 'mx-3 mt-2 text-xs leading-[19px] text-faint short:mt-1 short:leading-4'}>
                   {group.title}
                 </p>
-                <ul aria-labelledby={id} className={narrow ? 'flex flex-col items-center gap-1' : 'flex flex-col gap-0.5 short:gap-0'}>
+                <ul aria-labelledby={id} className={narrow ? 'flex flex-col items-center gap-1' : 'flex flex-col'}>
                   {group.links.map((link) => (
                     <li key={link.to}>
                       <NavLink
@@ -150,7 +150,7 @@ export function MenuPanel({ user, narrow = false, onToggle, onSignOut, className
         })}
       </nav>
 
-      <div className={`shrink-0 ${narrow ? 'mt-auto flex w-full flex-col items-center pt-1' : 'mt-auto flex flex-col gap-2 pt-2.5 short:gap-0 short:pt-1'}`}>
+      <div className={`shrink-0 ${narrow ? 'mt-auto flex w-full flex-col items-center pt-1' : 'mt-auto flex flex-col gap-1 pt-2 short:gap-0 short:pt-1'}`}>
         {!narrow && (
           // One button: the name of the mode sits beside its icon. A press moves to the next mode.
           <div className="flex items-center justify-between gap-2 px-3">
