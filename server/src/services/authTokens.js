@@ -10,10 +10,10 @@ import { q } from '../db.js';
 
 // The purposes the database allows. They are listed here too, so a typo fails in JavaScript
 // with a clear message and not as a database error.
-export const TOKEN_PURPOSES = ['verify_email', 'reset_password', 'change_email'];
+const TOKEN_PURPOSES = ['verify_email', 'reset_password', 'change_email'];
 
-// SHA-256 and not bcrypt. The input is 32 random bytes, not a password a person chose,
-// so there is nothing for a slow hash to protect and the lookup stays a fast exact match.
+// SHA-256 and not bcrypt. The input is 32 random bytes and not a password a person chose.
+// So there is nothing for a slow hash to protect and the lookup stays a fast exact match.
 const hashToken = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex');
 
 // Makes a token, stores its hash and returns the raw value.
@@ -30,11 +30,11 @@ export async function issueToken(userId, purpose, ttlHours = 24) {
   return raw;
 }
 
-// Uses a token. Returns its row. Returns null if it is unknown, already used, expired or made
-// for a different purpose. The caller learns only "no".
+// Uses a token. Returns its row. Returns null if it is unknown or already used or expired or made for a different purpose.
+// The caller learns only "no".
 //
-// One UPDATE checks and marks the token together. If two people use the same link at the
-// same moment, the database lets exactly one of them through.
+// One UPDATE checks and marks the token together.
+// If two people use the same link at the same moment the database lets exactly one of them through.
 export async function consumeToken(raw, purpose) {
   if (!raw || !purpose) return null;
   const [row] = await q(
@@ -50,9 +50,9 @@ export async function consumeToken(raw, purpose) {
   return row || null;
 }
 
-// Why a token was refused. Only for a caller that already holds the token, so the answer
-// tells them nothing new. Never use it where the caller gave only an email or an id.
-// Returns 'unknown', 'used', 'expired' or 'valid'. Call it after consumeToken returned null.
+// Why a token was refused. Only for a caller that already holds the token so the answer tells them nothing new.
+// Never use it where the caller gave only an email or an id.
+// Returns 'unknown' or 'used' or 'expired' or 'valid'. Call it after consumeToken returned null.
 export async function tokenStatus(raw, purpose) {
   if (!raw || !purpose) return 'unknown';
   const [row] = await q(

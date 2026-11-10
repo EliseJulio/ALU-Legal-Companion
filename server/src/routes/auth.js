@@ -1,5 +1,5 @@
-// Auth routes: register, verify the email, resend the link, log in and log out.
-// Also password reset, password change and the account a person manages themselves.
+// Auth routes: register and verify the email and resend the link and log in and log out.
+// Also password reset and password change and the account a person manages themselves.
 import { Router } from 'express';
 import { q } from '../db.js';
 import {
@@ -8,10 +8,19 @@ import {
 import { loginEmailLimiter, emailLimiter, authIpLimiter } from '../middleware/rateLimit.js';
 import { hashPassword, checkPassword } from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
-import { sendMail } from '../services/mailer.js';
+import { sendMail, mailAvailable } from '../services/mailer.js';
 import { consumeInvite, releaseInvite, inviteStatus } from '../services/invites.js';
 
 const router = Router();
+
+// GET /api/auth/mail-status: can this server send email at all?
+// The sign-up page asks before it shows the form because an account that cannot be confirmed cannot be used.
+// It answers one boolean and nothing about the mail setup. It gives no host and no login and no error text.
+// It is not cached so a fixed setup shows on the next visit.
+router.get('/mail-status', authIpLimiter, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ available: mailAvailable() });
+});
 
 // What a sign-in returns. It is small on purpose.
 function publicUser(u) {
@@ -227,11 +236,8 @@ router.get('/me', requireAuth(), async (req, res) => {
 });
 
 // POST /api/auth/logout: ends every session the account has.
-// A signed token cannot be taken back. Before this existed, signing out only cleared the
-// browser's copy. The same token still worked from anywhere for seven days.
-// It ends all sessions and not only this one. Someone signing out of a library computer
-// means "end this" and cannot list their other sessions to choose. Signing out on a phone
-// also signs out a laptop. That is the safe side to be on.
+// A signed token cannot be taken back, so this bumps session_version. That ends every session
+// of the account, not only this one.
 router.post('/logout', requireAuth(), async (req, res) => {
   await revokeSessions(req.user.id);
   res.status(204).end();
@@ -253,9 +259,8 @@ router.put('/me', requireAuth(), async (req, res) => {
   res.json({ token: signToken(user), user: publicUser(user) });
 });
 
-// POST /api/auth/change-password: the signed-in version of a reset.
-// It ends every other session. People change a password when they think someone else has
-// got in. The caller keeps a session because the new token carries the new number.
+// POST /api/auth/change-password: ends every other session. The caller keeps this one
+// because the new token carries the new session_version.
 router.post('/change-password', authIpLimiter, requireAuth(), async (req, res) => {
   const { current_password: currentPassword, new_password: newPassword } = req.body || {};
 
@@ -357,8 +362,8 @@ router.post('/change-email', authIpLimiter, requireAuth(), emailLimiter, async (
 });
 
 // POST /api/auth/confirm-email-change { token }: use the link sent to the new address.
-// The link works on any device because reading it proves the mailbox is the person's. It switches the
-// address, counts it as verified, ends every older session and signs the person in again.
+// The link works on any device because reading it proves the mailbox is the person's.
+// It switches the address and counts it as verified. It ends every older session and signs the person in again.
 // Like verify-email it may say why a link was refused because the caller already holds the token.
 router.post('/confirm-email-change', authIpLimiter, async (req, res) => {
   const { token } = req.body || {};
@@ -497,7 +502,6 @@ router.post('/reset-password', authIpLimiter, async (req, res) => {
   // The password changes. The address counts as verified because reading this link proves
   // the person owns the mailbox. Without that an unverified person would reset the password
   // and still be locked out. And session_version goes up so every older session ends.
-  // The reset is what people do when they think someone else has got in.
   const [user] = await q(
     `UPDATE users
         SET password_hash     = $1,

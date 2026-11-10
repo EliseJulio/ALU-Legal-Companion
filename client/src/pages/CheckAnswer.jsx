@@ -4,7 +4,7 @@ import { apiGet } from '@/lib/api';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import StatusPill from '@/components/StatusPill';
-import { RING, BUTTON_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT } from '@/lib/ui';
+import { RING, FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Read the answer to an anonymous question with its code. The code is kept in state and goes
 // only into the path of one request. It is never put in the address bar. The code alone opens
@@ -44,15 +44,15 @@ export default function CheckAnswer() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Check for your answer" />
-      <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Check your request</p>
-      <h1 className="mt-1 font-head text-4xl leading-heading text-primary md:text-5xl">Check for your answer</h1>
-      <p className="mt-4 max-w-reading text-muted-foreground">
+      <p className="mt-6 text-sm font-semibold text-muted-foreground">Check your request</p>
+      <h1 className={`mt-1 ${PAGE_TITLE}`}>Check for your answer</h1>
+      <p className="mt-4 max-w-[70ch] text-muted-foreground">
         Type the code you were given when you asked. It is the only thing that connects you to your
         question. No name, no email and no account is stored with it. Anonymous requests are not added
-        to My Activity.
+        to My activity.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 max-w-form rounded-card border border-border bg-surface p-6">
+      <form onSubmit={handleSubmit} className={`mt-6 max-w-form ${CARD}`}>
         <label htmlFor="answer-code" className="block text-sm font-semibold">Your question code</label>
         <p id="answer-code-hint" className="mt-1 text-sm text-muted-foreground">
           Sixteen characters in four groups. Small letters are fine.
@@ -68,13 +68,12 @@ export default function CheckAnswer() {
           autoCorrect="off"
           spellCheck="false"
           placeholder="XXXX-XXXX-XXXX-XXXX"
-          className={`mt-2 w-full min-h-touch rounded border border-input 
-            bg-surface px-3 py-2 font-mono ${RING}`}
+          className={`${FORM_FIELD} font-mono`}
         />
         <button
           type="submit"
           aria-disabled={checking || undefined}
-          className={`mt-4 ${checking ? BUTTON_DISABLED : BUTTON_PRIMARY}`}
+          className={`mt-6 w-full ${checking ? BUTTON_DISABLED : BUTTON_LG_PRIMARY}`}
         >
           {checking ? 'Checking…' : 'Check for answer'}
         </button>
@@ -87,8 +86,8 @@ export default function CheckAnswer() {
       )}
 
       {unknownCode && (
-        <div className="mt-2 rounded-card border border-border bg-surface p-6">
-          <h2 className="font-head text-base font-semibold text-primary">What to try next</h2>
+        <div className={`mt-2 ${CARD}`}>
+          <h2 className="font-head text-base font-semibold text-ink">What to try next</h2>
           <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm">
             <li>Compare the code with the one you saved. A letter O is really a zero.</li>
             <li>
@@ -97,7 +96,7 @@ export default function CheckAnswer() {
             </li>
             <li>
               A lost code cannot be sent or reset because nothing here is linked to you. Signing in will not add this request to your account.{' '}
-              <Link to="/ask" className={`font-semibold text-primary underline ${RING}`}>
+              <Link to="/ask" className={`font-semibold text-primary-text underline ${RING}`}>
                 Ask your question again to get a new code
               </Link>
               .
@@ -111,23 +110,23 @@ export default function CheckAnswer() {
         {checking && <p className="text-sm text-muted-foreground">Looking up your code…</p>}
 
         {result && answered && (
-          <div className="rounded-card border border-border bg-surface p-6">
+          <div className={CARD}>
             <StatusPill status="answered" />
-            <h2 className="mt-2 font-head text-2xl leading-heading text-primary">A legal expert has answered</h2>
+            <h2 className="mt-2 font-head text-[20px] leading-[1.25] text-ink">A legal expert has answered</h2>
             <p className="mt-3 text-xs font-medium text-muted-foreground">You asked</p>
             <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{result.text}</p>
             <p className="mt-3 text-xs font-medium text-muted-foreground">The answer</p>
-            <p className="mt-1 whitespace-pre-line">{result.answer}</p>
+            <p className="mt-1 max-w-[70ch] whitespace-pre-line">{result.answer}</p>
             <p className="mt-3 text-xs italic text-muted-foreground">Legal information not legal advice.</p>
           </div>
         )}
 
         {result && !answered && (
-          <div className="rounded-card border border-border bg-surface p-6">
+          <div className={CARD}>
             <StatusPill status="pending" />
-            <h2 className="mt-2 font-head text-2xl leading-heading text-primary">Awaiting a response</h2>
+            <h2 className="mt-2 font-head text-[20px] leading-[1.25] text-ink">Awaiting a response</h2>
             <p className="mt-2 text-sm">No response yet. Check again with the code you saved.</p>
-            <p className="mt-2 text-sm">
+            <p className="mt-2 max-w-[70ch] text-sm">
               Your question reached the legal team and is waiting for a reply. Nothing has gone
               wrong and you do not need to send it again.
             </p>

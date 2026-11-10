@@ -10,7 +10,7 @@ import Icon from '@/components/Icon';
 import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import { CheckField } from '@/components/Field';
-import { RING, RING_ON_CANVAS, FIELD, BUTTON_OUTLINE, BUTTON_PRIMARY, BUTTON_DISABLED } from '@/lib/ui';
+import { RING_ON_CANVAS, FORM_TEXTAREA, BUTTON_OUTLINE, BUTTON_LG_PRIMARY, PAGE_TITLE, CARD, TAB, TAB_CURRENT, TAB_IDLE } from '@/lib/ui';
 
 // There are two routes. The anonymous one ignores any login and stores no name. The other
 // needs a student or staff login. The choice picks the URL and the flag together.
@@ -32,8 +32,8 @@ export default function AskQuestion() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const boxRef = useRef(null);
-  // The confirmation holds the one-time code. When it replaces the form, focus goes to it, so the
-  // button the reader pressed does not vanish and leave them at the top of the page.
+  // The confirmation holds the one-time code. When it replaces the form focus goes to it.
+  // So the button the reader pressed does not vanish and leave them at the top of the page.
   const doneRef = useRef(null);
   // Only an anonymous question has a code. The reader promises to save it before it is sent.
   const [acknowledged, setAcknowledged] = useState(false);
@@ -104,14 +104,15 @@ export default function AskQuestion() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Ask an expert" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Ask a human legal expert</h1>
+      <h1 className={`mt-6 ${PAGE_TITLE}`}>Ask a human legal expert</h1>
       <p className="mt-4 max-w-reading text-muted-foreground">
         Send a written question to a human legal expert. A response is not guaranteed. Legal
         information, not legal advice.
       </p>
 
-      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_21rem] xl:gap-10">
-        <div className="min-w-0">
+      {/* Two columns on a wide screen: the question on the left, the explainer on the right. */}
+      <div className="mt-8 grid gap-6 wide:grid-cols-12">
+        <div className="min-w-0 wide:col-span-7">
           {anonToken ? (
             // The form is not shown with the code. A second send would make a second question and a
             // second code and the first would be lost.
@@ -122,26 +123,24 @@ export default function AskQuestion() {
               </div>
             </div>
           ) : askedAsSelf ? (
-            <div ref={doneRef} tabIndex={-1} className="rounded-card border border-border bg-surface p-6 outline-none">
+            <div ref={doneRef} tabIndex={-1} className={`${CARD} outline-none`}>
               <p>Your question is with the legal team. Nobody will email you. The answer appears on the site under your account.</p>
               <p className="mt-2 text-sm text-muted-foreground">There is no code. The question is kept with your account.</p>
-              <Link to="/my-activity" className={`${BUTTON_PRIMARY} mt-4`}>My activity</Link>
+              <Link to="/my-activity" className={`${BUTTON_LG_PRIMARY} mt-6`}>My activity</Link>
             </div>
           ) : (
             <>
-              <p className="text-sm">
-                If you are in danger right now, do not wait for an answer.{' '}
-                <Link to="/emergency" className={`rounded font-semibold text-info underline ${RING_ON_CANVAS}`}>
-                  See the urgent numbers
-                </Link>
-              </p>
+              <p className="text-sm">If you are in danger right now, do not wait for an answer.</p>
+              <Link to="/emergency" className={`mt-1 inline-flex min-h-touch items-center rounded-control text-sm font-semibold text-info underline ${RING_ON_CANVAS}`}>
+                See the urgent numbers
+              </Link>
 
               {/* Shown only while the question will be anonymous. The code cannot be reissued. */}
               {/* A visitor can still choose to sign in. Signed-in questions appear in My Activity. */}
               {!user && (
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Link to={signInPath(here)} className={BUTTON_OUTLINE}>Sign in instead</Link>
-                  <p className="text-sm text-muted-foreground">Signed-in questions appear in My Activity.</p>
+                  <p className="text-sm text-muted-foreground">Signed-in questions appear in My activity.</p>
                 </div>
               )}
 
@@ -154,8 +153,27 @@ export default function AskQuestion() {
 
               {error && <ErrorNotice key={errorCount} id="ask-error" error={error} className="mt-4" />}
 
-              <form onSubmit={handleSubmit} className="mt-4 rounded-card border border-border bg-surface p-6">
-                <label htmlFor="question" className="block text-sm font-semibold">Your question</label>
+              <form onSubmit={handleSubmit} className={`mt-4 ${CARD}`}>
+                {/* The choice sits at the top as tabs. Each tab is a
+                    radio button. The radio is hidden and its tab shows the focus ring, so the
+                    arrow keys still move between the two options. */}
+                {canChoose && (
+                  <fieldset>
+                    <legend className="text-sm font-semibold">How do you want to send this?</legend>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      <label className={`${TAB} ${choice === 'self' ? TAB_CURRENT : TAB_IDLE} relative cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-offset-2`}>
+                        <input type="radio" name="send-as" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" checked={choice === 'self'} onChange={() => { setChoice('self'); setAcknowledged(false); if (errorFor === 'saved-code') { setError(null); setErrorFor(null); } }} />
+                        <span>With my name ({user.name})</span>
+                      </label>
+                      <label className={`${TAB} ${choice === 'anonymous' ? TAB_CURRENT : TAB_IDLE} relative cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-offset-2`}>
+                        <input type="radio" name="send-as" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" checked={choice === 'anonymous'} onChange={() => { setChoice('anonymous'); setAcknowledged(false); if (errorFor === 'saved-code') { setError(null); setErrorFor(null); } }} />
+                        <span>Without my name</span>
+                      </label>
+                    </div>
+                  </fieldset>
+                )}
+
+                <label htmlFor="question" className={`block text-sm font-semibold ${canChoose ? 'mt-6' : ''}`}>Your question</label>
                 <p id="question-hint" className="mt-1 text-sm text-muted-foreground">
                   Leave out your name and anyone else’s if you can. Say what happened and what you want to know.
                 </p>
@@ -168,22 +186,8 @@ export default function AskQuestion() {
                   onChange={(e) => { setText(e.target.value); if (errorFor === 'question') setErrorFor(null); }}
                   aria-describedby={errorFor === 'question' ? 'question-hint ask-error' : 'question-hint'}
                   aria-invalid={errorFor === 'question' || undefined}
-                  className={FIELD}
+                  className={FORM_TEXTAREA}
                 />
-
-                {canChoose && (
-                  <fieldset className="mt-4">
-                    <legend className="text-sm font-semibold">How do you want to send this?</legend>
-                    <label className="mt-2 flex min-h-touch cursor-pointer items-center gap-3 text-sm">
-                      <input type="radio" name="send-as" checked={choice === 'self'} onChange={() => { setChoice('self'); setAcknowledged(false); if (errorFor === 'saved-code') { setError(null); setErrorFor(null); } }} className={`h-5 w-5 accent-primary ${RING}`} />
-                      <span>With my name ({user.name})</span>
-                    </label>
-                    <label className="flex min-h-touch cursor-pointer items-center gap-3 text-sm">
-                      <input type="radio" name="send-as" checked={choice === 'anonymous'} onChange={() => { setChoice('anonymous'); setAcknowledged(false); if (errorFor === 'saved-code') { setError(null); setErrorFor(null); } }} className={`h-5 w-5 accent-primary ${RING}`} />
-                      <span>Without my name</span>
-                    </label>
-                  </fieldset>
-                )}
 
                 {asAnonymous && (
                   <CheckField
@@ -200,7 +204,7 @@ export default function AskQuestion() {
                 <button
                   type="submit"
                   aria-disabled={(sending || mustChoose) || undefined}
-                  className={`mt-4 ${sending || mustChoose ? BUTTON_DISABLED : BUTTON_PRIMARY}`}
+                  className={`mt-6 ${BUTTON_LG_PRIMARY}`}
                 >
                   {sending ? 'Sending your question…' : 'Send my question'}
                 </button>
@@ -219,18 +223,48 @@ export default function AskQuestion() {
           )}
         </div>
 
-        <aside className="self-start rounded-card border border-chrome-raised bg-chrome p-6 text-chrome-foreground" aria-label="Privacy and the signed-in option">
-          <Icon name="lock" className="text-3xl" />
-          <h2 className="mt-3 font-head text-2xl leading-heading">Only share what is needed</h2>
-          <p className="mt-2 text-sm text-on-chrome">
-            A short factual description and a clear question are enough to begin. Free text can still
-            identify you, even if you do not give your name.
-          </p>
-          <h2 className="mt-6 font-head text-2xl leading-heading">Signed-in alternative</h2>
-          <p className="mt-2 text-sm text-on-chrome">
-            Account-linked questions and responses appear only in your private My Activity workspace.
-            Anonymous questions stay outside that account history.
-          </p>
+        <aside className="min-w-0 space-y-6 wide:col-span-5" aria-label="How anonymous questions work, and privacy">
+          <section className={CARD} aria-labelledby="how-anonymous">
+            <h2 id="how-anonymous" className="font-head text-[17px] leading-[1.25] text-ink">How anonymous questions work</h2>
+            {/* Three numbered steps. The numbers are decoration: each step says what happens. */}
+            <ol className="mt-4 space-y-5">
+              <li className="flex gap-4">
+                <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-border font-mono text-xs text-muted-foreground">1</span>
+                <div>
+                  <p className="font-semibold">You send the question</p>
+                  <p className="text-sm text-muted-foreground">No name, no email.</p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-border font-mono text-xs text-muted-foreground">2</span>
+                <div>
+                  <p className="font-semibold">You get a code</p>
+                  <p className="text-sm text-muted-foreground">Save it. It is the only way back.</p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control border border-border font-mono text-xs text-muted-foreground">3</span>
+                <div>
+                  <p className="font-semibold">Check your answer</p>
+                  <p className="text-sm text-muted-foreground">Enter the code on the Check answer page.</p>
+                </div>
+              </li>
+            </ol>
+          </section>
+
+          <section className={CARD} aria-labelledby="only-share">
+            <Icon name="lock" className="text-2xl text-muted-foreground" />
+            <h2 id="only-share" className="mt-3 font-head text-[17px] leading-[1.25] text-ink">Only share what is needed</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              A short factual description and a clear question are enough to begin. Free text can still
+              identify you, even if you do not give your name.
+            </p>
+            <h2 className="mt-6 font-head text-[17px] leading-[1.25] text-ink">Signed-in alternative</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Account-linked questions and responses appear only in your private My activity workspace.
+              Anonymous questions stay outside that account history.
+            </p>
+          </section>
         </aside>
       </div>
     </div>
