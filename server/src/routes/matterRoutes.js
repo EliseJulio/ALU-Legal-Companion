@@ -1,9 +1,8 @@
-// Where to go: for each kind of matter the body that must hear it first, the law that says so,
-// the steps after that and the deadline.
+// Where to go: for each kind of matter the body that must hear it first and the law that says so.
+// It also holds the steps after that and the deadline.
 //
-// This is a lookup against rows an admin checked and published. No language model is used. The body a
-// person must go to first and the deadline are facts that somebody checked. They are not text
-// that somebody generated.
+// This is a lookup against rows an admin published. No language model is used.
+// The body a person must go to first and the deadline are facts an admin wrote. They are not generated text.
 import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -72,7 +71,7 @@ router.get('/routes', async (req, res) => {
 // ------------------------------------------------------------------------------ staff
 
 // GET /api/directory/routes/all: every route in every state. It shows the name and the state
-// of the office so a reviewer can see when a route is ready but its office is not.
+// of the office, so an admin can see when a route is ready but its office is not.
 // It must be declared before /routes/:id. That route answers 404 for an id that is not a
 // number and would swallow the word "all".
 router.get('/routes/all', requireAuth('admin'), async (_req, res) => {
@@ -144,8 +143,8 @@ router.post('/routes', requireAuth('admin'), async (req, res) => {
 });
 
 // PUT /api/directory/routes/:id
-// Any edit sends the route back to draft and clears the stamp. Every field of a route is a
-// checked fact (where to go, why, what next and by when) so no field is exempt.
+// Any edit sends the route back to draft and clears the stamp.
+// Every field of a route is a published fact (where to go and why and what next and by when) so no field is exempt.
 router.put('/routes/:id', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   const [existing] = await q('SELECT * FROM matter_routes WHERE id = $1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Route not found' });

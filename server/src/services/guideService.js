@@ -1,9 +1,9 @@
-// The "how to do it" part of a guide. Links, fees, documents, offices and steps, each step
-// pointing at the page it happens on (such as Irembo's own support article for that step).
+// The "how to do it" part of a guide: links and fees and documents and offices and steps.
+// Each step points at the page it happens on (such as the support article of Irembo for that step).
 //
-// It lives on the guide row. So an edit sends the guide back to draft like any other edit.
-// This is the only check between what an admin types and what a reader clicks. A link becomes
-// an href. So it is checked here and never trusted.
+// It lives on the guide row so an edit sends the guide back to draft like any other edit.
+// This is the only check between what an admin types and what a reader clicks.
+// A link becomes an href. So it is checked here and never trusted.
 
 const HTTPS = /^https:\/\/[^\s/$.?#][^\s]*$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,7 +20,7 @@ export function validateService(input) {
   const errors = [];
   const fail = (path, message) => errors.push(`${path}: ${message}`);
 
-  // A field nobody planned for is data nobody reviewed. So unknown keys are refused.
+  // Unknown keys are refused, so no unchecked data is stored.
   function onlyKnown(obj, known, path) {
     for (const key of Object.keys(obj)) if (!known.includes(key)) fail(path, `unknown field "${key}"`);
   }

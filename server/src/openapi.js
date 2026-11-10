@@ -80,6 +80,19 @@ const schemas = {
     meet_link: text('Only an https://meet.google.com/ address.', { nullable: true }),
   }),
 
+  LadderStep: obj({
+    id: whole('The step number.'), position: whole('The order on screen, from 1 to 99.'), title: text(''), tagline: text(''),
+    description: text(''), law_cited: text(''),
+  }),
+  LadderStaff: obj({
+    id: whole('The step number.'), position: whole(''), title: text(''), tagline: text(''), description: text(''),
+    law_cited: text(''), status: oneOf(['draft', 'published']), updated_at: moment('Last change.'),
+  }),
+  LadderInput: obj({
+    position: whole('A whole number from 1 to 99.'), title: text('At most 120 characters. Required.'),
+    tagline: text('At most 120 characters.'), description: text('At most 1000 characters.'),
+    law_cited: text('At most 200 characters.'),
+  }, ['position', 'title']),
   RouteSummary: obj({
     id: whole('The route number.'), matter_type: text('A short name made of lowercase letters, digits and underscores.'),
     title: text('The situation in the words a reader would use.'), area: oneOf(DOMAINS, 'The area of law.'),
@@ -131,6 +144,13 @@ const schemas = {
     }),
   }),
 
+  AskAiReply: obj({
+    answered: flag('True when a guide answered the question. False when none matches or the guides do not cover it.'),
+    answer: text('The answer in plain text. Present only when answered is true.', { nullable: true }),
+    sources: arrayOf(obj({ id: whole('The guide number.'), title: text('The guide title.') })),
+    message: text('Why there is no answer. Present only when answered is false.', { nullable: true }),
+  }, ['answered']),
+
   ServiceBlock: obj({
     portal: obj({ name: text('The service, such as Irembo.'), url: text('The service page. https only.'), help_url: text('The service’s own help article. https only.') }),
     who_can_apply: text('Who may apply.'),
@@ -179,14 +199,17 @@ const schemas = {
   ChecklistCard: obj({
     id: whole(''), slug: text(''), title: text(''), description: text('', { nullable: true }),
     item_count: whole('How many documents.'), verified_at: moment('When it was published.'),
+    guide_id: whole('The guide this checklist is based on. Shown only while that guide is published.', { nullable: true }), guide_title: text('', { nullable: true }),
   }),
   Checklist: obj({
     id: whole(''), slug: text(''), title: text(''), description: text('', { nullable: true }),
     items: arrayOf('ChecklistItem'), verified_at: moment('When it was published.'),
+    guide_id: whole('The guide this checklist is based on. Shown only while that guide is published.', { nullable: true }), guide_title: text('', { nullable: true }),
   }),
   ChecklistStaff: obj({
     id: whole(''), slug: text(''), title: text(''), description: text('', { nullable: true }), items: arrayOf('ChecklistItem'),
     status: oneOf(['draft', 'pending_review', 'published']), verified_at: moment('', { nullable: true }), updated_at: moment(''),
+    guide_id: whole('The guide this checklist is based on.', { nullable: true }), guide_title: text('', { nullable: true }),
   }),
   ChecklistInput: obj({
     slug: text('At most 60 characters. Must be new.'), title: text('At most 200 characters.'),
@@ -212,10 +235,26 @@ const schemas = {
   MatterEvent: obj({
     id: whole(''), occurred_on: day('The day it happened.'), description: text(''), created_at: moment(''),
     author_is_owner: flag('False for a note written by a lawyer.'), author_name: text('Only ever set for the lawyer’s lines the owner reads.', { nullable: true }),
+    file: {
+      ...obj({ name: text('The name the file had, cleaned.'), size_bytes: whole(''), mime: oneOf(['application/pdf', 'image/png', 'image/jpeg']) }),
+      nullable: true, description: 'The file attached to this line, or null. The stored name is never sent.',
+    },
   }),
   Reminder: obj({
     id: whole(''), due_on: day('The deadline.'), send_on: day('The day it is sent.'),
     status: oneOf(['pending', 'sent', 'missed', 'cancelled']), sent_at: moment('', { nullable: true }),
+  }),
+  MatterReminder: obj({
+    id: whole(''), matter_id: whole('The matter it belongs to.'), title: text('The matter title. Only the owner reads this.'),
+    due_on: day('The deadline.'), send_on: day('The day it is sent.'),
+    status: oneOf(['pending', 'sent']), sent_at: moment('', { nullable: true }),
+  }),
+  MatterProgress: obj({
+    id: whole('The matter number.'), title: text(''), next_due: day('The next deadline.'), shared: flag('True while the matter is shared with a lawyer.'),
+    checklist: { ...obj({ title: text(''), under_review: flag('True while the checklist is being checked again. No figures are given then.') }), nullable: true },
+    needed: whole('Required documents. Left out when there is no published checklist.'), complete: whole('Checked by a lawyer.'),
+    awaiting: whole('Uploaded, waiting for a lawyer.'), to_fix: whole('A lawyer asked for a change.'), expired: whole('Out of date.'),
+    missing: whole('Not uploaded.'), ready: flag('True when every required document is complete. It is not a promise that an office will accept it.'),
   }),
   MatterDetail: obj({
     id: whole(''), title: text(''), status: oneOf(['open', 'closed']), next_action: text('', { nullable: true }), next_due: day(''),
@@ -264,7 +303,7 @@ const schemas = {
   }),
   BookingExpert: obj({
     id: whole(''), provider_id: whole(''), slot: moment(''), topic: text('', { nullable: true }), status: oneOf(BOOKING_STATES),
-    created_at: moment(''), meet_link: text('Only once accepted.', { nullable: true }), requester: text('The name, or "Anonymous".'),
+    created_at: moment(''), meet_link: text('Only once accepted.', { nullable: true }), requester: text('The name of a signed-in requester, or "Anonymous requester" for an anonymous one. Never any part of a token.'),
   }),
   BookingInput: obj({
     provider_id: whole('A published directory entry that takes bookings.'),
@@ -274,6 +313,14 @@ const schemas = {
     id: whole(''), provider_id: whole(''), slot: moment(''), topic: text('', { nullable: true }), status: oneOf(BOOKING_STATES),
     anon_token: text('Shown once. It cannot be recovered.'), warning: text('A reminder to save the token.'),
   }),
+  JoinReply: obj({
+    provider: oneOf(['daily', 'meet', 'none'], 'daily: join inside the platform. meet: open the Google Meet link. none: no call is set up.'),
+    url: text('The room address (daily) or the Meet link (meet).', { nullable: true }),
+    token: text('Only for daily. The person\'s own token for the room.', { nullable: true }),
+    audioOnlyAllowed: flag('Only for daily. Always true.'),
+    reason: text('Why the call is not in the platform: daily_unavailable, daily_failed or daily_cap.', { nullable: true }),
+    message: text('Only for none. What to tell the person.', { nullable: true }),
+  }, ['provider']),
   AnonBookingStatus: obj({
     id: whole(''), slot: moment(''), topic: text('', { nullable: true }), status: oneOf(BOOKING_STATES),
     provider_name: text(''), meet_link: text('Only once the lawyer has accepted.', { nullable: true }),
@@ -291,6 +338,50 @@ const schemas = {
   OpenQuestion: obj({
     id: whole(''), text: text(''), created_at: moment(''),
     kind: oneOf(['anonymous', 'signed-in'], 'Nothing more about who asked.'),
+    overdue: flag('True once the question has waited longer than the answer target.'),
+  }),
+
+  ReportSent: obj({
+    id: whole('The report number.'),
+    code: text('Only for a report sent without an email address. Shown once. For example LC-4F9K27QX. It is the only way to see the answer.'),
+    warning: text('A reminder to save the code.'),
+  }),
+  ReportStatus: obj({
+    type: oneOf(['info', 'office', 'broken', 'safety', 'idea'], 'What the report is about.'),
+    about_label: text('The page the sender was looking at.', { nullable: true }),
+    status: oneOf(['received', 'in_progress', 'resolved'], 'Where the report is.'),
+    created_at: moment('When it was sent.'), read_at: moment('When the admin first opened it.', { nullable: true }),
+    resolved_at: moment('When it was resolved.', { nullable: true }), admin_reply: text('The reply from the admin.', { nullable: true }),
+  }),
+  ReportRow: obj({
+    id: whole('The report number.'), type: oneOf(['info', 'office', 'broken', 'safety', 'idea']),
+    about_kind: { type: 'string', nullable: true, enum: ['guide', 'route', 'provider', 'page', null], description: 'What the sender was looking at.' },
+    about_id: whole('', { nullable: true }), about_label: text('', { nullable: true }), status: oneOf(['received', 'in_progress', 'resolved']),
+    reply_channel: oneOf(['code', 'email'], 'How the sender is answered.'), excerpt: text('The first 160 characters of the message.'),
+    read_at: moment('', { nullable: true }), resolved_at: moment('', { nullable: true }), created_at: moment(''),
+  }),
+  ReportList: obj({
+    reports: arrayOf('ReportRow'),
+    counts: obj({
+      received: whole(''), in_progress: whole(''), resolved: whole(''),
+      resolved_this_month: whole(''), unresolved_safety: whole('Safety concerns not yet resolved.'),
+    }),
+  }),
+  ReportDetail: obj({
+    id: whole(''), type: oneOf(['info', 'office', 'broken', 'safety', 'idea']),
+    about_kind: { type: 'string', nullable: true, enum: ['guide', 'route', 'provider', 'page', null] }, about_id: whole('', { nullable: true }),
+    about_label: text('', { nullable: true }), about_exists: flag('True when the guide, route or entry still exists.'),
+    message: text('What the sender wrote.'), status: oneOf(['received', 'in_progress', 'resolved']),
+    reply_channel: oneOf(['code', 'email']), contact_email: text('Only until the reply has been sent. Then null.', { nullable: true }),
+    admin_reply: text('', { nullable: true }), read_at: moment(''), resolved_at: moment('', { nullable: true }),
+    created_at: moment(''), updated_at: moment(''),
+  }),
+  ReportSaved: obj({
+    id: whole(''), type: oneOf(['info', 'office', 'broken', 'safety', 'idea']),
+    status: oneOf(['received', 'in_progress', 'resolved']), reply_channel: oneOf(['code', 'email']),
+    admin_reply: text('', { nullable: true }), read_at: moment(''), resolved_at: moment('', { nullable: true }), updated_at: moment(''),
+    has_email: flag('True while the address of the sender is still held.'),
+    delivery: oneOf(['sent', 'failed'], 'Only when an email report was resolved. "failed" keeps the address so the admin can save again.'),
   }),
 
   AdminUser: obj({
@@ -304,6 +395,21 @@ const schemas = {
   InviteCreated: obj({
     id: whole(''), email: text(''), expires_at: moment(''), message: text('Says whether the email was sent.'),
   }),
+  WeekCount: obj({
+    week_start: day('The Monday of the week (UTC). The week runs Monday to Sunday.'),
+    questions: whole('Questions asked in the week.'), bookings: whole('Consultations requested in the week.'),
+  }),
+  AdminBooking: obj({
+    id: whole('The booking number.'), provider_id: whole('The directory entry.'), provider_name: text('The office or person.'),
+    slot: moment('The time asked for.'), status: oneOf(BOOKING_STATES),
+  }),
+  QuestionSummary: obj({
+    open: whole('Open questions waiting for any lawyer.'),
+    overdue: whole('Open questions older than answer_target_days.'),
+    answer_target_days: whole('A question left open longer than this many days is overdue.'),
+    answered_this_month: whole('Questions this lawyer answered this calendar month (UTC).'),
+    average_wait_days: { type: 'number', description: 'Average days from asked to answered for those answers, one decimal. Left out when there are none.' },
+  }),
   Stats: {
     type: 'object',
     description: 'Counts only. No names, no emails and nothing about what one person did.',
@@ -315,7 +421,9 @@ const schemas = {
         stale: whole('Published entries not checked for 180 days.'),
       }),
       bookings: obj({ total: whole(''), anonymous: whole(''), by_status: obj({ requested: whole(''), accepted: whole(''), declined: whole(''), completed: whole('') }) }),
-      questions: obj({ total: whole(''), anonymous: whole(''), open: whole('') }),
+      questions: obj({ total: whole(''), anonymous: whole(''), open: whole(''), overdue: whole('Open questions older than answer_target_days.') }),
+      weekly: arrayOf(ref('WeekCount')),
+      answer_target_days: whole('A question left open longer than this many days is overdue.'),
       matters: obj({ total: whole(''), open: whole(''), shared: whole('') }),
       reminders: obj({ pending: whole(''), sent: whole(''), missed: whole(''), cancelled: whole(''), sent_late: whole('Sent after the deadline.') }),
       users: obj({ student: whole(''), staff: whole(''), legal_expert: whole(''), admin: whole(''), deactivated: whole('') }),
@@ -355,6 +463,11 @@ const OPS = [
   op('get', '/health', 'Server', 'Check that the server is running', { reply: [200, 'It is running.', obj({ status: text('Always "ok".') })] }),
 
   // ---- Accounts
+  op('get', '/auth/mail-status', 'Accounts', 'Say whether this server can send email', {
+    desc: 'The sign-up page asks this before it shows the form. It gives one answer and nothing about the mail setup.',
+    reply: [200, 'Whether email can be sent.', obj({ available: flag('False only in production with no mail service set up.') }, ['available'])],
+    limited: true,
+  }),
   op('post', '/auth/register', 'Accounts', 'Create a student or staff account', {
     desc: 'Only an @alustudent.com or @alueducation.com address. No token comes back. The account cannot sign in until the emailed link is used. Legal experts join by invitation.',
     body: obj({ name: text('The name.'), email: text('An ALU address.'), password: text('At least 8 characters.'), role: oneOf(['student', 'staff'], 'What the person is.') }, ['name', 'email', 'password', 'role']),
@@ -464,6 +577,28 @@ const OPS = [
     roles: ['admin'], reply: [200, 'Published.', obj({ id: whole(''), status: text('"published".') })], errors: [400],
   }),
 
+  // ---- Dispute ladder
+  op('get', '/directory/ladder', 'Where to go', 'The dispute ladder, in order', {
+    desc: 'Published steps only. An empty list means no step is published yet, so nothing is shown.',
+    reply: [200, 'The published steps.', arrayOf('LadderStep')],
+  }),
+  op('get', '/directory/ladder/all', 'Where to go', 'List every ladder step in every state', {
+    roles: ['admin'], reply: [200, 'All steps.', arrayOf('LadderStaff')],
+  }),
+  op('post', '/directory/ladder', 'Where to go', 'Add a ladder step as a draft', {
+    roles: ['admin'], body: ref('LadderInput'), reply: [201, 'The new draft.', ref('LadderStaff')], errors: [400],
+  }),
+  op('put', '/directory/ladder/{id}', 'Where to go', 'Change a ladder step', {
+    desc: 'A field left out keeps its value. Any edit sends the step back to draft.', roles: ['admin'],
+    body: ref('LadderInput'), reply: [200, 'The step after the change.', ref('LadderStaff')], errors: [400, 404],
+  }),
+  op('post', '/directory/ladder/{id}/publish', 'Where to go', 'Publish a ladder step', {
+    roles: ['admin'], reply: [200, 'Published.', obj({ id: whole(''), status: text('"published".') })], errors: [400],
+  }),
+  op('delete', '/directory/ladder/{id}', 'Where to go', 'Remove a ladder step', {
+    roles: ['admin'], reply: [200, 'Removed.', obj({ id: whole('') })], errors: [404],
+  }),
+
   // ---- Urgent numbers and search
   op('get', '/emergency-contacts', 'Urgent numbers', 'List the urgent help numbers', {
     desc: 'Never empty. A built-in list is sent when the table is empty or the database cannot be read.',
@@ -475,6 +610,17 @@ const OPS = [
       { name: 'library', schema: oneOf(['all', 'guides', 'routes', 'providers']), description: 'Search one list. The default is all.' },
     ],
     reply: [200, 'Up to a few results from each list.', ref('SearchReply')], errors: [400], limited: true,
+  }),
+
+  // ---- Ask AI
+  op('get', '/ask-ai/status', 'Ask AI', 'Is Ask AI set up on this server', {
+    desc: 'Says only whether Ask AI can answer. Nothing else about the setup is shown.',
+    reply: [200, 'The setup.', obj({ available: flag('True when the key and the model are set.') }, ['available'])],
+  }),
+  op('post', '/ask-ai', 'Ask AI', 'Ask a question answered from the published guides', {
+    desc: 'The answer is written by a Google Gemini model from the guides that match the question, and it may be wrong. Nothing about the asker or the question is stored. A question with no matching guide is answered without calling the model.',
+    body: obj({ question: text('5 to 500 characters.') }, ['question']),
+    reply: [200, 'The answer, or the reason there is none.', ref('AskAiReply')], errors: [400, 503], limited: true,
   }),
 
   // ---- Guides
@@ -545,12 +691,20 @@ const OPS = [
     reply: [200, 'The request.', ref('AnonBookingStatus')], errors: [404], limited: true,
   }),
   op('get', '/bookings/expert', 'Consultations', 'List the requests for my directory entry', {
-    desc: 'An anonymous requester is shown as "Anonymous".', roles: ['legal_expert'], reply: [200, 'Soonest first.', arrayOf('BookingExpert')],
+    desc: 'An anonymous requester is always shown as "Anonymous requester". No part of the token is ever sent. Act on a request by its id.', roles: ['legal_expert'], reply: [200, 'Soonest first.', arrayOf('BookingExpert')],
   }),
   op('post', '/bookings/{id}/status', 'Consultations', 'Accept, decline or complete a request', {
     desc: 'A request moves forward only. Accepting emails the person if they signed in.',
     roles: ['legal_expert'], body: obj({ status: oneOf(['accepted', 'declined', 'completed'], 'The new state.') }, ['status']),
     reply: [200, 'The request after the change.', ref('Booking')], errors: [400, 404, 409],
+  }),
+  op('post', '/bookings/{id}/join', 'Consultations', 'Get the call for an accepted booking', {
+    desc: 'For the signed-in owner, the lawyer, or the anonymous booker with the code in the body. Anyone else gets 404. The first join makes the private video room, and later joins reuse it. If the call cannot start in the platform, the answer is the lawyer\'s Google Meet link instead, with the reason. The Meet link is never given for a request that is not accepted.',
+    body: obj({
+      anon_token: text('The anonymous booking code. Only for the anonymous booker.'),
+      audio_only: flag('Start with the camera off.'),
+    }),
+    reply: [200, 'The call, or the fallback.', ref('JoinReply')], errors: [404, 409], limited: true,
   }),
 
   // ---- Questions
@@ -568,9 +722,32 @@ const OPS = [
   op('get', '/questions/open', 'Questions', 'List the questions waiting for an answer', {
     desc: 'Says whether the question is anonymous and nothing more about who asked.', roles: ['legal_expert'], reply: [200, 'Oldest first.', arrayOf('OpenQuestion')],
   }),
+  op('get', '/questions/summary', 'Questions', 'My answering figures', {
+    desc: 'Counts and one average. Only the answers this lawyer gave. Answers given before the time was recorded are not counted.',
+    roles: ['legal_expert'], reply: [200, 'The figures.', ref('QuestionSummary')],
+  }),
   op('post', '/questions/{id}/answer', 'Questions', 'Answer a question', {
     roles: ['legal_expert'], body: obj({ answer: text('At most 10000 characters.') }, ['answer']),
     reply: [200, 'Answered.', obj({ id: whole(''), status: text('"answered".') })], errors: [400, 404],
+  }),
+
+  // ---- Reports
+  op('post', '/reports', 'Reports', 'Report a problem', {
+    desc: 'Stores no account and no IP address. With reply_by "code" the reply holds a code, shown once. With reply_by "email" the address is kept only until the reply of the admin is sent.',
+    body: obj({
+      type: oneOf(['info', 'office', 'broken', 'safety', 'idea'], 'What the report is about.'),
+      message: text('10 to 2000 characters.'),
+      about_kind: oneOf(['guide', 'route', 'provider', 'page'], 'Optional. What the sender was looking at.'),
+      about_id: whole('Needed for a guide, route or provider.'), about_label: text('The page title. At most 200 characters.'),
+      reply_by: oneOf(['code', 'email'], 'How the sender wants to be reached.'),
+      email: text('Only with reply_by "email".'),
+    }, ['type', 'message', 'reply_by']),
+    reply: [201, 'The report number and, for a code-only report, the code.', ref('ReportSent')], errors: [400], limited: true,
+  }),
+  op('post', '/reports/check', 'Reports', 'See where a report is with its code', {
+    desc: 'A POST so the code is never in a URL. A wrong code gets the same answer as any other unknown code.',
+    body: obj({ code: text('The code shown when the report was sent, for example LC-4F9K27QX. Case, spaces and hyphens do not matter.') }, ['code']),
+    reply: [200, 'Where the report is.', ref('ReportStatus')], errors: [404], limited: true,
   }),
 
   // ---- Matters
@@ -582,6 +759,14 @@ const OPS = [
   }),
   op('get', '/matters/share-targets', 'Matters', 'List who a matter can be shared with', {
     roles: OWNERS, reply: [200, 'Published entries that have a legal expert account.', arrayOf('ShareTarget')],
+  }),
+  op('get', '/matters/reminders', 'Matters', 'List the reminders of my open matters', {
+    desc: 'Waiting and sent reminders for deadlines no more than two weeks past. Newest send date first.',
+    roles: OWNERS, reply: [200, 'Up to 20 reminders.', arrayOf('MatterReminder')],
+  }),
+  op('get', '/matters/progress', 'Matters', 'Where the documents of each open matter stand', {
+    desc: 'Counts of required documents by what a lawyer has said. A matter with no published checklist carries no figures.',
+    roles: OWNERS, reply: [200, 'Soonest deadline first.', arrayOf('MatterProgress')],
   }),
   op('get', '/matters/shared', 'Matters', 'List the matters shared with my directory entry', {
     desc: 'The owner is not named.', roles: ['legal_expert'], reply: [200, 'Soonest deadline first.', arrayOf('SharedMatter')],
@@ -595,9 +780,16 @@ const OPS = [
     reply: [200, 'The matter after the change.', ref('Matter')], errors: [400, 404],
   }),
   op('post', '/matters/{id}/events', 'Matters', 'Write a line in the record of a matter', {
-    desc: 'The owner. The lawyer too, while the matter is shared.', roles: [...OWNERS, 'legal_expert'],
+    desc: 'The owner. The lawyer too, while the matter is shared. Send JSON, or multipart/form-data when the owner attaches one file (field "file": a PDF, PNG or JPEG of at most 5 MB, read by its bytes). The line and its file are made together or not at all. A lawyer’s note carries no file. With no document key on the server a file is refused with 503 and no line is made.',
+    roles: [...OWNERS, 'legal_expert'], limited: true,
     body: obj({ description: text('At most 2000 characters.'), occurred_on: day('Not in the future. Defaults to today in Kigali.') }, ['description']),
-    reply: [201, 'The line.', ref('MatterEvent')], errors: [400, 404],
+    multipart: obj({ description: text('At most 2000 characters.'), occurred_on: day('Not in the future. Defaults to today in Kigali.'), file: { type: 'string', format: 'binary', description: 'The optional file.' } }, ['description']),
+    reply: [201, 'The line, with its file when it has one.', ref('MatterEvent')], errors: [400, 404, 503],
+  }),
+  op('get', '/matters/{id}/events/{eventId}/file', 'Matters', 'Download the file on a line of the record', {
+    desc: 'The owner, or the legal expert the matter is shared with at this moment. Anyone else, an admin too, gets 404.',
+    roles: ANYONE_SIGNED_IN,
+    reply: [200, 'The file as it was attached.', null, ['application/pdf', 'image/png', 'image/jpeg']], errors: [404],
   }),
   op('post', '/matters/{id}/share', 'Matters', 'Share a matter with one office', {
     desc: 'The owner only. It replaces any earlier share.', roles: OWNERS, body: obj({ provider_id: whole('A published entry that has a legal expert account.') }, ['provider_id']),
@@ -691,6 +883,35 @@ const OPS = [
   op('delete', '/admin/emergency-contacts/{id}', 'Administration', 'Delete an urgent number', {
     desc: 'Deleting the last one is allowed. The public list then shows the built-in numbers.', roles: ['admin'], reply: [204, 'Deleted.'], errors: [404],
   }),
+  op('get', '/admin/bookings', 'Administration', 'List every consultation, view only', {
+    desc: 'The office, the time and the state. Never who asked: no name, account, token or topic. Optional from and to (YYYY-MM-DD, both included) limit it by time, in UTC. Soonest first.',
+    roles: ['admin'], reply: [200, 'The consultations.', arrayOf('AdminBooking')], errors: [400],
+  }),
+  op('get', '/admin/reports', 'Administration', 'List the reports', {
+    desc: 'Unresolved safety concerns come first, then the newest. The code hash is never sent.',
+    roles: ['admin'], query: [
+      { name: 'status', schema: oneOf(['received', 'in_progress', 'resolved']), description: 'Keep one status.' },
+      { name: 'type', schema: oneOf(['info', 'office', 'broken', 'safety', 'idea']), description: 'Keep one type.' },
+    ],
+    reply: [200, 'The reports and the counts.', ref('ReportList')], errors: [400],
+  }),
+  op('get', '/admin/reports/export', 'Administration', 'Download the reports as a CSV file', {
+    desc: 'Takes the same filters as the list. UTF-8 with a BOM. Columns: id, type, about_kind, about_label, status, reply_channel, created_at, read_at, resolved_at, message, admin_reply. Never the code hash or an email address. A cell that could run as a formula starts with a quote.',
+    roles: ['admin'],
+    query: [
+      { name: 'status', schema: oneOf(['received', 'in_progress', 'resolved']), description: 'Keep one status.' },
+      { name: 'type', schema: oneOf(['info', 'office', 'broken', 'safety', 'idea']), description: 'Keep one type.' },
+    ],
+    reply: [200, 'The file.', null, ['text/csv']], errors: [400],
+  }),
+  op('get', '/admin/reports/{id}', 'Administration', 'Read one report', {
+    desc: 'Opening a report marks it read.', roles: ['admin'], reply: [200, 'The report.', ref('ReportDetail')], errors: [404],
+  }),
+  op('put', '/admin/reports/{id}', 'Administration', 'Set the status of a report and reply', {
+    desc: 'Resolving an email report sends one email with the reply and then erases the address. If the send fails the address stays and delivery is "failed".',
+    roles: ['admin'], body: obj({ status: oneOf(['received', 'in_progress', 'resolved']), admin_reply: text('At most 1000 characters.') }, ['status']),
+    reply: [200, 'The report after the change.', ref('ReportSaved')], errors: [400, 404],
+  }),
   op('get', '/admin/stats', 'Administration', 'Read the counts', { roles: ['admin'], reply: [200, 'Counts only.', ref('Stats')] }),
 ];
 
@@ -703,11 +924,13 @@ const TAGS = [
   ['Where to go', 'Which body a kind of matter goes to first, with the law, the steps and the deadline.'],
   ['Urgent numbers', 'Numbers for someone in a crisis. This list is never empty.'],
   ['Search', 'One search over guides, routes and directory entries.'],
+  ['Ask AI', 'A short answer written by a model from the published guides. Anyone may ask.'],
   ['Guides', 'Legal information in simple words, written and published by an admin.'],
   ['Saved guides', 'Guides a signed-in person keeps.'],
   ['Checklists', 'Which documents a task needs.'],
   ['Consultations', 'Requests for a consultation, in a name or without one.'],
   ['Questions', 'Questions for a legal expert, in a name or without one.'],
+  ['Reports', 'Reports of a problem on the site, with or without a name.'],
   ['Matters', 'A person’s private record of a legal problem, with reminders and sharing.'],
   ['Matter documents', 'Files a person attaches to a matter for a lawyer to check.'],
   ['Administration', 'Invitations, accounts, urgent numbers and counts. Admin only.'],
@@ -744,7 +967,10 @@ function build(o) {
     parameters: parameters(o, o.path),
     responses,
   };
-  if (o.body) operation.requestBody = { required: true, content: { 'application/json': { schema: o.body } } };
+  if (o.body) {
+    operation.requestBody = { required: true, content: { 'application/json': { schema: o.body } } };
+    if (o.multipart) operation.requestBody.content['multipart/form-data'] = { schema: o.multipart };
+  }
   if (o.rawBody) {
     operation.requestBody = {
       required: true, description: 'The file itself.',
@@ -766,7 +992,7 @@ export const openapi = {
     title: 'ALU Legal Companion API',
     version: '0.1.0',
     description: [
-      'A verified directory of the bodies in Rwanda that solve legal problems, where each kind of matter goes first, tracking of a matter with deadline reminders, guides in simple words, anonymous help-seeking and a small assistant.',
+      'A verified directory of the bodies in Rwanda that solve legal problems, where each kind of matter goes first, tracking of a matter with deadline reminders, guides in simple words, document checklists, documents a lawyer can check, and anonymous questions and bookings.',
       '',
       'Sign in with POST /auth/login. Use "Authorize" and paste the token. Routes marked with a lock need it.',
       'Every error is { "error": "a message a person can act on" }.',

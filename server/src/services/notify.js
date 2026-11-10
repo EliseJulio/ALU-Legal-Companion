@@ -5,8 +5,8 @@
 //
 // An email says that something changed and where to look. It never carries the text of a comment,
 // the name of a document, the title of a matter or who the owner is. Those are the person's own
-// words and a mailbox is less private than this site. The meeting link is the one detail a person
-// asked to receive, and a booking with no account has no address, so it gets nothing.
+// words and a mailbox is less private than this site. The meeting link is the only detail sent.
+// A booking with no account has no address, so it gets nothing.
 //
 // A failed send never breaks the request that caused it. It is logged without the address and the
 // person still sees the change on the site.
@@ -28,8 +28,8 @@ function fire(task) {
 // For tests. It resolves once every send started so far has finished.
 export const whenSettled = () => Promise.allSettled([...pending]);
 
-// A burst of uploads must not send the lawyer one email for each file. One email says look, and a
-// second one within a few minutes would add nothing.
+// A burst of uploads must not send the lawyer one email for each file.
+// One email says look. A second one within a few minutes would add nothing.
 const QUIET_MS = 5 * 60 * 1000;
 const lastTold = new Map();
 export const resetNotifyThrottle = () => lastTold.clear();

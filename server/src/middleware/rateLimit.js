@@ -8,9 +8,9 @@ import Redis from 'ioredis';
 
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
-// With no REDIS_URL every limiter keeps express-rate-limit's own in-memory store (fine for one
-// instance, which is all this capstone deploys). With REDIS_URL set, counts live in Redis instead,
-// so every limit still holds when more than one server process shares the load.
+// With no REDIS_URL every limiter keeps the in-memory store of express-rate-limit. That is fine for one instance.
+// With REDIS_URL set the counts live in Redis instead.
+// So every limit still holds when more than one server process shares the load.
 const redisClient = process.env.REDIS_URL
   ? new Redis(process.env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
   : null;
@@ -49,10 +49,8 @@ export function createLimiter({ windowMs = FIFTEEN_MINUTES, max, message, ...opt
 }
 
 // POST /matters/:id/documents. It is counted for the signed-in person and the IP is only the fallback.
-// An upload is up to 10 MB held in memory and then encrypted and written to disk. So this limits what
-// one account can ask of the server. 60 in 15 minutes is far above real use. A person attaching the
-// paperwork for a car uploads about a dozen files. It is counted by account so a shared campus IP
-// cannot use up the budget of anyone else.
+// An upload is up to 10 MB held in memory, then encrypted and written to disk. The limit is per
+// account, so a shared campus IP cannot use up the budget of anyone else.
 export const documentUploadLimiter = createLimiter({
   max: 60,
   keyGenerator: (req) => (req.user?.id ? `user:${req.user.id}` : req.ip),
@@ -84,14 +82,22 @@ export const loginEmailLimiter = createLimiter({
   requestWasSuccessful: (_req, res) => res.statusCode < 400 || res.statusCode === 403,
 });
 
-// Routes that send an email (resend a verification link, forgot password): strict, per email.
-// The risk is someone filling one person's inbox. These routes always answer 200 on purpose,
-// so successful requests count too. The count uses the email that was typed and never whether
-// an account exists, so a 429 does not reveal anything a 200 would not.
+// Routes that send an email (resend a verification link or forgot password): strict and per email.
+// The risk is someone filling one person's inbox. These routes always answer 200 on purpose so successful requests count too.
+// The count uses the email that was typed. It never uses whether an account exists.
+// So a 429 does not reveal anything a 200 would not.
 export const emailLimiter = createLimiter({
   max: 5,
   message: 'Too many emails requested. Please wait 15 minutes and try again.',
   keyGenerator: emailOrIp,
+});
+
+// POST /api/ask-ai. Each question can cost a model call, so this is kept low per address.
+// Five a minute is far above a person reading an answer and stops a script from using up the quota.
+export const askAiLimiter = createLimiter({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: 'Too many questions. Please wait a minute and try again.',
 });
 
 // Every auth route: loose, counted per IP. It only stops one computer trying many accounts.
