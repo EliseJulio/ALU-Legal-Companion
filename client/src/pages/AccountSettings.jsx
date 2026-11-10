@@ -18,7 +18,7 @@ const ROLE_WORDS = { student: 'Student', staff: 'Staff', legal_expert: 'Legal ex
 
 // Change your own name. The server reads the name and nothing else, so this form cannot be used
 // to change a role or an address. A new token comes back because the name is stored in it.
-function NameForm({ current }) {
+function NameForm({ current, onSaved }) {
   const { signIn } = useAuth();
   const [name, setName] = useState(current);
   // The name can arrive from the server after the box is shown. The box then takes it.
@@ -42,6 +42,8 @@ function NameForm({ current }) {
     setDone(false);
     try {
       signIn(await apiPut('/auth/me', { name: name.trim() }));
+      // The details panel asks the server again so it shows the saved name at once.
+      onSaved?.();
       setDone(true);
     } catch (err) {
       setError(err);
@@ -251,7 +253,7 @@ export default function AccountSettings() {
       <div className="mt-8 grid gap-6 wide:grid-cols-12">
         <div className="min-w-0 wide:col-span-8">
           <div className={CARD}>
-            <NameForm current={me?.name ?? user.name} />
+            <NameForm current={me?.name ?? user.name} onSaved={refetch} />
             <EmailForm onRequested={refetch} />
             <PasswordForm />
           </div>
