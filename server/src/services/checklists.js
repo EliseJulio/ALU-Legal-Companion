@@ -1,12 +1,12 @@
 // Document checklists. "Buying a second-hand car needs these documents."
 //
-// The documents are stored as JSON on the checklist row and checked here. A guide's service part
-// is stored the same way and for the same reason. The steps (draft, pending review, published and
-// any edit sends it back to draft) are written against the row. So the documents follow them with
-// no second set of steps to keep in line.
+// The documents are stored as JSON on the checklist row and checked here.
+// The service part of a guide is stored the same way and for the same reason.
+// The steps (draft and published and any edit sends it back to draft) are written against the row.
+// So the documents follow them with no second set of steps to keep in line.
 //
-// A checklist is a claim about what an office will ask for. So a person only sees it once an admin
-// has checked and published it.
+// A checklist is a claim about what an office will ask for.
+// So a person only sees it once an admin has published it.
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const HTTPS = /^https:\/\/[^\s/$.?#][^\s]*$/i;
@@ -88,4 +88,18 @@ export function itemState(document) {
 export function isReady(items) {
   const required = items.filter((i) => i.required);
   return required.length > 0 && required.every((i) => i.state === 'complete');
+}
+
+// The figures a matter shows for its checklist. Each REQUIRED item is counted once by the latest file that answers it.
+// An optional item and a free file and an older file that was replaced are never counted.
+// Items are counted by their distinct keys so `complete` can never be more than `needed` even if a checklist row repeats a key.
+// `documents` must be this matter's files only.
+export function progressFigures(items, documents) {
+  const keys = [...new Set(items.filter((i) => i.required).map((i) => i.key))];
+  const counts = { complete: 0, pending: 0, needs_fix: 0, out_of_date: 0, missing: 0 };
+  for (const key of keys) {
+    const doc = [...documents].reverse().find((d) => d.item_key === key) ?? null;
+    counts[itemState(doc)] += 1;
+  }
+  return { needed: keys.length, counts };
 }

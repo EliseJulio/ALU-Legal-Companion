@@ -1,4 +1,4 @@
-// Admin: invitations for legal experts, user management, crisis contacts and counts.
+// Admin: invitations for legal experts and user management and crisis contacts and counts.
 import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth, normalizeEmail } from '../middleware/auth.js';
@@ -6,6 +6,8 @@ import { requireIntParam } from '../middleware/validate.js';
 import { createInvite, deleteInvite } from '../services/invites.js';
 import { sendMail, appUrl } from '../services/mailer.js';
 import { STALE_AFTER_DAYS } from './directory.js';
+import { ANSWER_TARGET_DAYS } from '../config/targets.js';
+import { countOverdue, weeklyCounts } from '../services/overview.js';
 
 const router = Router();
 
@@ -74,21 +76,14 @@ router.get('/invites', requireAuth('admin'), async (_req, res) => {
 
 // ------------------------------------------------------------------------------ users
 //
-// This is the largest amount of personal data the platform shows. It exists only because
-// managing accounts needs it. The fields are the ones that job needs: name, email, role,
-// whether the address is verified, whether the account is active and when it was made.
-// The columns are listed one by one. A plain SELECT * would put every password hash in a browser.
-// There are no counts of what a person has asked or booked. A column like that next to a
-// name would turn account management into watching people.
+// The columns are listed one by one. A plain SELECT * would return every password hash.
 const USER_COLUMNS = 'id, name, email, role, email_verified_at, deactivated_at, created_at';
 
 router.get('/users', requireAuth('admin'), async (_req, res) => {
   res.json(await q(`SELECT ${USER_COLUMNS} FROM users ORDER BY created_at DESC, id DESC`));
 });
 
-// How many admins could still sign in if this one were not an admin any more.
-// Reaching zero is the one mistake the platform cannot undo. Nobody could promote or
-// reactivate anyone and the fix would be to edit the database by hand.
+// Counts the other active admins. The last admin cannot be demoted or deactivated.
 async function otherActiveAdmins(excludeUserId) {
   const [row] = await q(
     `SELECT count(*)::int AS n FROM users WHERE role = 'admin' AND deactivated_at IS NULL AND id <> $1`,
@@ -102,8 +97,7 @@ const ASSIGNABLE_ROLES = ['student', 'staff', 'admin'];
 router.put('/users/:id/role', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   const { role } = req.body || {};
 
-  // legal_expert cannot be given here. Only an invitation gives it. The link proves the person
-  // owns the address before they can answer questions and hold consultations. A drop-down would remove that proof.
+  // legal_expert cannot be given here. Only an invitation can give it, because the invitation proves the address is owned.
   if (role === 'legal_expert') {
     return res.status(400).json({
       error: 'Legal experts join by invitation only. Send an invitation instead. The link proves they own the address before they can answer questions and hold consultations.',
@@ -160,9 +154,8 @@ router.post('/users/:id/reactivate', requireAuth('admin'), requireIntParam('id')
 
 // ------------------------------------------------------------------------------ crisis contacts
 //
-// An admin can correct a wrong number without a deploy. Deleting the last one is allowed.
-// The public list falls back to the built-in contacts when the table is empty, so the crisis
-// page can never be empty. That is what makes deleting safe.
+// Deleting the last contact is allowed. The public list then uses the built-in contacts,
+// so the crisis page is never empty.
 
 const MAX_SORT = 10000;
 
@@ -264,7 +257,10 @@ router.get('/stats', requireAuth('admin'), async (_req, res) => {
       ...bookings,
       by_status: counts(['requested', 'accepted', 'declined', 'completed'], await byStatus('bookings')),
     },
-    questions,
+    questions: { ...questions, overdue: await countOverdue() },
+    // The last eight weeks, oldest first. Counts only.
+    weekly: await weeklyCounts(),
+    answer_target_days: ANSWER_TARGET_DAYS,
     matters,
     reminders: {
       ...counts(['pending', 'sent', 'missed', 'cancelled'], await byStatus('reminders')),
@@ -276,6 +272,38 @@ router.get('/stats', requireAuth('admin'), async (_req, res) => {
       deactivated: deactivated.n,
     },
   });
+});
+
+// ------------------------------------------------------------------------------ appointments
+//
+// Every booking for the view-only calendar of the admin. It names the office and the time and the state.
+// It never says who asked: no name and no account and no token and no topic and no label.
+// An admin can see how busy the directory is. An admin cannot see who is booking.
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_BOOKINGS = 5000;
+
+// A real calendar day such as 2026-11-05. 2026-02-30 is refused.
+const isDay = (v) => DATE_PATTERN.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+
+// GET /api/admin/bookings?from=YYYY-MM-DD&to=YYYY-MM-DD
+// The window is by slot in UTC and both days are included. Either end may be left out.
+router.get('/bookings', requireAuth('admin'), async (req, res) => {
+  const { from, to } = req.query;
+  for (const [name, value] of [['from', from], ['to', to]]) {
+    if (value !== undefined && (typeof value !== 'string' || !isDay(value))) {
+      return res.status(400).json({ error: `${name} must be a date (YYYY-MM-DD)` });
+    }
+  }
+  // Both ends of the window are optional, so the SQL ignores one that is NULL.
+  res.json(await q(
+    `SELECT b.id, b.provider_id, p.name AS provider_name, b.slot, b.status
+       FROM bookings b JOIN providers p ON p.id = b.provider_id
+      WHERE ($1::date IS NULL OR b.slot >= $1::date::timestamp AT TIME ZONE 'UTC')
+        AND ($2::date IS NULL OR b.slot < ($2::date + 1)::timestamp AT TIME ZONE 'UTC')
+      ORDER BY b.slot ASC, b.id ASC
+      LIMIT ${MAX_BOOKINGS}`,
+    [from ?? null, to ?? null]));
 });
 
 export default router;

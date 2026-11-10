@@ -9,8 +9,8 @@ import { DOMAINS, normalizeDomain } from '../services/domains.js';
 
 const router = Router();
 
-// The areas of law live in services/domains.js. They are exported here as well because the tests
-// and the older code import them from this file.
+// The areas of law live in services/domains.js. They are re-exported here for the routes and tests
+// that import them from this file.
 export { DOMAINS };
 
 const SECTIONS = ['situation', 'law_says', 'your_rights', 'steps', 'get_help'];
@@ -94,9 +94,9 @@ router.get('/all', requireAuth('admin'), async (_req, res) => {
       ORDER BY g.updated_at DESC, g.id`));
 });
 
-// GET /api/guides/:id : the full guide. A guide that is a draft or was never published is a
-// 404, the same as one that does not exist — a direct link teaches nothing. A withdrawn guide
-// was public knowledge, so it answers 410 with the reason instead, not a bare 404.
+// GET /api/guides/:id : the full guide. A draft or a guide that was never published is a 404.
+// It is the same as one that does not exist so a direct link reveals nothing.
+// A withdrawn guide answers 410 with the reason because it may already have been read.
 router.get('/:id', requireIntParam('id'), async (req, res) => {
   const [row] = await q('SELECT status FROM guides WHERE id = $1', [req.params.id]);
   if (!row || (row.status !== 'published' && row.status !== 'withdrawn')) {

@@ -11,6 +11,7 @@ import 'express-async-errors';
 import authRoutes from './routes/auth.js';
 import directoryRoutes from './routes/directory.js';
 import matterRouteRoutes from './routes/matterRoutes.js';
+import ladderRoutes from './routes/ladder.js';
 import contactRoutes from './routes/contacts.js';
 import bookingRoutes from './routes/bookings.js';
 import matterTrackingRoutes from './routes/matters.js';
@@ -18,9 +19,11 @@ import guideRoutes from './routes/guides.js';
 import checklistRoutes from './routes/checklists.js';
 import matterDocumentRoutes from './routes/matterDocuments.js';
 import questionRoutes from './routes/questions.js';
+import reportRoutes, { adminReports } from './routes/reports.js';
 import bookmarkRoutes from './routes/bookmarks.js';
 import adminRoutes from './routes/admin.js';
 import searchRoutes from './routes/search.js';
+import askAiRoutes from './routes/askAi.js';
 import swaggerUi from 'swagger-ui-express';
 import { openapi } from './openapi.js';
 
@@ -42,7 +45,12 @@ if (/^\d+$/.test(TRUST_PROXY || '')) {
 }
 
 // First, so the security headers are on every response.
-app.use(helmet());
+// The API is never shown in a frame, so framing is refused outright (helmet's default allows the
+// same site). Everything else is helmet's default, including no-referrer and nosniff.
+app.use(helmet({
+  frameguard: { action: 'deny' },
+  contentSecurityPolicy: { directives: { 'frame-ancestors': ["'none'"] } },
+}));
 
 // The browser addresses allowed to call this API. CORS_ORIGINS is a comma-separated list.
 // Requests with no Origin header (curl, health checks) are not affected by CORS.
@@ -74,15 +82,19 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle
 app.use('/api/auth', authRoutes);
 app.use('/api/directory', directoryRoutes);
 app.use('/api/directory', matterRouteRoutes);
+app.use('/api/directory', ladderRoutes);
 app.use('/api/emergency-contacts', contactRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/ask-ai', askAiRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/matters/:matterId/documents', matterDocumentRoutes);
 app.use('/api/matters', matterTrackingRoutes);
 app.use('/api/guides', guideRoutes);
 app.use('/api/checklists', checklistRoutes);
+app.use('/api/admin/reports', adminReports);
 app.use('/api/admin', adminRoutes);
 app.use('/api/questions', questionRoutes);
+app.use('/api/reports', reportRoutes);
 // Mounted at /api because it serves /api/bookmarks and /api/guides/:id/bookmark.
 app.use('/api', bookmarkRoutes);
 

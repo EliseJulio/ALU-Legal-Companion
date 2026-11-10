@@ -9,11 +9,8 @@ const router = Router();
 const OWNERS = ['student', 'staff'];
 
 // GET /api/bookmarks : the caller's saved guides, newest first.
-// A save is kept even when an admin edits the guide and it goes back to draft — the student still
-// sees the row, now with status 'draft', so a save never looks silently deleted. It reappears as
-// 'published' once an admin publishes the guide again. Only the card fields are returned; the full
-// text of a saved guide would be a large download for text nobody is reading yet, and the text of
-// a draft a student cannot read anyway.
+// A save stays when an admin sends the guide back to draft. The row then shows status 'draft'
+// until the guide is published again. Only the card fields are returned, not the full text.
 router.get('/bookmarks', requireAuth(...OWNERS), async (req, res) => {
   res.json(await q(
     `SELECT g.id, g.domain, g.title, g.status, g.source_law, g.verified_at,
@@ -26,10 +23,8 @@ router.get('/bookmarks', requireAuth(...OWNERS), async (req, res) => {
 });
 
 // POST /api/guides/:id/bookmark : save a guide.
-// Only a published guide can be saved. The 404 matches what GET /api/guides/:id says for a
-// draft. A different answer would let a caller find out which guides exist but are not published.
-// Saving twice is not an error. A person who taps the button twice on a slow connection should
-// not have to read about it.
+// Only a published guide can be saved. The 404 matches GET /api/guides/:id for a draft, so drafts
+// are not revealed. Saving twice is not an error: ON CONFLICT ignores the duplicate.
 router.post('/guides/:id/bookmark', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
   const [guide] = await q(`SELECT id FROM guides WHERE id = $1 AND status = 'published'`, [req.params.id]);
   if (!guide) return res.status(404).json({ error: 'Guide not found' });
