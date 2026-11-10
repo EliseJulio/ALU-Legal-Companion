@@ -9,8 +9,8 @@ The platform makes promises to its users. The most important is that nothing rea
 | Level | Tool | What it checks | Count |
 |---|---|---|---|
 | API and database | Jest and Supertest against a real PostgreSQL | The rules, the roles, the database constraints and the emails | 810 tests in 45 suites |
-| Pages and components | Vitest and Testing Library | What each page shows and sends, for each kind of person | 996 tests in 83 files |
-| Browser | Playwright at 390 pixels wide in Chromium, Firefox and WebKit | Whole journeys on a phone, touch target sizes and sideways scrolling | 197 tests in 17 files |
+| Pages and components | Vitest and Testing Library | What each page shows and sends, for each kind of person | 138 test files (counted 9 Nov 2026; run `npm test` for the test total) |
+| Browser | Playwright at 390 pixels wide in Chromium, Firefox and WebKit | Whole journeys on a phone, touch target sizes and sideways scrolling | 25 spec files (counted 9 Nov 2026) |
 
 The API tests use a real database and not a pretend one. A database constraint is one of the rules. A pretend database could not break it.
 

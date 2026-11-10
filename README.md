@@ -128,7 +128,7 @@ cd client && npm test && npm run e2e
 
 The design is easy to read, usable on a phone and accessible by default. The built screens are the design record.
 
-- ALU navy and red on white. A colour never carries a meaning alone.
+- Black, white and blue in a dark and a light theme, with red only for emergencies. A colour never carries a meaning alone.
 - Every link and button is at least 44 by 44 pixels. Every control shows a focus ring.
 - The emergency numbers link is on every page and the urgent numbers show even when the server is down.
 - The disclaimer "Legal information not legal advice." is in every footer.
@@ -141,7 +141,7 @@ The platform is deployed on Render. Anyone can open the website and browse with 
 
 | Part | Address | What to do there |
 |---|---|---|
-| Website | https://alu-legal-companion-qu8w.onrender.com | Use the platform. Start at Where to Go, the Directory or the Legal Guides. Register with an `@alustudent.com` or `@alueducation.com` address to track matters, book a consultation or save guides |
+| Website | https://alu-legal-companion-qu8w.onrender.com | Use the platform. Start at the Directory (its guided questions say where a matter goes first) or the Legal guides. Register with an `@alustudent.com` or `@alueducation.com` address to track matters, book a consultation or save guides |
 | API | https://alu-legal-companion.onrender.com | The server behind the website. `https://alu-legal-companion.onrender.com/api/health` answers `{"status":"ok"}` when it is running |
 | API documentation | https://alu-legal-companion.onrender.com/api/docs | Every route, who may call it and what it returns. Each route can be tried from the page. The raw file is at `/api/openapi.json` |
 | Database | PostgreSQL on Render | Private. Only the API can reach it |

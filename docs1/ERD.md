@@ -23,6 +23,8 @@ erDiagram
     matters ||--o{ reminders : "has"
     document_checklists ||--o{ matters : "is followed by"
     matters ||--o{ matter_documents : "holds"
+    matter_events ||--o| matter_event_files : "may carry one file"
+    matters ||--o{ matter_event_files : "holds"
     matter_documents ||--o{ matter_document_comments : "has"
     users ||--o{ matter_document_comments : "writes (expert)"
     guides ||--o{ bookmarks : "is saved in"
@@ -115,6 +117,7 @@ erDiagram
         text text
         text answer
         int answered_by FK
+        timestamptz answered_at "empty for answers given before it existed"
         text status "open or answered"
     }
     matters {
@@ -147,6 +150,7 @@ erDiagram
         jsonb items "the documents a task needs"
         text status "draft, pending_review, published"
         int verified_by FK
+        int guide_id FK "the guide it was borrowed from, may be empty"
     }
     matter_documents {
         int id PK
@@ -156,6 +160,15 @@ erDiagram
         text mime "pdf, png or jpeg"
         text review_status "pending, complete, needs_fix, out_of_date"
         int reviewed_by FK
+    }
+    matter_event_files {
+        int id PK
+        int matter_id FK
+        int event_id FK,UK "one file for each entry"
+        text stored_name UK "random name of the encrypted file"
+        text original_name "cleaned, at most 120 characters"
+        text mime "pdf, png or jpeg"
+        int size_bytes
     }
     matter_document_comments {
         int id PK

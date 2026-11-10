@@ -1,6 +1,6 @@
 # ALU Legal Companion: client
 
-The website of the platform. A student or staff member uses it to find a lawyer, consultant or organisation, to see where a legal matter must go first, to track a matter with reminders and to read guides an administrator has checked. Legal experts and administrators use it to check and manage that content.
+The website of the platform. A student or staff member uses it to find a lawyer, consultant or organisation, to see where a legal matter must go first, to track a matter with reminders and to read guides an administrator has published. Administrators write and publish all of the content (guides, checklists, routes and directory entries; the statuses are Draft and Published). Legal experts answer questions, take appointments and read the matters shared with them.
 
 - **Built with:** React 19, Vite, Tailwind CSS, React Router
 - **Tests:** Vitest with Testing Library for the components, Playwright for the browser
@@ -35,13 +35,17 @@ The live website is built with `VITE_API_URL=https://alu-legal-companion.onrende
 
 ## The pages
 
+The routes are in `src/App.jsx` and the menu links are in `src/lib/nav.js`.
+
 | Who | Pages |
 |---|---|
-| Anyone | `/` front door, `/where-to-go` and `/where-to-go/:id`, `/directory` and `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/ask` and `/ask/check`, `/emergency` |
+| Anyone | `/` front door, `/directory` (with the guided questions that say where a matter goes first), `/directory/:id`, `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/search`, `/ask`, `/ask-ai`, `/ask/check`, `/check-request`, `/report`, `/report/sent`, `/report/check`, `/emergency` |
 | Accounts | `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`, `/confirm-email-change`, `/redeem-invite` |
-| Student or staff | `/matters`, `/matters/new`, `/matters/:id`, `/saved`, `/my-activity`, `/settings` |
-| Legal expert | `/expert/questions`, `/expert/bookings`, `/expert/matters` |
-| Admin | `/admin` dashboard, `/admin/guides`, `/admin/providers`, `/admin/routes`, `/admin/users`, `/admin/invites`, `/admin/contacts` |
+| Student or staff | `/home`, `/matters`, `/matters/new`, `/matters/:id`, `/calendar`, `/saved`, `/my-activity`, `/settings` |
+| Legal expert | `/expert` overview, `/expert/questions`, `/expert/calendar`, `/expert/matters` |
+| Admin | `/admin` overview, `/admin/calendar`, `/admin/guides`, `/admin/checklists`, `/admin/providers`, `/admin/routes`, `/admin/ladder/new` and `/admin/ladder/:id`, `/admin/reports`, `/admin/users`, `/admin/invites`, `/admin/contacts` (each list has its own `new` and `:id` editor page) |
+
+Old addresses still work and redirect: `/where-to-go` and `/where-to-go/:id` go to the Directory, `/appointments`, `/expert/appointments`, `/expert/bookings` and `/admin/appointments` go to the Calendar of that role.
 
 A page that a person's role cannot use explains why. It does not redirect and it never signs anyone out. The server is the real gate. The pages only avoid sending a request that the server would refuse.
 
@@ -50,11 +54,13 @@ A page that a person's role cannot use explains why. It does not redirect and it
 ```text
 src/
   main.jsx, App.jsx    start up and the list of routes
-  index.css            the colours and fonts as variables
+  index.css            the colours and fonts as variables (two themes, dark and light)
   lib/                 api.js (calls to the server), auth.js, AuthContext.jsx, useApi.js,
-                       ui.js (shared styles), dates.js, directory.js, bookings.js, email.js, url.js
-  components/          the parts that pages share: Header, Footer, ProviderCard, TokenDisplay,
-                       MeetLink, StatusPill, Field, RequireRole, OwnerOnly and more
+                       nav.js (the menu links), icons.js (icon names), ui.js (shared styles),
+                       dates.js, directory.js, bookings.js, email.js, url.js
+  components/          the parts that pages share: Layout, TopBar, MenuPanel, BottomBar, Footer,
+                       ProviderCard, TokenDisplay, MeetLink, StatusPill, Field, RequireRole, OwnerOnly
+                       and more. wizard/ holds the step-by-step editors and overview/ the home panels
   pages/               one file for each page
 tests/                 the component tests, laid out like src/
   e2e/                 the browser tests and the screenshot script
@@ -66,13 +72,15 @@ These come from the research brief and are checked by tests.
 
 The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
 
-- **Colours.** ALU navy, ALU red and white with a few tints. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. `tests/lib/tokens.test.js` checks the contrast and that no colour is used with an opacity suffix, which Tailwind would silently drop.
-- **Touch targets.** Every link and button is at least 44 by 44 pixels. The browser tests measure the header.
+- **Colours.** Black, white and blue, in a dark and a light theme. Red is kept for the Emergency numbers link and the Emergency page. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. The values are tokens in `src/index.css` and are written up in [`../docs1/DESIGN_SYSTEM.md`](../docs1/DESIGN_SYSTEM.md). `tests/lib/tokens.test.js` checks the contrast and that no colour is used with an opacity suffix, which Tailwind would silently drop.
+- **Type.** Source Sans 3 for all text and IBM Plex Mono for counts and law citations, both served from `public/fonts/`. The app makes no request to another site on its own.
+- **Touch targets.** Every link and button is at least 44 by 44 pixels. The browser tests measure the menus and bars.
 - **Focus.** Every control shows a ring when it has keyboard focus. The ring styles live in one file, `src/lib/ui.js`, so they cannot drift apart.
 - **Urgent help.** The emergency numbers link is in the header on every page and comes before the menu in the keyboard order. The urgent numbers are written into the page. They show even when the server is down.
 - **Disclaimer.** "Legal information not legal advice." is in the footer of every page.
 - **Anonymous flows.** A one-time code is shown once and the reader must say they saved it. The code is kept in the page and sent in one request. It is never put in the address bar. The page sends an anonymous request without the login, even for a signed-in person.
 - **No AI.** The site has no assistant and no chatbot. A real legal expert answers every question.
+- **One publisher.** An administrator publishes alone. A guide, checklist, route or directory entry is Draft or Published, and editing a published one takes it back to Draft until it is published again. The site shows no "awaiting review" step.
 
 ## How the site talks to the server
 
@@ -86,8 +94,8 @@ The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPj
 ## Tests
 
 ```bash
-npm test        # 996 tests in 83 files
-npm run e2e     # 197 browser tests in 17 files
+npm test        # the component and unit tests: 138 test files in tests/
+npm run e2e     # the browser tests: 25 spec files in tests/e2e/
 ```
 
 The component tests live in `tests/`. The browser tests live in `tests/e2e/`. They run the real pages in Chromium at 390 pixels wide. The API is replaced in each test by fixed replies from `tests/e2e/support.js`, so no server or database is needed and no test can change real data. The first run starts the dev server by itself.
