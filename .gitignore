@@ -5,6 +5,7 @@ node_modules/
 .env.*
 !.env.example
 docs/
+docs1/ALU_Legal_Companion_VideoDemo_EliseJulio.mp4
 
 # Build and test output
 dist/
