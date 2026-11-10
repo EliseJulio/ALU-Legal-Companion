@@ -31,7 +31,7 @@ const PATHWAY = [
 
 const REVIEW = [
   { title: 'Before publication', text: 'An administrator reviews content against official sources before it is shown.' },
-  { title: 'After a significant change', text: 'Content returns for review and is temporarily hidden until it is approved again.' },
+  { title: 'After a significant change', text: 'Editing a published guide turns it back into a draft. It stays hidden until an administrator publishes it again.' },
   { title: 'At the point of use', text: 'Official sources and the date of the last check are shown when available. Missing evidence is never disguised.' },
 ];
 
@@ -39,7 +39,8 @@ const labelOf = (domain) => DOMAINS.find((d) => d.value === domain)?.label ?? ''
 
 // The inner box keeps the text in the same column as the header.
 const INNER = 'mx-auto max-w-content px-5 md:px-12';
-const EYEBROW = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+// A small lead-in line in sentence case. It uses the same sans face as the rest and is 14 px at the least.
+const EYEBROW = 'text-sm font-medium text-muted-foreground';
 const LINK = `inline-flex min-h-touch items-center text-sm font-semibold text-info underline ${RING_ON_CANVAS}`;
 // The buttons here sit on the page grey. The gap around the focus ring is that grey.
 const ON_CANVAS = 'focus-visible:ring-offset-canvas';
@@ -53,11 +54,11 @@ function Band({ id, tone, children }) {
   );
 }
 
-function Heading({ id, eyebrow, title, children }) {
+function Heading({ id, eyebrow, title, eyebrowClass = EYEBROW, children }) {
   return (
     <div>
-      <p className={EYEBROW}>{eyebrow}</p>
-      <h2 id={id} className="mt-3 font-head text-3xl leading-heading text-primary md:text-4xl">{title}</h2>
+      <p className={eyebrowClass}>{eyebrow}</p>
+      <h2 id={id} className="text-balance mt-3 font-head text-3xl leading-heading text-ink md:text-4xl">{title}</h2>
       {children && <p className="mt-3 max-w-reading text-muted-foreground">{children}</p>}
     </div>
   );
@@ -84,24 +85,24 @@ export default function Landing() {
         <div className={`${INNER} flex flex-col gap-10 xl:flex-row xl:items-start`}>
           <div className="xl:flex-1">
             <p className={EYEBROW}>Legal information for ALU students &amp; staff</p>
-            <h1 id="landing-title" className="mt-4 font-head text-4xl leading-heading text-primary sm:text-5xl 2xl:text-display">
+            <h1 id="landing-title" className="text-balance mt-4 font-head text-4xl leading-heading text-ink sm:text-5xl 2xl:text-display">
               Understand your issue. Find your next step.
             </h1>
-            <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+            <p className="mt-6 max-w-xl text-pretty text-lg text-muted-foreground">
               A clearer place to begin. Explore clear information, find a possible route and
               connect with a human legal expert.
             </p>
             <p className="mt-6 flex flex-wrap gap-3">
               <Link to="/where-to-go" className={`${BUTTON_PRIMARY} ${ON_CANVAS}`}>Find Where to Go</Link>
-              <Link to="/guides" className={`${BUTTON_OUTLINE} ${ON_CANVAS}`}>Explore Legal Guides</Link>
+              <Link to="/guides" className={`${BUTTON_OUTLINE} ${ON_CANVAS}`}>Explore Legal guides</Link>
             </p>
-            <p className="mt-4 text-xs text-muted-foreground">Browse without an account. Your personal matters stay private.</p>
+            <p className="mt-4 text-sm text-muted-foreground">Browse without an account. Your personal matters stay private.</p>
           </div>
 
           <aside aria-labelledby="landing-pathway" className="rounded-2xl bg-chrome p-8 text-chrome-foreground xl:w-96 xl:shrink-0 2xl:w-pathway">
-            <p className="text-xs font-semibold uppercase tracking-wide text-on-chrome">A pathway, not a promise</p>
-            <h2 id="landing-pathway" className="mt-4 font-head text-3xl leading-heading">Clarity comes one step at a time.</h2>
-            {/* On a tablet the card is full width, so the three steps sit in three columns as in the design. */}
+            <p className="text-sm font-medium text-on-chrome">A pathway, not a promise</p>
+            <h2 id="landing-pathway" className="text-balance mt-4 font-head text-3xl leading-heading">Clarity comes one step at a time.</h2>
+            {/* On a tablet the card is full width, so the three steps sit in three columns. */}
             <ol role="list" className="mt-6 flex flex-col gap-6 md:max-xl:grid md:max-xl:grid-cols-3">
               {PATHWAY.map(({ title, text }, i) => (
                 <li key={title} className="flex gap-4 md:max-xl:flex-col md:max-xl:gap-3">
@@ -115,12 +116,12 @@ export default function Landing() {
                 </li>
               ))}
             </ol>
-            <p className="mt-6 text-xs text-on-chrome">Pre-authored routes · Conventional search · Human experts</p>
+            <p className="mt-6 text-sm text-on-chrome">Pre-authored routes · Conventional search · Human experts</p>
           </aside>
 
           {/* The menu has the search box on a wide screen. Where the menu is closed this card leads to it. */}
           <section aria-labelledby="landing-search" className="rounded-card border border-border bg-surface p-6 xl:hidden">
-            <h2 id="landing-search" className="font-head text-2xl leading-heading text-primary">Search guides or routes</h2>
+            <h2 id="landing-search" className="text-balance font-head text-2xl leading-heading text-ink">Search guides or routes</h2>
             <p className="mt-2 text-sm text-muted-foreground">Choose a library, then search its available issue and topic fields.</p>
             <Link to="/search" className={`${BUTTON_OUTLINE} mt-4 w-full`}>
               Choose where to search<span aria-hidden="true">&nbsp;→</span>
@@ -137,19 +138,19 @@ export default function Landing() {
             const subject = SUBJECTS[value];
             const glyph = subject?.icon ?? 'public';
             return (
-              // From sm up each subject is a card. On a phone it is a compact row, as in the design:
+              // From sm up each subject is a card. On a phone it is a compact row:
               // the name and an arrow. The whole row is the link and its name is still "Explore …".
               <li
                 key={value}
                 className="relative flex items-center justify-between gap-4 rounded border-b border-border py-1 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-canvas sm:flex-col sm:items-stretch sm:justify-start sm:rounded-card sm:border sm:bg-surface sm:p-6"
               >
                 <div className="flex min-w-0 items-center gap-4">
-                  <span aria-hidden="true" className="hidden h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary sm:grid">
+                  <span aria-hidden="true" className="hidden h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary-text sm:grid">
                     <Icon name={glyph} className="text-xl" />
                   </span>
                   <div className="min-w-0">
-                    <h3 className="font-head text-2xl text-primary">{label}</h3>
-                    {subject && <p className="hidden text-xs text-muted-foreground sm:block">{subject.text}</p>}
+                    <h3 className="text-balance font-head text-2xl text-ink">{label}</h3>
+                    {subject && <p className="hidden text-sm text-muted-foreground sm:block">{subject.text}</p>}
                   </div>
                 </div>
                 <Link
@@ -176,7 +177,7 @@ export default function Landing() {
           {example ? (
             <div className="mt-8 flex flex-col gap-10 xl:flex-row xl:items-start">
               <div className="flex flex-col gap-4 xl:flex-1">
-                <h3 className="font-head text-3xl leading-heading text-primary">{example.title}</h3>
+                <h3 className="text-balance font-head text-3xl leading-heading text-ink">{example.title}</h3>
                 <p>
                   Go first to: <span className="font-semibold">{example.first_forum.name}</span>
                 </p>
@@ -185,7 +186,7 @@ export default function Landing() {
                 <ol className="border-t border-border">
                   {example.steps.slice(0, 3).map((step, i) => (
                     <li key={step} className="flex gap-4 border-b border-border py-4">
-                      <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-xs text-primary-foreground">
+                      <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-sm text-primary-foreground">
                         0{i + 1}
                       </span>
                       <span className="text-sm">{step}</span>
@@ -199,12 +200,12 @@ export default function Landing() {
 
               <aside aria-labelledby="landing-next" className="flex flex-col gap-5 rounded-2xl border border-primary bg-surface p-8 xl:w-route xl:shrink-0">
                 <p className={EYEBROW}>Recommended next step</p>
-                <h3 id="landing-next" className="font-head text-3xl leading-heading text-primary">Read the route before you act</h3>
+                <h3 id="landing-next" className="text-balance font-head text-3xl leading-heading text-ink">Read the route before you act</h3>
                 <p className="text-sm text-ink">
                   A route names the office to go to first, the law that sends you there and the steps in order.
                 </p>
                 <Link to={`/where-to-go/${example.id}`} className={`${BUTTON_PRIMARY} w-full`}>Read this route in full</Link>
-                <p className="text-xs text-muted-foreground">A route is a starting point. It does not promise an outcome.</p>
+                <p className="text-sm text-muted-foreground">A route is a starting point. It does not promise an outcome.</p>
               </aside>
             </div>
           ) : (
@@ -227,24 +228,24 @@ export default function Landing() {
       {/* Up to four checked guides. Each card shows its summary when it has one and the law it rests on. */}
       <Band id="landing-guides" tone="bg-surface">
         <Heading id="landing-guides" eyebrow="Understand" title="Read for your situation, not a law number.">
-          Guides in simple words, each checked against the law before it is published. Official references stay as supporting detail.
+          Guides in simple words, each one published by an administrator. Official references stay as supporting detail.
         </Heading>
         {guides?.length > 0 && (
           <ul className="mt-7 grid gap-4 md:grid-cols-2">
             {guides.slice(0, 4).map((g) => (
               <li key={g.id} className="relative flex flex-col gap-4 rounded-card border border-border bg-surface p-6 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-canvas">
-                <p className="text-xs font-semibold text-muted-foreground">{labelOf(g.domain)}</p>
-                <h3 className="font-head text-2xl leading-heading text-primary">
-                  <Link to={`/guides/${g.id}`} className={`hover:underline after:absolute after:inset-0 ${RING_ON_CANVAS}`}>{g.title}</Link>
+                <p className="text-sm font-semibold text-muted-foreground">{labelOf(g.domain)}</p>
+                <h3 className="text-balance font-head text-2xl leading-heading text-ink">
+                  <Link to={`/guides/${g.id}`} className={`inline-flex min-h-touch items-center hover:underline after:absolute after:inset-0 ${RING_ON_CANVAS}`}>{g.title}</Link>
                 </h3>
                 {g.summary && <p className="text-sm text-muted-foreground">{g.summary}</p>}
-                <p className="w-fit rounded bg-primary-subtle px-2 py-0.5 font-mono text-xs text-primary">{g.source_law}</p>
-                <span aria-hidden="true" className="text-sm font-semibold text-primary underline">Read guide →</span>
+                <p className="w-fit rounded-control bg-primary-subtle px-2 py-1 text-sm text-primary-text">{g.source_law}</p>
+                <span aria-hidden="true" className="text-sm font-semibold text-primary-text underline">Read guide →</span>
               </li>
             ))}
           </ul>
         )}
-        <p className="mt-4"><Link to="/guides" className={LINK}>Explore all Legal Guides<span aria-hidden="true">&nbsp;→</span></Link></p>
+        <p className="mt-4"><Link to="/guides" className={LINK}>Explore all Legal guides<span aria-hidden="true">&nbsp;→</span></Link></p>
       </Band>
 
       <Band id="landing-people" tone="bg-canvas">
@@ -252,11 +253,11 @@ export default function Landing() {
         <ul className="mt-7 grid gap-4 md:grid-cols-2">
           <li className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6">
             <div className="flex items-center gap-4">
-              <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary">
+              <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary-text">
                 <Icon name="calendar_clock" className="text-xl" />
               </span>
               <div>
-                <h3 className="font-head text-2xl leading-heading text-primary">Request a consultation</h3>
+                <h3 className="text-balance font-head text-2xl leading-heading text-ink">Request a consultation</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   For eligible listings, request a date and time. The provider must accept before it becomes an appointment.
                 </p>
@@ -266,11 +267,11 @@ export default function Landing() {
           </li>
           <li className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6">
             <div className="flex items-center gap-4">
-              <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary">
+              <span aria-hidden="true" className="grid h-12 w-12 shrink-0 place-items-center rounded-card bg-canvas text-primary-text">
                 <Icon name="chat_bubble" className="text-xl" />
               </span>
               <div>
-                <h3 className="font-head text-2xl leading-heading text-primary">Ask a legal expert</h3>
+                <h3 className="text-balance font-head text-2xl leading-heading text-ink">Ask a legal expert</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Send a written question to a human expert. You can ask anonymously. Keep the one-time code to read the response.
                 </p>
@@ -282,11 +283,11 @@ export default function Landing() {
       </Band>
 
       <Band id="landing-review" tone="bg-primary-subtle">
-        <Heading id="landing-review" eyebrow="What review should mean" title="Trust is a visible record." />
+        <Heading id="landing-review" eyebrow="What review should mean" eyebrowClass="text-sm font-medium text-ink" title="Trust is a visible record." />
         <ul className="mt-7 grid gap-4 xl:grid-cols-3">
           {REVIEW.map(({ title, text }) => (
             <li key={title} className="rounded-card border border-border bg-surface p-6">
-              <h3 className="font-semibold text-ink">{title}</h3>
+              <h3 className="text-balance font-semibold text-ink">{title}</h3>
               <p className="mt-3 text-sm text-ink">{text}</p>
             </li>
           ))}
@@ -296,15 +297,15 @@ export default function Landing() {
       {/* A labelled region and not role="alert". An alert is read out the moment the page
           opens. The front door should not sound an alarm on every visit. */}
       <Band id="landing-urgent" tone="bg-canvas">
-        <div className="flex flex-col gap-4 rounded border border-warning-border border-l-4 border-l-warning bg-warning-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 rounded-card border border-border bg-warning-subtle p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 id="landing-urgent" className="font-semibold text-warning-strong">In danger, or has someone hurt you?</h2>
+            <h2 id="landing-urgent" className="text-balance font-semibold text-warning-strong">In danger, or has someone hurt you?</h2>
             <p className="mt-1 text-sm text-ink">Do not wait for a written response. Call now.</p>
             <ul className="mt-2 flex flex-wrap gap-x-6 text-sm">
               {urgent.map((c) => (
                 <li key={c.name}>
                   <a href={`tel:${c.contact.replace(/\s+/g, '')}`} className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING_ON_WARNING}`}>
-                    {c.name}: <span className="font-mono text-base font-bold text-primary">{c.contact}</span>
+                    {c.name}: <span className="font-mono text-base font-bold text-primary-text">{c.contact}</span>
                   </a>
                 </li>
               ))}
@@ -317,7 +318,7 @@ export default function Landing() {
       <section aria-labelledby="landing-start" className="bg-canvas pb-12 pt-4 md:pb-16">
         <div className={INNER}>
           <div className="border-t border-border pt-10">
-            <h2 id="landing-start" className="font-head text-3xl leading-heading text-primary md:text-5xl">
+            <h2 id="landing-start" className="text-balance font-head text-3xl leading-heading text-ink md:text-5xl">
               A good next step starts with a clearer question.
             </h2>
             <p className="mt-4 text-muted-foreground">Choose your situation. Read the context. Decide what to check next.</p>
