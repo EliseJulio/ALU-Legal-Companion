@@ -1,80 +1,20 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
-import { apiDelete, apiPost, apiPut } from '@/lib/api';
+import { apiDelete } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
-import Field from '@/components/Field';
-import { PANEL, BUTTON_PRIMARY, BUTTON_OUTLINE } from '@/lib/ui';
+import { CARD, PAGE_TITLE } from '@/lib/ui';
+import {
+  ADMIN_BUTTON_DANGER, ADMIN_BUTTON_OUTLINE, ADMIN_BUTTON_PRIMARY, Cell, RecordList, RecordRow,
+} from '@/components/AdminRecords';
 
-const BLANK = { name: '', contact: '', when_to_use: '', sort_order: '100' };
+// Name and number and when to use then the actions. Wide screens get four columns. Phones stack them.
+const ROW = 'md:grid-cols-[minmax(0,1fr)_8rem_minmax(0,1.2fr)_auto]';
 
-// The form starts from the saved contact. A blank box in an edit means "empty this".
-function ContactForm({ contact, onDone, onCancel }) {
-  const [values, setValues] = useState(() => (
-    contact ? { ...BLANK, ...contact, sort_order: String(contact.sort_order) } : BLANK
-  ));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const set = (key) => (event) => setValues((v) => ({ ...v, [key]: event.target.value }));
-
-  async function save(event) {
-    event.preventDefault();
-    setBusy(true);
-    setError(null);
-    const body = {
-      name: values.name,
-      contact: values.contact,
-      when_to_use: values.when_to_use,
-      sort_order: Number(values.sort_order),
-    };
-    try {
-      if (contact) await apiPut(`/admin/emergency-contacts/${contact.id}`, body);
-      else await apiPost('/admin/emergency-contacts', body);
-      onDone();
-    } catch (err) {
-      setError(err);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={save} className={`mt-4 ${PANEL}`} aria-label={contact ? 'Edit contact' : 'New contact'}>
-      <h2 className="font-head text-2xl leading-heading text-primary">{contact ? `Edit ${contact.name}` : 'New contact'}</h2>
-      <Field id="c-name" label="Name" className="mt-4" value={values.name} onChange={set('name')} />
-      <Field
-        id="c-contact"
-        label="Number or website"
-        hint="A phone number becomes a link people can tap to call."
-        className="mt-4"
-        value={values.contact}
-        onChange={set('contact')}
-      />
-      <Field id="c-when" label="When to use it" as="textarea" 
-      rows={2} className="mt-4" value={values.when_to_use} 
-      onChange={set('when_to_use')} />
-      <Field
-        id="c-order"
-        label="Order on the page"
-        hint="A smaller number comes first."
-        className="mt-4"
-        type="number"
-        min="0"
-        value={values.sort_order}
-        onChange={set('sort_order')}
-      />
-      {error && <ErrorNotice error={error} className="mt-4" />}
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button type="submit" 
-        aria-disabled={busy || undefined} aria-busy={busy} className={BUTTON_PRIMARY}>
-          {busy ? 'Saving…' : 'Save contact'}</button>
-        <button type="button" className={BUTTON_OUTLINE} onClick={onCancel}>Cancel</button>
-      </div>
-    </form>
-  );
-}
-
-function ContactRow({ contact, onEdit, onDone }) {
+// One contact on the list. Edit opens its own page. Delete stays here: it is one confirmed action.
+function ContactRow({ contact, onDone }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -92,25 +32,33 @@ function ContactRow({ contact, onEdit, onDone }) {
   }
 
   return (
-    <li className={PANEL}>
-      <h2 className="font-head font-semibold text-primary">{contact.name}</h2>
-      <p className="mt-1 font-mono text-sm">{contact.contact}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{contact.when_to_use}</p>
-      <div className="mt-3 flex flex-wrap gap-3">
-        <button type="button" className={BUTTON_OUTLINE} onClick={onEdit}>Edit</button>
-        {!asking && <button type="button" className={BUTTON_OUTLINE} onClick={() => setAsking(true)}>Delete</button>}
-      </div>
+    <RecordRow template={ROW}>
+      <Cell>
+        <h2 className="font-head text-base font-semibold leading-[1.3] text-ink">{contact.name}</h2>
+      </Cell>
+      <Cell label="Number">
+        <p className="font-mono text-sm">{contact.contact}</p>
+      </Cell>
+      <Cell label="When to use">
+        <p className="text-sm text-muted-foreground">{contact.when_to_use}</p>
+      </Cell>
+      <Cell className="flex flex-wrap items-start gap-2 md:justify-end">
+        <Link to={`/admin/contacts/${contact.id}`} className={ADMIN_BUTTON_OUTLINE} aria-label={`Edit ${contact.name}`}>Edit</Link>
+        {!asking && <button type="button" className={ADMIN_BUTTON_OUTLINE} onClick={() => setAsking(true)}>Delete</button>}
+      </Cell>
       {asking && (
-        <div className="mt-3" role="group" aria-label={`Delete ${contact.name}`}>
-          <p className="text-sm font-semibold">Delete this contact? It disappears from the urgent help page at once. The built-in list stays available if you delete every one.</p>
-          <div className="mt-2 flex gap-3">
-            <button type="button" aria-disabled={busy || undefined} className={BUTTON_PRIMARY} onClick={remove}>Delete contact record</button>
-            <button type="button" className={BUTTON_OUTLINE} onClick={() => setAsking(false)}>Keep contact</button>
+        <Cell className="md:col-span-full" >
+          <div role="group" aria-label={`Delete ${contact.name}`}>
+            <p className="text-sm font-semibold">Delete this contact? It disappears from the urgent help page at once. The built-in list stays available if you delete every one.</p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button type="button" aria-disabled={busy || undefined} className={ADMIN_BUTTON_DANGER} onClick={remove}>Delete contact record</button>
+              <button type="button" className={ADMIN_BUTTON_OUTLINE} onClick={() => setAsking(false)}>Keep contact</button>
+            </div>
           </div>
-        </div>
+        </Cell>
       )}
-      {error && <ErrorNotice error={error} className="mt-3" />}
-    </li>
+      {error && <Cell className="md:col-span-full"><ErrorNotice error={error} /></Cell>}
+    </RecordRow>
   );
 }
 
@@ -119,50 +67,31 @@ function ContactRow({ contact, onEdit, onDone }) {
 // in a crisis never sees an empty page.
 export default function AdminContacts() {
   const { data: contacts, error, loading, refetch } = useApi('/admin/emergency-contacts');
-  const [editing, setEditing] = useState(null);
-
-  function finished() {
-    setEditing(null);
-    refetch();
-  }
 
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Urgent contacts" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Urgent contacts</h1>
-      <p className="mt-3 max-w-reading text-muted-foreground">
+      <h1 className={`mt-4 ${PAGE_TITLE}`}>Urgent contacts</h1>
+      <p className="mt-2.5 max-w-reading text-sm text-muted-foreground">
         Manage the numbers shown on the urgent help page, and where each one comes from.
       </p>
       <Callout title="The page is never empty" className="mt-6">
         If you delete every one, the urgent help page shows a built-in list so it is never empty.
       </Callout>
-      {editing === null && (
-        <p className="mt-4"><button type="button" 
-        className={BUTTON_PRIMARY} onClick={() => setEditing('new')}
-        >Add a contact</button></p>
-      )}
-
-      {editing !== null && (
-        <ContactForm
-          key={editing === 'new' ? 'new' : editing.id}
-          contact={editing === 'new' ? null : editing}
-          onDone={finished}
-          onCancel={() => setEditing(null)}
-        />
-      )}
+      <p className="mt-4"><Link to="/admin/contacts/new" className={ADMIN_BUTTON_PRIMARY}>Add a contact</Link></p>
 
       {loading && !contacts && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
       {contacts?.length === 0 && (
-        <p className={`mt-6 text-muted-foreground ${PANEL}`}>
+        <p className={`mt-6 text-muted-foreground ${CARD}`}>
           No contacts are saved. The urgent help page is showing the built-in list.</p>
       )}
 
-      <ul className="mt-6 space-y-3">
+      <RecordList columns={contacts?.length ? ['Name', 'Number', 'When to use', ''] : null} template={ROW} className="mt-6">
         {contacts?.map((c) => (
-          <ContactRow key={c.id} contact={c} onEdit={() => setEditing(c)} onDone={refetch} />
+          <ContactRow key={c.id} contact={c} onDone={refetch} />
         ))}
-      </ul>
+      </RecordList>
     </div>
   );
 }

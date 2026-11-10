@@ -4,10 +4,10 @@
 // every field the server has. A form that left out the source link of a document would delete
 // that link the next time anyone changed a phone number. Nobody would be told.
 
-export const FEE_COLUMNS = ['item', 'amount_rwf', 'note', 'source_url'];
-export const DOCUMENT_COLUMNS = ['name', 'notes', 'where_to_get', 'required_if', 'source_url'];
-export const OFFICE_COLUMNS = ['name', 'address', 'district', 'hours', 'phone', 'map_url', 'source_url'];
-export const STEP_COLUMNS = ['instruction', 'url_at_step'];
+const FEE_COLUMNS = ['item', 'amount_rwf', 'note', 'source_url'];
+const DOCUMENT_COLUMNS = ['name', 'notes', 'where_to_get', 'required_if', 'source_url'];
+const OFFICE_COLUMNS = ['name', 'address', 'district', 'hours', 'phone', 'map_url', 'source_url'];
+const STEP_COLUMNS = ['instruction', 'url_at_step'];
 
 const str = (v) => (v === null || v === undefined ? '' : String(v));
 

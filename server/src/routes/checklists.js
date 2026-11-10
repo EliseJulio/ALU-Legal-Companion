@@ -9,29 +9,33 @@ import { validateChecklist } from '../services/checklists.js';
 
 const router = Router();
 
-const PUBLIC = `c.id, c.slug, c.title, c.description, c.items, c.verified_at`;
+// The guide a checklist is based on. The public sees it only once that guide is published.
+const GUIDE_PUBLIC = `CASE WHEN g.status = 'published' THEN g.id END AS guide_id,
+       CASE WHEN g.status = 'published' THEN g.title END AS guide_title`;
+const PUBLIC = `c.id, c.slug, c.title, c.description, c.items, c.verified_at, ${GUIDE_PUBLIC}`;
 
-// A slug that is already used is the caller's mistake. It is not a fault of the server.
+// A slug already in use raises Postgres error 23505, which the route maps to a 409.
 const slugTaken = (err) => err?.code === '23505';
 
-// GET /api/checklists : published only. The id, the title, the description and how many documents.
+// GET /api/checklists : published only. It gives the id and the title and the description and how many documents.
 router.get('/', async (_req, res) => {
   res.json(await q(
-    `SELECT c.id, c.slug, c.title, c.description, jsonb_array_length(c.items)::int AS item_count, c.verified_at
-       FROM document_checklists c WHERE c.status = 'published' ORDER BY c.title`));
+    `SELECT c.id, c.slug, c.title, c.description, jsonb_array_length(c.items)::int AS item_count, c.verified_at, ${GUIDE_PUBLIC}
+       FROM document_checklists c LEFT JOIN guides g ON g.id = c.guide_id WHERE c.status = 'published' ORDER BY c.title`));
 });
 
 // GET /api/checklists/all : every checklist in every state. Only the admin editor
 // uses it. It is declared before /:id. That route would take the word "all" otherwise.
 router.get('/all', requireAuth('admin'), async (_req, res) => {
   res.json(await q(
-    `SELECT c.* FROM document_checklists c ORDER BY c.updated_at DESC, c.id`));
+    `SELECT c.*, g.title AS guide_title FROM document_checklists c
+       LEFT JOIN guides g ON g.id = c.guide_id ORDER BY c.updated_at DESC, c.id`));
 });
 
 // GET /api/checklists/:id : published only. A draft is a 404 as it is for guides.
 router.get('/:id', requireIntParam('id'), async (req, res) => {
   const [c] = await q(
-    `SELECT ${PUBLIC} FROM document_checklists c
+    `SELECT ${PUBLIC} FROM document_checklists c LEFT JOIN guides g ON g.id = c.guide_id
       WHERE c.id = $1 AND c.status = 'published'`, [req.params.id]);
   if (!c) return res.status(404).json({ error: 'Checklist not found' });
   res.json(c);

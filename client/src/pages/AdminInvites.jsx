@@ -7,7 +7,10 @@ import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import Field from '@/components/Field';
 import { readableDate } from '@/lib/dates';
-import { PANEL, BUTTON_PRIMARY } from '@/lib/ui';
+import { CARD, PAGE_TITLE } from '@/lib/ui';
+import { ADMIN_BUTTON_PRIMARY, Cell, RecordList, RecordRow } from '@/components/AdminRecords';
+
+const ROW = 'md:grid-cols-[minmax(0,1fr)_11rem]';
 
 // Invite a legal expert by email. The link in the email works once and proves the person owns the
 // address before they can verify anything. That is why there is no other way to become one. The
@@ -41,9 +44,15 @@ function InviteForm({ onSent }) {
   }
 
   return (
-    <form onSubmit={send} className={`mt-3 ${PANEL}`} aria-labelledby="invite-heading">
-      <Field id="invite-email" label="Email address" type="email" 
-      autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+    <form onSubmit={send} className={`mt-3 ${CARD}`} aria-labelledby="invite-heading">
+      <Field
+        id="invite-email"
+        label="Email address"
+        type="email"
+        autoComplete="off"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
       <Field
         id="invite-days"
         label="Days the invitation lasts"
@@ -57,7 +66,7 @@ function InviteForm({ onSent }) {
       />
       {error && <ErrorNotice error={error} className="mt-4" />}
       <div role="status">{message && <p className="mt-4 text-sm">{message}</p>}</div>
-      <button type="submit" aria-disabled={busy || undefined} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-4`}>
+      <button type="submit" aria-disabled={busy || undefined} aria-busy={busy} className={`${ADMIN_BUTTON_PRIMARY} mt-4`}>
         {busy ? 'Sending…' : 'Send the invitation'}
       </button>
     </form>
@@ -70,44 +79,45 @@ export default function AdminInvites() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Admin workspace' }]} current="Invitations" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Invitations</h1>
-      <p className="mt-3 max-w-reading text-muted-foreground">
+      <h1 className={`mt-4 ${PAGE_TITLE}`}>Invitations</h1>
+      <p className="mt-2.5 max-w-reading text-sm text-muted-foreground">
         Legal experts join by invitation only. The email carries a link that works once. After they
         join, link their account to their directory entry on Directory entries, using the account
         number shown on People. Until then their appointment inbox stays empty.
       </p>
 
       <div className="mt-6 grid gap-8 xl:grid-cols-[26rem_minmax(0,1fr)] xl:items-start">
-      <div className="min-w-0">
-      <h2 id="invite-heading" className="font-head text-2xl leading-heading text-primary">New expert invitation</h2>
-      <InviteForm onSent={refetch} />
-      <Callout title="Validate the recipient first" className="mt-4">
-        Confirm the expert’s eligibility through the institution’s approved process before you send an
-        invitation.
-      </Callout>
-      </div>
+        <div className="min-w-0">
+          <h2 id="invite-heading" className="font-head text-base leading-[1.3] text-ink">New expert invitation</h2>
+          <InviteForm onSent={refetch} />
+          <Callout title="Validate the recipient first" className="mt-4">
+            Confirm the expert’s eligibility through the institution’s approved process before you send an
+            invitation.
+          </Callout>
+        </div>
 
-      <div className="min-w-0">
-      <h2 className="font-head text-2xl leading-heading text-primary">Sent invitations</h2>
-      {loading && <p className="mt-3 text-muted-foreground">Loading…</p>}
-      {error && <ErrorNotice error={error} className="mt-3" />}
-      {invites?.length === 0 && <p className={`mt-3 text-muted-foreground ${PANEL}`}>No invitations have been sent.</p>}
+        <div className="min-w-0">
+          {loading && <p className="text-muted-foreground">Loading…</p>}
+          {error && <ErrorNotice error={error} />}
+          {invites?.length === 0 && <p className={`text-muted-foreground ${CARD}`}>No invitations have been sent.</p>}
 
-      <ul className="mt-3 space-y-3">
-        {invites?.map((invite) => (
-          <li key={invite.id} className={PANEL}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="font-medium">{invite.email}</p>
-              <StatusPill status={invite.status} />
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Invited by {invite.invited_by} on {readableDate(invite.created_at)}
-              {invite.status === 'used' ? ` · used ${readableDate(invite.used_at)}` : ` · lasts until ${readableDate(invite.expires_at)}`}
-            </p>
-          </li>
-        ))}
-      </ul>
-      </div>
+          <RecordList title="Sent invitations" columns={['Invitation', 'Status']} template={ROW}>
+            {invites?.map((invite) => (
+              <RecordRow key={invite.id} template={ROW}>
+                <Cell>
+                  <p className="font-medium">{invite.email}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Invited by {invite.invited_by} on {readableDate(invite.created_at)}
+                    {invite.status === 'used' ? ` · used ${readableDate(invite.used_at)}` : ` · lasts until ${readableDate(invite.expires_at)}`}
+                  </p>
+                </Cell>
+                <Cell label="Status">
+                  <StatusPill status={invite.status} />
+                </Cell>
+              </RecordRow>
+            ))}
+          </RecordList>
+        </div>
       </div>
     </div>
   );
