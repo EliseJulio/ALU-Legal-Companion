@@ -3,8 +3,8 @@
 // screen reader does not announce it on every visit.
 export default function Callout({ title, children, className = '' }) {
   return (
-    <div className={`border-l-4 border-info bg-primary-subtle p-4 text-sm ${className}`}>
-      {title && <p className="font-semibold text-primary">{title}</p>}
+    <div className={`rounded-card bg-chrome-raised p-4 text-sm ${className}`}>
+      {title && <p className="font-semibold text-ink">{title}</p>}
       <div className={title ? 'mt-1' : ''}>{children}</div>
     </div>
   );

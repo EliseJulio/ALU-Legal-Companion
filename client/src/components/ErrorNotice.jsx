@@ -4,7 +4,7 @@
 // `error.message` is the server's own wording and is shown as it is.
 export default function ErrorNotice({ error, className = '', id }) {
   return (
-    <p id={id} role="alert" className={`rounded border border-border bg-surface p-3 text-warning-strong ${className}`}>
+    <p id={id} role="alert" className={`rounded-card border border-border bg-surface p-4 text-warning-strong ${className}`}>
       {error.message}
     </p>
   );

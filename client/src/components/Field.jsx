@@ -1,4 +1,5 @@
-import { FIELD, RING } from '@/lib/ui';
+import Select from '@/components/Select';
+import { FORM_FIELD, FORM_TEXTAREA, CHECKBOX, RING } from '@/lib/ui';
 
 // One labelled form box. The label is always shown. A hint, if there is one, is tied to the box
 // so a screen reader reads it with the label. `as` picks a text box (the default), a text area
@@ -6,11 +7,15 @@ import { FIELD, RING } from '@/lib/ui';
 export default function Field({ id, label, hint, as = 'input', className = '', children, ...props }) {
   const hintId = hint ? `${id}-hint` : undefined;
   const Box = as;
+  // A select gets the shared chevron, 12 px from the right edge.
+  const box = as === 'select'
+    ? <Select id={id} aria-describedby={hintId} className={FORM_FIELD} wrapperClassName="mt-2 flex w-full" {...props}>{children}</Select>
+    : <Box id={id} aria-describedby={hintId} className={as === 'textarea' ? FORM_TEXTAREA : FORM_FIELD} {...props}>{children}</Box>;
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium">{label}</label>
+      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
       {hint && <p id={hintId} className="mt-1 text-sm text-muted-foreground">{hint}</p>}
-      <Box id={id} aria-describedby={hintId} className={FIELD} {...props}>{children}</Box>
+      {box}
     </div>
   );
 }
@@ -28,7 +33,7 @@ export function CheckField({ id, label, checked, onChange, hint, className = '',
           onChange={(e) => onChange(e.target.checked)}
           aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
-          className={`h-5 w-5 shrink-0 accent-primary ${RING}`}
+          className={`${CHECKBOX} ${RING}`}
         />
         <span>{label}</span>
       </label>

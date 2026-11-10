@@ -1,14 +1,18 @@
+import { pillClass, statusToneFor } from '@/lib/ui';
+
 // A status as a word in a pill. What it means is in the text and never in the colour alone.
 // The pill reads the same in greyscale and to a screen reader. The stored code is never shown.
 // A reader sees "Open" and not a database value. The words live here so two pages cannot call
-// the same state by two names. Later slices add their own states to this list.
+// the same state by two names. New states are added to this list.
 const PHRASES = {
   // matters
   open: 'Open',
   closed: 'Finished',
   // guides, directory entries and routes
+  // The admin writes and publishes. There is no review state to show, so a pending_review
+  // row reads as a draft.
   draft: 'Draft',
-  pending_review: 'Pending review',
+  pending_review: 'Draft',
   published: 'Published',
   withdrawn: 'Withdrawn',
   // accounts
@@ -27,6 +31,10 @@ const PHRASES = {
   accepted: 'Accepted',
   declined: 'Declined',
   completed: 'Completed',
+  // reports of a problem
+  received: 'Received',
+  in_progress: 'In progress',
+  resolved: 'Resolved',
   // documents on a matter. The plain word pending is already used for invitations.
   missing: 'Missing',
   awaiting_check: 'Awaiting check',
@@ -39,11 +47,14 @@ export default function StatusPill({ status }) {
   // Nothing at all is better than an empty pill. It would look like a value that failed to load.
   if (!status) return null;
   // An unknown status is shown as it is. That is clumsy but better than a blank or a crash.
-  const phrase = PHRASES[String(status).toLowerCase()] ?? status;
+  const key = String(status).toLowerCase();
+  const phrase = Object.hasOwn(PHRASES, key) ? PHRASES[key] : status;
+
+  // The tone comes from the one shared list in lib/ui.js: soft blue for a state that is under way or
+  // done, grey for the rest. The word carries the meaning either way.
 
   return (
-    <span className="inline-flex items-center whitespace-nowrap rounded-full border border-border bg-canvas
-    px-3 py-1 text-xs font-semibold text-ink">
+    <span className={pillClass(statusToneFor(status))}>
       <span className="sr-only">Status: </span>{phrase}
     </span>
   );
