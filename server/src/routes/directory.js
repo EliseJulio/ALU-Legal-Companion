@@ -2,7 +2,6 @@
 //
 //   draft -> published      the admin publishes directly
 //   published --(admin edits a checked fact)--> draft
-// A wrong entry sends a person to the wrong office. That is as harmful as a wrong guide.
 import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -30,8 +29,8 @@ export const PUBLIC_PROVIDER_COLUMNS = `
   (p.last_checked_at IS NULL OR p.last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS}) AS stale`;
 
 // The facts the admin checks. Editing one on a published entry sends it back to draft.
-// Changing user_id, bookable or meet_link does not. Nobody relying on the directory is misled by that.
-export const PROVIDER_CHECKED_FIELDS = [
+// Changing user_id, bookable or meet_link does not.
+const PROVIDER_CHECKED_FIELDS = [
   'name', 'category', 'type', 'location', 'contact', 'services', 'languages', 'is_free',
   'official_source_url', 'address', 'hours', 'address_note',
 ];
@@ -194,9 +193,8 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
      merged.languages, merged.is_free, merged.official_source_url, merged.user_id, merged.bookable,
      merged.meet_link, merged.address, merged.hours, merged.address_note, existing.id]);
 
-  // Pointing the entry at a different account or removing the link changes who can read every matter
-  // already shared with it. The owners agreed to share with this office and not with whoever an admin
-  // links to it next. So those shares end here and each owner is told. They can share again.
+  // Changing the linked account changes who can read every matter already shared with this entry.
+  // So those shares end here and each owner is told. They can share again.
   if (String(merged.user_id ?? '') !== String(existing.user_id ?? '')) {
     await q(
       `WITH ended AS (

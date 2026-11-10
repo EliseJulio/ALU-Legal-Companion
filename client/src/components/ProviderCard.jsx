@@ -3,17 +3,27 @@ import MapCard from '@/components/MapCard';
 import { typeLabel } from '@/lib/directory';
 import { readableDay } from '@/lib/dates';
 import { secureAddress } from '@/lib/url';
-import { BUTTON_OUTLINE, BUTTON_PRIMARY, RING_ON_CANVAS } from '@/lib/ui';
+import { contactPieces } from '@/lib/contactLinks';
+import { BUTTON_PRIMARY, BUTTON_TEXT, RING_ON_CANVAS } from '@/lib/ui';
 
-// A contact line is plain text. A full https address in it becomes a link that opens in a new tab.
-// It is for an office that books on its own calendar. Nothing loads until the reader presses it.
+// A contact line is plain text. A full https address in it becomes a "Book a session" link that opens
+// in a new tab. It is for an office that books on its own calendar. Nothing loads until the reader
+// presses it. A phone number becomes a call link and an email a mail link, each 44 px high.
 function contactParts(contact, name) {
-  return contact.split(/(https:\/\/\S+)/).map((part, i) => {
-    const href = secureAddress(part);
-    if (!href) return part;
+  return contactPieces(contact).map((piece, i) => {
+    if (!piece.href) return piece.text;
+    if (piece.kind === 'web') {
+      const href = secureAddress(piece.text);
+      if (!href) return piece.text;
+      return (
+        <a key={i} href={href} target="_blank" rel="noopener noreferrer" className={`inline-flex min-h-touch items-center font-semibold text-primary-text underline ${RING_ON_CANVAS}`}>
+          Book a session{' '}<span className="sr-only">with {name} (opens in a new tab)</span>
+        </a>
+      );
+    }
     return (
-      <a key={i} href={href} target="_blank" rel="noopener noreferrer" className={`font-semibold text-primary underline ${RING_ON_CANVAS}`}>
-        Book a session{' '}<span className="sr-only">with {name} (opens in a new tab)</span>
+      <a key={i} href={piece.href} className={`inline-flex min-h-touch items-center font-semibold text-primary-text underline ${RING_ON_CANVAS}`}>
+        {piece.text}
       </a>
     );
   });
@@ -31,21 +41,17 @@ export default function ProviderCard({ provider, bare = false, noBooking = false
   const checked = readableDay(lastChecked);
 
   return (
-    <li className={`border border-border bg-surface p-6 ${bare ? 'rounded-b-card' : 'rounded-card'}`}>
+    // A flex column so the action and the footer sit at the foot of the card.
+    // Cards in a grid row stretch to one height so their buttons line up across the row.
+    <li className={`flex flex-col border border-border bg-surface p-[22px] ${bare ? 'rounded-b-card' : 'rounded-card'}`}>
       {!bare && (
         <>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h3 className="font-head text-2xl leading-heading text-primary">
-              <Link to={`/directory/${id}`} className={`inline-block py-2 hover:underline ${RING_ON_CANVAS}`}>{name}</Link>
+            <h3 className="font-head text-[15px] leading-[1.3] text-ink">
+              <Link to={`/directory/${id}`} className={`inline-flex min-h-touch items-center hover:underline ${RING_ON_CANVAS}`}>{name}</Link>
             </h3>
-            {/* Words, not colour, say whether a booking can be asked for here. */}
-            {bookable ? (
-              <span className="rounded-pill border border-info bg-primary-subtle px-2.5 py-1 text-xs font-semibold text-info">Bookings open</span>
-            ) : (
-              <span className="rounded-pill border border-border bg-badge px-2.5 py-1 text-xs font-semibold text-muted-foreground">Contact directly</span>
-            )}
           </div>
-          <p className="mt-2 text-xs uppercase tracking-wide text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             {typeLabel(type)}
             {location ? ` · ${location}` : ''}
           </p>
@@ -70,6 +76,7 @@ export default function ProviderCard({ provider, bare = false, noBooking = false
         <dd>{isFree ? 'Free' : 'May charge a fee. Ask first.'}</dd>
       </dl>
 
+      <div className="mt-auto">
       {!noBooking && (bookable ? (
         <Link to={`/directory/book/${id}`} className={`mt-4 w-full sm:w-auto ${BUTTON_PRIMARY}`}>
           Request consultation{' '}<span className="sr-only">with {name}</span>
@@ -78,13 +85,11 @@ export default function ProviderCard({ provider, bare = false, noBooking = false
         // No link on purpose. The server refuses a booking for an entry that is not bookable.
         // A link would lead the reader straight to an error.
         <>
-          <p className="mt-3 text-sm text-muted-foreground">
-            This office does not take online bookings. Contact them directly or walk in.
-          </p>
-          {/* The full listing has the hours and the map. A list card leads to it. A page that is the
-              listing, or has its own way there, leaves the button out. */}
+          <p className="mt-3 text-sm text-muted-foreground">This office does not take online bookings.</p>
+          {/* The full listing has the hours and the map. A list card leads to it, as a plain text link.
+              A page that is the listing, or has its own way there, leaves it out. */}
           {!bare && (
-            <Link to={`/directory/${id}`} className={`mt-4 w-full sm:w-auto ${BUTTON_OUTLINE}`}>
+            <Link to={`/directory/${id}`} className={`mt-2 ${BUTTON_TEXT}`}>
               Expand listing{' '}<span className="sr-only">for {name}</span>
             </Link>
           )}
@@ -93,9 +98,10 @@ export default function ProviderCard({ provider, bare = false, noBooking = false
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         {checked && <span>Details last checked {checked}</span>}
-        {/* An old entry may still be right. Saying so plainly helps more than hiding it. */}
+        {/* A stale entry may still be right, so the card says so rather than hiding it. */}
         {stale && <span className="font-semibold text-warning-strong">Not re-checked for over 
           six months. Confirm by phone first.</span>}
+      </div>
       </div>
     </li>
   );

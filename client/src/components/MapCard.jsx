@@ -24,7 +24,7 @@ export default function MapCard({ name, address }) {
           aria-expanded={shown}
           aria-controls={panelId}
           onClick={() => setShown((open) => !open)}
-          className={`inline-flex min-h-touch items-center gap-1.5 rounded font-semibold text-primary underline ${RING}`}
+          className={`inline-flex min-h-touch items-center gap-1.5 rounded-control font-semibold text-primary-text underline ${RING}`}
         >
           <Icon name="location_on" className="text-base" />
           {/* The visible words come first in the name. The rest says which office. */}
@@ -34,7 +34,7 @@ export default function MapCard({ name, address }) {
           href={`https://www.google.com/maps/search/?api=1&query=${query}`}
           target="_blank"
           rel="noreferrer"
-          className={`inline-flex min-h-touch items-center rounded font-semibold text-primary underline ${RING}`}
+          className={`inline-flex min-h-touch items-center rounded-control font-semibold text-primary-text underline ${RING}`}
         >
           Open in Google Maps{' '}<span className="sr-only">for {name} (opens in a new tab)</span>
         </a>
@@ -43,10 +43,10 @@ export default function MapCard({ name, address }) {
         {shown && (
           <iframe
             title={`Map of ${name}`}
-            src={`https://maps.google.com/maps?q=${query}&output=embed`}
+            src={`https://www.google.com/maps?q=${query}&output=embed`}
             loading="lazy"
             referrerPolicy="no-referrer"
-            className="mt-1 h-64 w-full rounded border border-border"
+            className="mt-1 h-64 w-full rounded-card border border-border"
           />
         )}
       </div>

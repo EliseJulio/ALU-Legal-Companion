@@ -1,18 +1,16 @@
 import { useState } from 'react';
 import Icon from '@/components/Icon';
-import { RING } from '@/lib/ui';
+import { RING, BUTTON_PRIMARY, CARD } from '@/lib/ui';
 import { secureAddress } from '@/lib/url';
 
-// The "how to do it" part of a guide. The service links, who can apply, the fees, the time, the
-// documents to bring, where to go and the step by step manual.
-// All of it is data from the guide. Nothing here is typed into this file. A fee or an address
-// written here would stay after the guide had been changed.
+// The "how to do it" part of a guide: the service links and who can apply and the fees and the time.
+// It also holds the documents to bring and where to go and the step by step manual.
+// All of it is data from the guide. Nothing here is typed into this file.
 //
-// A fact the sources could not confirm is shown as that. It is never filled in. An amount that is
-// empty says so. "FRW 0" and "not published" are different things.
-const LINK = `inline-flex min-h-touch items-center font-semibold text-primary underline ${RING}`;
-const BUTTON = `inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans text-sm font-semibold text-primary-foreground ${RING}`;
-const H3 = 'font-sans text-xs font-semibold uppercase tracking-wide text-primary';
+// A fact the sources could not confirm is shown as that. It is never filled in.
+// An amount that is empty says so. "FRW 0" and "not published" are different things.
+const LINK = `inline-flex min-h-touch items-center font-semibold text-primary-text underline ${RING}`;
+const H3 = 'font-sans text-sm font-semibold text-ink';
 
 const frw = (n) => `FRW ${Number(n).toLocaleString('en-US')}`;
 
@@ -46,16 +44,16 @@ export default function GuideServiceBlock({ service }) {
   const packedCount = documents ? documents.filter((d) => checkedDocs[d.name]).length : 0;
 
   return (
-    <section aria-labelledby="how-heading" className="mt-5 space-y-5 rounded border border-border bg-surface p-4">
-      <h2 id="how-heading" className="font-head text-lg font-bold text-primary">How to do it</h2>
+    <section aria-labelledby="how-heading" className={`space-y-5 ${CARD}`}>
+      <h2 id="how-heading" className="font-head text-[15px] leading-[1.3] text-ink">How to do it</h2>
 
       {hasBefore && (
-        <section aria-labelledby="before-heading" className="border-l-4 border-l-primary pl-3">
+        <section aria-labelledby="before-heading">
           <h3 id="before-heading" className={H3}>Before you start</h3>
           {(portal?.url || portal?.help_url) && (
             <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
               {portal.url && (
-                <External href={portal.url} className={BUTTON}>
+                <External href={portal.url} className={BUTTON_PRIMARY}>
                   Open the service{portal.name ? ` on ${portal.name}` : ''}
                 </External>
               )}
@@ -63,7 +61,7 @@ export default function GuideServiceBlock({ service }) {
             </p>
           )}
           {(portal?.name?.toLowerCase().includes('irembo') || portal?.url?.includes('irembo.gov.rw')) && (
-            <div className="mt-3 rounded border border-border bg-primary-subtle p-3 text-xs text-primary">
+            <div className="mt-3 rounded-card border border-border bg-primary-subtle p-3 text-xs text-primary-text">
               <p className="font-semibold flex items-center gap-1.5">
                 <Icon name="verified" className="text-sm" /> Official Rwanda Government Portal (IremboGov)
               </p>
@@ -87,7 +85,7 @@ export default function GuideServiceBlock({ service }) {
                           {fee.amount_rwf === null || fee.amount_rwf === undefined ? 'not published. Ask the office' : frw(fee.amount_rwf)}
                         </span>
                         {fee.note && <span> ({fee.note})</span>}
-                        {fee.source_url && <> · <External href={fee.source_url} className={`underline text-primary ${RING}`}>source</External></>}
+                        {fee.source_url && <> · <External href={fee.source_url} className={`underline text-primary-text ${RING}`}>source</External></>}
                       </li>
                     ))}
                   </ul>
@@ -115,7 +113,7 @@ export default function GuideServiceBlock({ service }) {
       )}
 
       {documents?.length > 0 && (
-        <section aria-labelledby="needs-heading" className="border-l-4 border-l-primary pl-3">
+        <section aria-labelledby="needs-heading">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 id="needs-heading" className={H3}>What you need</h3>
             <span className="font-mono text-xs text-muted-foreground">
@@ -126,6 +124,7 @@ export default function GuideServiceBlock({ service }) {
             Check off each physical document as you pack your bag before visiting the office.
           </p>
           <ul className="mt-2 space-y-2 text-sm">
+            {/* Each checkbox has a 44 px hit area. Its negative margin keeps the small box where it was. */}
             {documents.map((doc) => {
               const isChecked = !!checkedDocs[doc.name];
               return (
@@ -136,27 +135,30 @@ export default function GuideServiceBlock({ service }) {
                     aria-checked={isChecked}
                     aria-label={`Mark ${doc.name} as packed in your physical dossier`}
                     onClick={() => toggleDoc(doc.name)}
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                    className={`-m-3 flex h-11 w-11 shrink-0 items-center justify-center ${RING}`}
+                  >
+                    <span className={`flex h-6 w-6 items-center justify-center rounded-bar border transition-colors ${
                       isChecked
                         ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-surface hover:border-primary'
-                    } ${RING}`}
-                  >
-                    {isChecked ? <Icon name="check" className="text-xs" /> : null}
+                        : 'border-control bg-chrome-raised hover:border-primary'
+                    }`}
+                    >
+                      {isChecked ? <Icon name="check" className="text-xs" /> : null}
+                    </span>
                   </button>
                   <span className={isChecked ? 'text-muted-foreground line-through transition-all' : ''}>
                     <span className="font-semibold">{doc.name}</span>
                     {doc.required_if && <span> (only if {doc.required_if})</span>}
                     {doc.notes && <span className="block text-muted-foreground no-underline">{doc.notes}</span>}
                     {doc.where_to_get && <span className="block text-muted-foreground no-underline">Get it from: {doc.where_to_get}</span>}
-                    {doc.source_url && <External href={doc.source_url} className={`text-xs underline text-primary ${RING}`}>source</External>}
+                    {doc.source_url && <External href={doc.source_url} className={`text-xs underline text-primary-text ${RING}`}>source</External>}
                   </span>
                 </li>
               );
             })}
           </ul>
-          <div className="mt-3 rounded border border-border bg-surface-subtle p-2.5 text-xs text-muted-foreground">
-            <p className="font-semibold text-primary">Rwandan Civic Tip</p>
+          <div className="mt-3 rounded-card border border-border bg-surface-subtle p-2.5 text-xs text-muted-foreground">
+            <p className="font-semibold text-ink">Rwandan civic tip</p>
             <p className="mt-0.5">
               Always bring original physical documents (Passport/Alien Card, signed physical lease, or stamped certificates). Rwandan administrative offices require seeing the physical original even when an electronic copy was uploaded.
             </p>
@@ -165,7 +167,7 @@ export default function GuideServiceBlock({ service }) {
       )}
 
       {offices?.length > 0 && (
-        <section aria-labelledby="where-heading" className="border-l-4 border-l-primary pl-3">
+        <section aria-labelledby="where-heading">
           <h3 id="where-heading" className={H3}>Where to go</h3>
           <ul className="mt-2 space-y-3 text-sm">
             {offices.map((office) => (
@@ -185,12 +187,12 @@ export default function GuideServiceBlock({ service }) {
       )}
 
       {walkthrough?.length > 0 && (
-        <section aria-labelledby="steps-heading" className="border-l-4 border-l-primary pl-3">
+        <section aria-labelledby="steps-heading">
           <h3 id="steps-heading" className={H3}>Do it online, step by step</h3>
           <ol className="mt-2 space-y-4 text-sm">
             {walkthrough.map((step, i) => (
               <li key={step.instruction} className="flex gap-3">
-                <span className="mt-0.5 h-6 min-w-6 rounded bg-primary px-1.5 text-center font-mono text-xs font-medium leading-6 text-primary-foreground">{i + 1}</span>
+                <span className="mt-0.5 h-6 min-w-6 rounded-control bg-primary px-1.5 text-center font-mono text-xs font-medium leading-6 text-primary-foreground">{i + 1}</span>
                 <div>
                   <p>{step.instruction}</p>
                   {step.url_at_step && <External href={step.url_at_step}>Open this page</External>}
@@ -202,7 +204,7 @@ export default function GuideServiceBlock({ service }) {
       )}
 
       {unconfirmed?.length > 0 && (
-        <section aria-labelledby="confirm-heading" className="rounded border border-warning-border bg-warning-subtle p-3">
+        <section aria-labelledby="confirm-heading" className="rounded-card border border-warning-border bg-warning-subtle p-3">
           <h3 id="confirm-heading" className="font-head text-sm font-bold text-warning-strong">Ask the office to confirm</h3>
           <p className="mt-1 text-sm text-warning-strong">We could not confirm these from an official source. So they are not stated as fact:</p>
           <ul className="mt-1 list-disc pl-5 text-sm text-warning-strong">

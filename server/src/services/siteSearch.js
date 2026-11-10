@@ -6,7 +6,7 @@ import { q } from '../db.js';
 import { searchRoutes } from './routing.js';
 
 export const LIBRARIES = ['guides', 'routes', 'providers'];
-export const MAX_RESULTS = 6;
+const MAX_RESULTS = 6;
 export const MIN_QUERY = 2;
 export const MAX_QUERY = 100;
 const MAX_WORDS = 6;
@@ -17,7 +17,7 @@ const MAX_WORDS = 6;
 const likeEscape = (word) => word.replace(/[!%_]/g, (c) => `!${c}`);
 
 // The words of the query. Every word must be found, so a longer question narrows the answer.
-export function wordsOf(text) {
+function wordsOf(text) {
   return text.split(/\s+/).filter(Boolean).slice(0, MAX_WORDS);
 }
 
