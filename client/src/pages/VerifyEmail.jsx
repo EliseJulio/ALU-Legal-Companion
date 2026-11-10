@@ -5,9 +5,9 @@ import { scrubTokenFromUrl } from '@/lib/url';
 import { useAuth } from '@/lib/AuthContext';
 import ErrorNotice from '@/components/ErrorNotice';
 import AuthLayout from '@/components/AuthLayout';
-import { RING } from '@/lib/ui';
+import { BUTTON_LG_PRIMARY } from '@/lib/ui';
 
-const BUTTON_LINK = `mt-4 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`;
+const BUTTON_LINK = `mt-6 ${BUTTON_LG_PRIMARY}`;
 
 // The link in the email opens this page. The check runs when the page opens because the reader
 // has already clicked the link. A second button would be a second click for the same thing.

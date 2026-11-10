@@ -1,30 +1,34 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
+import { FORM_ERROR_ID, fieldProblem, focusField, useFieldMarks } from '@/lib/fieldError';
 import { looksLikeEmail } from '@/lib/email';
 import ErrorNotice from '@/components/ErrorNotice';
 import AuthLayout from '@/components/AuthLayout';
 import Callout from '@/components/Callout';
-import { RING, RING_ON_CANVAS, FIELD } from '@/lib/ui';
+import { FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_TEXT, CARD } from '@/lib/ui';
 
-// Ask for a link to set a new password. The server gives the same answer for every address,
-// with or without an account. This page shows that answer as it is and adds nothing. Anything
-// extra, such as "we found your account", would let a stranger find out which addresses exist.
+// Ask for a link to set a new password. The server gives the same answer for every address.
+// That is true with or without an account. This page shows that answer as it is and adds nothing.
+// Anything extra such as "we found your account" would let a stranger find out which addresses exist.
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const { marks, edited } = useFieldMarks(error);
   const [message, setMessage] = useState(null);
 
   async function handleSubmit(event) {
     event.preventDefault();
     const address = email.trim();
     if (!address) {
-      setError({ message: 'Enter the email address for your account.' });
+      setError(fieldProblem('email', 'Enter the email address for your account.'));
+      focusField('email');
       return;
     }
     if (!looksLikeEmail(address)) {
-      setError({ message: 'That does not look like an email address.' });
+      setError(fieldProblem('email', 'That does not look like an email address.'));
+      focusField('email');
       return;
     }
     setError(null);
@@ -42,36 +46,35 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout eyebrow="Recovery" title="Forgot your password?" intro="If an account exists, reset instructions will be sent.">
-      {error && <ErrorNotice error={error} className="mt-4" />}
+      {error && <ErrorNotice error={error} id={FORM_ERROR_ID} className="mb-4" />}
       <div role="status">
-        {message && <Callout title="Check your email" className="mt-4">{message}</Callout>}
+        {message && <Callout title="Check your email" className="mb-4">{message}</Callout>}
       </div>
 
-      <form onSubmit={handleSubmit} noValidate className="mt-4 rounded-card border border-border bg-surface p-6">
-        <label htmlFor="email" className="block text-sm font-medium">Email address</label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          className={FIELD}
-        />
-        <button
-          type="submit"
-          aria-disabled={sending || undefined}
-          className={`mt-4 inline-flex min-h-button items-center justify-center rounded px-5 font-sans
-            font-semibold text-primary-foreground ${RING} ${sending ? 'bg-disabled' : 'bg-primary'}`}
-        >
-          {sending ? 'Sending…' : 'Send reset instructions'}
-        </button>
-      </form>
+      <div className={CARD}>
+        <form onSubmit={handleSubmit} noValidate>
+          <label htmlFor="email" className="block text-sm font-semibold">Email address</label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); edited('email'); }}
+            autoComplete="email"
+            className={FORM_FIELD}
+            {...marks('email')}
+          />
+          <button
+            type="submit"
+            aria-disabled={sending || undefined}
+            className={`mt-6 w-full ${sending ? BUTTON_DISABLED : BUTTON_LG_PRIMARY}`}
+          >
+            {sending ? 'Sending…' : 'Send reset instructions'}
+          </button>
+        </form>
+      </div>
 
       <p className="mt-4 text-sm">
-        <Link to="/login" className={`inline-flex min-h-touch items-center
-          font-semibold text-info underline underline-offset-2 ${RING_ON_CANVAS}`}>
-          Back to sign in →
-        </Link>
+        <Link to="/login" className={BUTTON_TEXT}>Back to sign in →</Link>
       </p>
     </AuthLayout>
   );

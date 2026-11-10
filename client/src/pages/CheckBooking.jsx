@@ -6,7 +6,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import StatusPill from '@/components/StatusPill';
 import MeetLink from '@/components/MeetLink';
 import { readableSlot, bookingStatusStep } from '@/lib/bookings';
-import { FIELD, BUTTON_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT } from '@/lib/ui';
+import { FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Check an anonymous booking with its code. The code is kept in state and goes only into the
 // path of one request. It is never put in the address bar. The code alone opens the booking.
@@ -43,14 +43,14 @@ export default function CheckBooking() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }, { label: 'Directory', to: '/directory' }]} current="Check your booking" />
-      <p className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Check your request</p>
-      <h1 className="mt-1 font-head text-4xl leading-heading text-primary md:text-5xl">Check your booking</h1>
+      <p className="mt-6 text-sm font-semibold text-muted-foreground">Check your request</p>
+      <h1 className={`mt-1 ${PAGE_TITLE}`}>Check your booking</h1>
       <p className="mt-4 max-w-reading text-muted-foreground">
         Type the code you were given when you booked. We cannot look a booking up by name because
-        we never stored one. Anonymous requests are not added to My Activity.
+        we never stored one. Anonymous requests are not added to My activity.
       </p>
 
-      <form onSubmit={lookUp} className="mt-6 max-w-form rounded-card border border-border bg-surface p-6">
+      <form onSubmit={lookUp} className={`mt-6 max-w-form ${CARD}`}>
         <label htmlFor="booking-code" className="block text-sm font-semibold">Your booking code</label>
         <input
           id="booking-code"
@@ -62,12 +62,12 @@ export default function CheckBooking() {
           autoCorrect="off"
           spellCheck="false"
           placeholder="XXXX-XXXX-XXXX-XXXX"
-          className={`${FIELD} font-mono`}
+          className={`${FORM_FIELD} font-mono`}
         />
         <button
           type="submit"
           aria-disabled={looking || undefined}
-          className={`mt-4 ${looking ? BUTTON_DISABLED : BUTTON_PRIMARY}`}
+          className={`mt-6 w-full ${looking ? BUTTON_DISABLED : BUTTON_LG_PRIMARY}`}
         >
           {looking ? 'Looking…' : 'Check booking'}
         </button>
@@ -82,9 +82,9 @@ export default function CheckBooking() {
       {/* Always on the page so the result is read out when it arrives. */}
       <div role="status">
       {booking && (
-        <section className="mt-4 rounded-card border border-border bg-surface p-6" aria-labelledby="booking-heading">
+        <section className={`mt-4 ${CARD}`} aria-labelledby="booking-heading">
           <StatusPill status={booking.status} />
-          <h2 id="booking-heading" className="mt-2 font-head text-2xl leading-heading text-primary">{step.heading}</h2>
+          <h2 id="booking-heading" className="mt-2 font-head text-[20px] leading-[1.25] text-ink">{step.heading}</h2>
           <p className="mt-1 text-sm">{step.body}</p>
           <dl className="mt-3 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
             <dt className="text-muted-foreground">With</dt>
@@ -93,7 +93,7 @@ export default function CheckBooking() {
             <dd className="font-medium">{readableSlot(booking.slot) ?? 'Not available'}</dd>
             {booking.topic && (<><dt className="text-muted-foreground">About</dt><dd>{booking.topic}</dd></>)}
           </dl>
-          <MeetLink booking={booking} className="mt-4" />
+          <MeetLink booking={booking} anonCode={code.trim()} className="mt-4" />
           {step.next && (
             <Link to="/directory" className={`mt-4 ${BUTTON_OUTLINE}`}>
               {step.next}

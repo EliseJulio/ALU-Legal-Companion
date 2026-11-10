@@ -14,8 +14,21 @@ import nodemailer from 'nodemailer';
 
 // This address can never be registered, so if it appears in a real mailbox MAIL_FROM was not set.
 const DEFAULT_FROM = 'ALU Legal Companion <no-reply@alu-legal.invalid>';
+const DEFAULT_NAME = 'ALU Legal Companion';
 
-const mailFrom = () => process.env.MAIL_FROM || DEFAULT_FROM;
+// The sender of every message. A bare address in MAIL_FROM is shown with the app's name first,
+// so the inbox says "ALU Legal Companion". If MAIL_FROM already has a name in it ("Name <address>")
+// it is used exactly as written.
+export function fromHeader() {
+  const raw = (process.env.MAIL_FROM || '').trim();
+  if (!raw) return DEFAULT_FROM;
+  if (raw.includes('<')) return raw;
+  const name = (process.env.MAIL_FROM_NAME || '').trim() || DEFAULT_NAME;
+  return `"${name.replace(/"/g, '')}" <${raw}>`;
+}
+
+// Where a reply goes. Optional: with nothing set, replies go to the sender address.
+const replyTo = () => (process.env.MAIL_REPLY_TO || '').trim() || undefined;
 
 // The base address that links in emails are built from. The default is the Vite dev server.
 export const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
@@ -23,6 +36,13 @@ export const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').rep
 // Read at call time and not at import time, so a late config or a test sees the truth.
 export function isRealTransport() {
   return Boolean(process.env.SMTP_URL);
+}
+
+// Can a message reach someone right now? A real transport sends it.
+// Outside production the dev mode prints it to the terminal where the developer reads it.
+// In production with no transport nothing can be sent and sendMail refuses. So the answer is no.
+export function mailAvailable() {
+  return isRealTransport() || process.env.NODE_ENV !== 'production';
 }
 
 // --- Dev mode. Everything that can print a message is in this function. ---
@@ -36,7 +56,7 @@ function sendViaTerminal({ to, subject, text }) {
   }
   const preview = [
     '──────── mail: DEV MODE — NOT SENT (no SMTP_URL) ────────',
-    `From:    ${mailFrom()}`,
+    `From:    ${fromHeader()}`,
     `To:      ${to}`,
     `Subject: ${subject}`,
     '',
@@ -65,7 +85,7 @@ function smtpTransporter() {
 // There is no fallback to dev mode when this fails. A fallback would print a live link.
 // A configured transport that cannot send must fail and let the caller decide what to do.
 async function sendViaSmtp({ to, subject, text }) {
-  await smtpTransporter().sendMail({ from: mailFrom(), to, subject, text });
+  await smtpTransporter().sendMail({ from: fromHeader(), replyTo: replyTo(), to, subject, text });
   return Object.freeze({ delivered: true });
 }
 

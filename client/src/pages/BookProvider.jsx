@@ -10,7 +10,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import { CheckField } from '@/components/Field';
-import { RING, FIELD, BUTTON_OUTLINE, BUTTON_PRIMARY, BUTTON_DISABLED, BUTTON_TEXT } from '@/lib/ui';
+import { RING, FIELD, BUTTON_OUTLINE, BUTTON_PRIMARY, BUTTON_DISABLED, BUTTON_TEXT, CARD, PAGE_TITLE } from '@/lib/ui';
 
 // There are two routes. The anonymous one ignores any login and stores no name. The other
 // needs a student or staff login. The choice picks the URL and the flag together so they can
@@ -42,8 +42,8 @@ export default function BookProvider() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const slotRef = useRef(null);
-  // The confirmation holds the one-time code. When it replaces the form, focus goes to it, so the
-  // button the reader pressed does not vanish and leave them at the top of the page.
+  // The confirmation holds the one-time code. When it replaces the form focus goes to it.
+  // So the button the reader pressed does not vanish and leave them at the top of the page.
   const doneRef = useRef(null);
 
   // Only students and staff have a choice. Everyone else books anonymously because the other
@@ -130,11 +130,11 @@ export default function BookProvider() {
   if (!usableId) {
     return (
       <div>
-        <h1 className="font-head text-2xl text-primary">That booking link is not right</h1>
-        <div className="mt-4 rounded-card border border-border bg-surface p-6">
+        <h1 className="font-head text-[15px] leading-[1.3] text-ink">That booking link is not right</h1>
+        <div className={`mt-4 ${CARD}`}>
           <p className="text-sm">Open the directory and use the booking button on the entry you want.</p>
           <Link to="/directory" className={`mt-3 inline-flex min-h-touch items-center 
-            rounded bg-primary px-4 font-sans text-sm font-semibold text-primary-foreground ${RING}`}>
+            rounded-control bg-primary px-4 font-sans text-sm font-semibold text-primary-foreground ${RING}`}>
             Go to the directory
           </Link>
         </div>
@@ -145,7 +145,7 @@ export default function BookProvider() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }, { label: 'Directory', to: '/directory' }]} current="Request consultation" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Request a consultation</h1>
+      <h1 className={`mt-6 ${PAGE_TITLE}`}>Request a consultation</h1>
       <p className="mt-3 text-muted-foreground">
         {provider?.name ? `${provider.name} · ` : ''}A request is not a confirmed appointment.
       </p>
@@ -169,7 +169,7 @@ export default function BookProvider() {
           </div>
         </div>
       ) : bookedAsSelf ? (
-        <div ref={doneRef} tabIndex={-1} className="mt-4 rounded-card border border-border bg-surface p-6 outline-none">
+        <div ref={doneRef} tabIndex={-1} className={`mt-4 outline-none ${CARD}`}>
           <p>
             Your request is with the lawyer. When they accept the time, you will get an email with the
             time and the meeting link. You can also see the answer at any time on the site under your account.
@@ -178,7 +178,7 @@ export default function BookProvider() {
             There is no code. The request is kept with your account so the lawyer can see who asked.
           </p>
           <Link to="/my-activity" className={`mt-4 inline-flex min-h-touch items-center 
-            rounded bg-primary px-4 font-sans font-semibold text-primary-foreground ${RING}`}>
+            rounded-control bg-primary px-4 font-sans font-semibold text-primary-foreground ${RING}`}>
             My activity
           </Link>
         </div>
@@ -193,7 +193,7 @@ export default function BookProvider() {
           {!user && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <Link to={signInPath(here)} className={BUTTON_OUTLINE}>Sign in instead</Link>
-              <p className="text-sm text-muted-foreground">Signed-in requests appear in My Activity.</p>
+              <p className="text-sm text-muted-foreground">Signed-in requests appear in My activity.</p>
             </div>
           )}
 
@@ -208,7 +208,7 @@ export default function BookProvider() {
 
           {error && <ErrorNotice key={errorCount} id="booking-error" error={error} className="mt-4" />}
 
-          <form onSubmit={handleSubmit} className="mt-4 rounded-card border border-border bg-surface p-6">
+          <form onSubmit={handleSubmit} className={`mt-4 ${CARD}`}>
             <label htmlFor="slot" className="block text-sm font-semibold">Date and time</label>
             <p id="slot-hint" className="mt-1 text-sm text-muted-foreground">
               When would suit you? The lawyer can accept it or ask for another time.
@@ -292,6 +292,7 @@ export default function BookProvider() {
               <button
                 type="submit"
                 aria-disabled={(sending || mustChoose) || undefined}
+                aria-describedby={mustChoose ? 'choose-hint' : undefined}
                 className={`${sending || mustChoose ? BUTTON_DISABLED : BUTTON_PRIMARY} w-full sm:w-auto`}
               >
                 {sending ? 'Sending the request…' : 'Send consultation request'}
@@ -300,7 +301,7 @@ export default function BookProvider() {
             </div>
             {/* A grey button that explains nothing is a dead end. So this says why. */}
             {mustChoose && (
-              <p className="mt-2 text-sm text-muted-foreground">Pick one of the two options above to send your request.</p>
+              <p id="choose-hint" className="mt-2 text-sm text-muted-foreground">Pick one of the two options above to send your request.</p>
             )}
           </form>
 
@@ -313,20 +314,20 @@ export default function BookProvider() {
       )}
       </div>
 
-      <aside className="self-start rounded-card border border-chrome-raised bg-chrome p-6 text-chrome-foreground" aria-labelledby="next-heading">
-        <h2 id="next-heading" className="font-head text-2xl leading-heading">What happens next</h2>
+      <aside className={`self-start ${CARD}`} aria-labelledby="next-heading">
+        <h2 id="next-heading" className="font-head text-[15px] leading-[1.3] text-ink">What happens next</h2>
         <dl className="mt-4 flex flex-col gap-4 text-sm">
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-on-chrome">You request</dt>
+            <dt className="text-sm font-semibold text-faint">You request</dt>
             <dd className="mt-0.5">Suggest a date and time.</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-on-chrome">The lawyer responds</dt>
+            <dt className="text-sm font-semibold text-faint">The lawyer responds</dt>
             <dd className="mt-0.5">They accept the time or ask for another.</dd>
           </div>
           <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-on-chrome">You check</dt>
-            <dd className="mt-0.5">Use your code, or My Activity if you are signed in.</dd>
+            <dt className="text-sm font-semibold text-faint">You check</dt>
+            <dd className="mt-0.5">Use your code, or My activity if you are signed in.</dd>
           </div>
         </dl>
       </aside>

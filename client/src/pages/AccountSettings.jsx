@@ -9,10 +9,11 @@ import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import PasswordField from '@/components/PasswordField';
 import { readableDate } from '@/lib/dates';
-import { FIELD, BUTTON_PRIMARY } from '@/lib/ui';
+import { FORM_FIELD, BUTTON_LG_PRIMARY, PAGE_TITLE, CARD } from '@/lib/ui';
 
-const PANEL = 'rounded-card border border-border bg-surface p-6';
-const LABEL = 'text-xs font-semibold uppercase tracking-wide text-muted-foreground';
+// Each form is a section inside one card on the left, with a line between sections.
+const SECTION = 'border-t border-border py-6 first:border-t-0 first:pt-0';
+const LABEL = 'text-sm font-semibold text-muted-foreground';
 const ROLE_WORDS = { student: 'Student', staff: 'Staff', legal_expert: 'Legal expert', admin: 'Administrator' };
 
 // Change your own name. The server reads the name and nothing else, so this form cannot be used
@@ -44,13 +45,13 @@ function NameForm({ current }) {
   }
 
   return (
-    <form onSubmit={save} className={PANEL} aria-labelledby="name-heading">
-      <h2 id="name-heading" className="font-head text-2xl leading-heading text-primary">Your name</h2>
-      <label htmlFor="settings-name" className="mt-2 block text-sm font-medium">Name</label>
-      <input id="settings-name" type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={FIELD} />
+    <form onSubmit={save} className={SECTION} aria-labelledby="name-heading">
+      <h2 id="name-heading" className="font-head text-[20px] leading-[1.25] text-ink">Your name</h2>
+      <label htmlFor="settings-name" className="mt-2 block text-sm font-semibold">Name</label>
+      <input id="settings-name" type="text" maxLength={100} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className={FORM_FIELD} />
       {error && <ErrorNotice error={error} className="mt-3" />}
       <div role="status">{done && <p className="mt-3 text-sm">Your name is saved.</p>}</div>
-      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_LG_PRIMARY} mt-6`}>
         {busy ? 'Saving…' : 'Save name'}
       </button>
     </form>
@@ -94,13 +95,13 @@ function EmailForm({ onRequested }) {
   }
 
   return (
-    <form onSubmit={save} className={PANEL} aria-labelledby="email-heading">
-      <h2 id="email-heading" className="font-head text-2xl leading-heading text-primary">Change your email address</h2>
+    <form onSubmit={save} className={SECTION} aria-labelledby="email-heading">
+      <h2 id="email-heading" className="font-head text-[20px] leading-[1.25] text-ink">Change your email address</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         A link is sent to the new address. Your address changes only when you use it.
       </p>
-      <label htmlFor="settings-new-email" className="mt-3 block text-sm font-medium">New email address</label>
-      <input id="settings-new-email" type="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={FIELD} />
+      <label htmlFor="settings-new-email" className="mt-3 block text-sm font-semibold">New email address</label>
+      <input id="settings-new-email" type="email" maxLength={200} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className={FORM_FIELD} />
       <PasswordField
         id="email-current-password"
         label="Your password"
@@ -113,7 +114,7 @@ function EmailForm({ onRequested }) {
       />
       {error && <ErrorNotice error={error} className="mt-3" />}
       <div role="status">{message && <p className="mt-3 text-sm">{message}</p>}</div>
-      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_LG_PRIMARY} mt-6`}>
         {busy ? 'Sending…' : 'Send confirmation link'}
       </button>
     </form>
@@ -165,8 +166,8 @@ function PasswordForm() {
   }
 
   return (
-    <form onSubmit={save} className={PANEL} aria-labelledby="password-heading">
-      <h2 id="password-heading" className="font-head text-2xl leading-heading text-primary">Change your password</h2>
+    <form onSubmit={save} className={SECTION} aria-labelledby="password-heading">
+      <h2 id="password-heading" className="font-head text-[20px] leading-[1.25] text-ink">Change your password</h2>
       <p className="mt-1 text-sm text-muted-foreground">This signs you out everywhere else and keeps you signed in here.</p>
 
       <PasswordField
@@ -205,7 +206,7 @@ function PasswordForm() {
 
       {error && <ErrorNotice error={error} className="mt-3" />}
       <div role="status">{done && <p className="mt-3 text-sm">Your password is changed. Other devices are signed out.</p>}</div>
-      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_PRIMARY} mt-3`}>
+      <button type="submit" aria-disabled={busy || undefined} className={`${BUTTON_LG_PRIMARY} mt-6`}>
         {busy ? 'Saving…' : 'Change password'}
       </button>
     </form>
@@ -222,9 +223,9 @@ export default function AccountSettings() {
 
   if (!user) {
     return (
-      <div className={`mt-6 ${PANEL}`}>
-        <h1 className="font-head text-4xl leading-heading text-primary md:text-5xl">Sign in to manage your account</h1>
-        <Link to={signInPath(here)} className={`${BUTTON_PRIMARY} mt-3`}>Sign in</Link>
+      <div className={`mt-6 ${CARD}`}>
+        <h1 className={PAGE_TITLE}>Sign in to manage your account</h1>
+        <Link to={signInPath(here)} className={`${BUTTON_LG_PRIMARY} mt-6`}>Sign in</Link>
       </div>
     );
   }
@@ -234,17 +235,26 @@ export default function AccountSettings() {
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Account settings" />
-      <h1 className="mt-6 font-head text-4xl leading-heading text-primary md:text-5xl">Account settings</h1>
+      <h1 className={`mt-6 ${PAGE_TITLE}`}>Account settings</h1>
       <p className="mt-4 max-w-reading text-muted-foreground">Manage your name, your email address and your password. No extra personal information is collected.</p>
 
       {loading && <p className="mt-4 text-muted-foreground">Loading your account…</p>}
       {error && <ErrorNotice error={error} className="mt-4" />}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
-        <div className="min-w-0 space-y-6">
+      {/* Two columns on a wide screen: the forms on the left, the details on the right. */}
+      <div className="mt-8 grid gap-6 wide:grid-cols-12">
+        <div className="min-w-0 wide:col-span-8">
+          <div className={CARD}>
+            <NameForm current={user.name} />
+            <EmailForm onRequested={refetch} />
+            <PasswordForm />
+          </div>
+        </div>
+
+        <div className="min-w-0 space-y-6 wide:col-span-4">
           {me && (
-            <section className={PANEL} aria-labelledby="overview-heading">
-              <h2 id="overview-heading" className="font-head text-2xl leading-heading text-primary">Overview</h2>
+            <section className={CARD} aria-labelledby="overview-heading">
+              <h2 id="overview-heading" className="font-head text-[17px] leading-[1.25] text-ink">Your details</h2>
               <dl className="mt-3 space-y-4 text-sm">
                 <div>
                   <dt className={LABEL}>Name</dt>
@@ -276,12 +286,6 @@ export default function AccountSettings() {
           <Callout title="Your account stays separate from shared matter identity">
             Free text can still identify you. Share only what you intend to disclose.
           </Callout>
-        </div>
-
-        <div className="min-w-0 space-y-6">
-          <NameForm current={user.name} />
-          <EmailForm onRequested={refetch} />
-          <PasswordForm />
         </div>
       </div>
     </div>
