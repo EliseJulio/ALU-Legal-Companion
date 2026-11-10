@@ -1,6 +1,6 @@
 // Encrypted storage for the documents people attach to a matter.
 //
-// These are passports, IDs and contracts. Three decisions follow from that.
+// These are passports, IDs and contracts. Three rules follow from that.
 //
 // 1. They are encrypted on disk with AES-256-GCM. The key lives only in the environment as
 //    DOCUMENT_KEY. It is 64 hex characters. A copy of the uploads folder or of a database backup
@@ -22,6 +22,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const MAX_BYTES = 10 * 1024 * 1024;
 export const MAX_PER_MATTER = 25;
+// Across all the matters of one person. A few dozen files is real use.
+export const MAX_PER_PERSON = 100;
+// A file on an entry in the record is smaller than a checklist document.
+export const MAX_EVENT_FILE_BYTES = 5 * 1024 * 1024;
 export const MIME_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 export const EXTENSION = { 'application/pdf': 'pdf', 'image/png': 'png', 'image/jpeg': 'jpg' };
 
@@ -86,8 +90,24 @@ export async function removeDocumentFile(storedName) {
 
 // Called only when the owner deletes their own matter. Nothing else in the application deletes a
 // matter or its documents. Closing it does not. An admin does not. Deactivating the account does
-// not. A person's record is theirs to keep or to erase.
+// not.
 export async function removeMatterFiles(matterId) {
-  const rows = await q('SELECT stored_name FROM matter_documents WHERE matter_id = $1', [matterId]);
+  const rows = await q(
+    `SELECT stored_name FROM matter_documents WHERE matter_id = $1
+     UNION ALL SELECT stored_name FROM matter_event_files WHERE matter_id = $1`, [matterId]);
   await Promise.all(rows.map((r) => removeDocumentFile(r.stored_name)));
+}
+
+// How many files a matter holds and how many a person holds. Both tables count: a checklist document
+// and a file on an entry in the record use the same room. Pass the transaction client so the count
+// is read under the lock that the insert is made under.
+export async function countFiles(client, matterId, userId) {
+  const { rows: [c] } = await client.query(
+    `SELECT
+       (SELECT count(*)::int FROM matter_documents WHERE matter_id = $1)
+       + (SELECT count(*)::int FROM matter_event_files WHERE matter_id = $1) AS in_matter,
+       (SELECT count(*)::int FROM matter_documents d JOIN matters m ON m.id = d.matter_id WHERE m.user_id = $2)
+       + (SELECT count(*)::int FROM matter_event_files f JOIN matters m ON m.id = f.matter_id WHERE m.user_id = $2) AS in_total`,
+    [matterId, userId]);
+  return { inMatter: c.in_matter, total: c.in_total };
 }

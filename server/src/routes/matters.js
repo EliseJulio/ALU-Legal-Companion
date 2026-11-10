@@ -12,7 +12,11 @@ import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { scheduleReminders, isDateString, addDays, kigaliToday } from '../services/reminders.js';
-import { removeMatterFiles } from '../services/documentStore.js';
+import { removeMatterFiles, documentsEnabled, readDocument, EXTENSION } from '../services/documentStore.js';
+import {
+  readEventUpload, limitEventUploads, typeOfUpload, addEntryWithFile, Refusal,
+} from '../services/eventFiles.js';
+import { progressFigures } from '../services/checklists.js';
 
 const router = Router();
 const OWNERS = ['student', 'staff'];
@@ -124,6 +128,61 @@ router.get('/share-targets', requireAuth(...OWNERS), async (_req, res) => {
       ORDER BY name`));
 });
 
+// GET /api/matters/reminders: the reminders of my open matters that are waiting or already sent.
+// Cancelled and missed ones are not shown. The title is shown here because only the owner reads it.
+// The email itself never carries it.
+router.get('/reminders', requireAuth(...OWNERS), async (req, res) => {
+  const since = addDays(kigaliToday(), -14);
+  res.json(await q(
+    `SELECT r.id, r.matter_id, m.title, r.due_on, r.send_on, r.status, r.sent_at
+       FROM reminders r JOIN matters m ON m.id = r.matter_id
+      WHERE m.user_id = $1 AND m.status = 'open' AND r.status IN ('pending', 'sent') AND r.due_on >= $2
+      ORDER BY r.send_on DESC, r.id DESC
+      LIMIT 20`,
+    [req.user.id, since]));
+});
+
+// GET /api/matters/progress: where the documents of each open matter stand.
+// It uses the same rule as the checklist page. The latest file for an item is the one that counts.
+// Only required items are counted.
+// A matter with no checklist or one being checked again says so and carries no figures.
+// It is a statement about files a lawyer checked. It is never a promise that an office will accept them.
+router.get('/progress', requireAuth(...OWNERS), async (req, res) => {
+  const matters = await q(
+    `SELECT id, title, next_due, checklist_id, shared_with FROM matters
+      WHERE user_id = $1 AND status = 'open'
+      ORDER BY next_due NULLS LAST, updated_at DESC`,
+    [req.user.id]);
+  if (matters.length === 0) return res.json([]);
+  const checklistIds = [...new Set(matters.map((m) => m.checklist_id).filter(Boolean))];
+  const checklists = checklistIds.length
+    ? await q('SELECT id, title, items, status FROM document_checklists WHERE id = ANY($1::int[])', [checklistIds])
+    : [];
+  const docs = await q(
+    `SELECT matter_id, item_key, review_status FROM matter_documents
+      WHERE matter_id = ANY($1::int[]) AND item_key IS NOT NULL ORDER BY id`,
+    [matters.map((m) => m.id)]);
+
+  res.json(matters.map((m) => {
+    const base = { id: m.id, title: m.title, next_due: m.next_due, shared: Boolean(m.shared_with) };
+    const c = checklists.find((x) => x.id === m.checklist_id);
+    if (!c) return { ...base, checklist: null };
+    if (c.status !== 'published') return { ...base, checklist: { title: c.title, under_review: true } };
+    const { needed, counts } = progressFigures(c.items, docs.filter((d) => d.matter_id === m.id));
+    return {
+      ...base,
+      checklist: { title: c.title, under_review: false },
+      needed,
+      complete: counts.complete,
+      awaiting: counts.pending,
+      to_fix: counts.needs_fix,
+      expired: counts.out_of_date,
+      missing: counts.missing,
+      ready: needed > 0 && counts.complete === needed,
+    };
+  }));
+});
+
 // GET /api/matters/shared: the expert's list. These are the matters shared with an entry linked
 // to their account. The owner is not named. The owner shares the matter and not their identity.
 // documents_waiting says how many files wait for the lawyer's check. Without it the lawyer would have
@@ -142,7 +201,7 @@ router.get('/shared', requireAuth('legal_expert'), async (req, res) => {
 });
 
 // POST /api/matters/:id/share { provider_id }: the owner only.
-// It replaces any earlier share. A matter is shared with one place at a time so the owner
+// It replaces any existing share. A matter is shared with one place at a time, so the owner
 // always knows who can see it.
 router.post('/:id/share', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
@@ -205,8 +264,11 @@ router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id')
   // entries from the expert's notes. The expert needs nothing more about the owner than that.
   const events = await q(
     `SELECT e.id, e.occurred_on, e.description, e.created_at, (e.author_id = $2) AS author_is_owner,
-            CASE WHEN e.author_id = $2 THEN NULL ELSE u.name END AS author_name
+            CASE WHEN e.author_id = $2 THEN NULL ELSE u.name END AS author_name,
+            CASE WHEN f.id IS NULL THEN NULL
+                 ELSE json_build_object('name', f.original_name, 'size_bytes', f.size_bytes, 'mime', f.mime) END AS file
        FROM matter_events e JOIN users u ON u.id = e.author_id
+       LEFT JOIN matter_event_files f ON f.event_id = e.id
       WHERE e.matter_id = $1
       ORDER BY e.occurred_on DESC, e.id DESC`,
     [m.id, m.user_id]);
@@ -218,8 +280,8 @@ router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id')
     // The expert sees the matter and its history. The expert does not see who shared it.
     delete view.shared_with;
     delete view.shared_at;
-    // One expert never sees the name of another. If the owner shares with a different office later,
-    // the new expert reads the earlier notes as a legal expert and not as the work of a named colleague.
+    // One expert never sees the name of another. A new expert sees the existing notes as a legal
+    // expert's, not as a named colleague's.
     for (const e of events) e.author_name = null;
   }
   res.json({ ...view, viewer: access.as, events, reminders });
@@ -255,7 +317,9 @@ router.put('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, re
 });
 
 // POST /api/matters/:id/events: log a step taken. The owner can. An expert can while it is shared.
-router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id'), async (req, res) => {
+// The owner may also attach one file (multipart/form-data, field "file"). The entry and its file are
+// made together or not at all. A lawyer's note never carries a file.
+router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id'), readEventUpload, limitEventUploads, async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
   if (!access) return res.status(404).json({ error: 'Matter not found' });
   const description = clean(req.body?.description);
@@ -264,6 +328,26 @@ router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntPar
   if (description.length > MAX_TEXT) return res.status(400).json({ error: 'That entry is too long' });
   if (!isDateString(occurredOn)) return res.status(400).json({ error: 'occurred_on must be a date (YYYY-MM-DD)' });
   if (occurredOn > kigaliToday()) return res.status(400).json({ error: 'That date is in the future' });
+
+  if (req.file) {
+    if (access.as !== 'owner') return res.status(400).json({ error: 'Only the person who owns the matter can attach a file.' });
+    // Before anything is stored. With no key the feature is off and the entry is not made either.
+    if (!documentsEnabled()) {
+      return res.status(503).json({ error: 'Attaching files is not switched on yet. Please try again later.' });
+    }
+    const mime = typeOfUpload(req.file);
+    if (!mime) return res.status(400).json({ error: 'Attach a PDF, PNG or JPEG file.' });
+    try {
+      const e = await addEntryWithFile({
+        matterId: access.matter.id, userId: req.user.id, occurredOn, description, file: req.file, mime,
+      });
+      return res.status(201).json({ ...e, author_is_owner: true });
+    } catch (err) {
+      if (err instanceof Refusal) return res.status(err.status).json({ error: err.message });
+      throw err;
+    }
+  }
+
   const [e] = await q(
     `INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)
      RETURNING id, occurred_on, description, created_at`,
@@ -272,8 +356,34 @@ router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntPar
   res.status(201).json({ ...e, author_is_owner: access.as === 'owner' });
 });
 
-// DELETE /api/matters/:id: the owner only. It is the person's record so it is theirs to erase.
-// The events and reminders go with it.
+// GET /api/matters/:id/events/:eventId/file: the decrypted file as a download.
+// The access is exactly loadMatter: the owner and the lawyer the matter is shared with right now.
+// Anyone else gets a 404 as if there were no such file. That includes an admin.
+router.get('/:id/events/:eventId/file', requireAuth(), requireIntParam('id'), requireIntParam('eventId'), async (req, res) => {
+  const access = await loadMatter(req.params.id, req.user);
+  if (!access) return res.status(404).json({ error: 'File not found' });
+  // Found by matter_id too, so an entry from another matter is a miss and not a leak.
+  const [row] = await q('SELECT * FROM matter_event_files WHERE event_id = $1 AND matter_id = $2',
+    [req.params.eventId, access.matter.id]);
+  if (!row) return res.status(404).json({ error: 'File not found' });
+  let bytes;
+  try {
+    bytes = await readDocument(row);
+  } catch {
+    // Missing or altered. It says nothing about why. That is information for an attacker.
+    return res.status(500).json({ error: 'Could not read that file. Please try again.' });
+  }
+  res.set({
+    'Content-Type': row.mime,
+    // A plain name. The person's own file name has no place in a header.
+    'Content-Disposition': `attachment; filename="record-${row.event_id}.${EXTENSION[row.mime]}"`,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+  });
+  res.send(bytes);
+});
+
+// DELETE /api/matters/:id: the owner only. The events and reminders are deleted with it.
 router.delete('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
   if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
