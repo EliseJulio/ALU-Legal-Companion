@@ -1,50 +1,19 @@
-import { useId } from 'react';
-import { RING, BUTTON_DISABLED } from '@/lib/ui';
-import { secureAddress } from '@/lib/url';
+import { CARD } from '@/lib/ui';
+import JoinCallLink from '@/components/JoinCallLink';
 
-// How a confirmed appointment happens. The server sends `meet_link` only for an accepted
-// booking. So this component does not decide when a room may be shown. It does handle the case
-// where the booking is accepted and the lawyer set up no room. Saying nothing there would leave
-// a confirmed appointment that nobody can attend.
-export default function MeetLink({ booking, className = '' }) {
-  const why = useId();
+// How a confirmed appointment happens. The server sends `meet_link` only for an accepted booking.
+// The page the link opens decides whether the call starts in the platform or falls back to that Meet link.
+// So this card never shows the Meet address itself. It shows a link to the join page.
+// anonCode is passed only by the booking check page.
+export default function MeetLink({ booking, anonCode, className = '' }) {
   if (!booking || booking.status !== 'accepted') return null;
 
-  // The server only saves a Google Meet address. The page checks again before it makes a link.
-  // A value such as javascript:... would run code when clicked. Anything that is not https is
-  // treated as no room.
-  const room = secureAddress(booking.meet_link);
-
-  if (!room) {
-    return (
-      <div className={`rounded border border-warning-border bg-warning-subtle p-4 ${className}`}>
-        <p className="font-medium text-warning-strong">No video room has been set up for this appointment yet.</p>
-        {/* Off, and still reachable by keyboard, so the reason below is heard with it. */}
-        <button type="button" aria-disabled="true" aria-describedby={why} className={`${BUTTON_DISABLED} mt-3`}>Join consultation</button>
-        <p id={why} className="mt-2 text-sm">
-          The time is confirmed but the lawyer has not added a meeting link. Check again shortly
-          before the appointment. If there is still nothing, use the contact details in the
-          directory.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className={`rounded border border-border bg-surface p-4 ${className}`}>
+    <div className={`${CARD} ${className}`}>
       <p className="text-xs font-medium text-muted-foreground">How to join</p>
-      <a
-        href={room}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`mt-2 inline-flex min-h-button items-center justify-center rounded bg-primary px-5 font-sans font-semibold text-primary-foreground ${RING}`}
-      >
-        <span>Join the video call<span aria-hidden="true">&nbsp;↗</span>{' '}<span className="sr-only">(opens in a new tab)</span></span>
-      </a>
-      {/* The full address is shown too. Someone joining from another device needs to copy it. */}
-      <p className="mt-3 break-all font-mono text-xs text-muted-foreground">{room}</p>
+      <JoinCallLink booking={booking} anonCode={anonCode} className="mt-2" />
       <p className="mt-3 text-sm text-muted-foreground">
-        You may wait in a waiting area until the lawyer lets you in. 
+        You may wait in a waiting area until the lawyer lets you in.
         That is on purpose. It keeps each consultation private.
       </p>
     </div>
