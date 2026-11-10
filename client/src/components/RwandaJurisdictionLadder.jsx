@@ -1,97 +1,35 @@
-import Icon from '@/components/Icon';
+import { useApi } from '@/lib/useApi';
+import { CARD } from '@/lib/ui';
 
-// Visualizes Rwanda's dispute resolution hierarchy for civil, tenancy and community matters.
-// Rooted in Law N° 37/2016 establishing the organisation, jurisdiction and competence of Abunzi committees.
-export default function RwandaJurisdictionLadder({ className = '' }) {
-  const tiers = [
-    {
-      level: '1',
-      title: 'Umudugudu (Village)',
-      tagline: 'Community Level',
-      description: 'First informal mediation by the Village Executive Committee. Best for quick neighborhood resolutions.',
-      icon: 'home',
-    },
-    {
-      level: '2',
-      title: 'Akagari (Cell Abunzi)',
-      tagline: 'Mandatory First Legal Stop',
-      description: 'Mandatory mediation for civil and property claims up to FRW 3,000,000 (Law N° 37/2016). Formal court cases can be dismissed if this is skipped.',
-      icon: 'balance',
-      highlight: true,
-    },
-    {
-      level: '3',
-      title: 'Umurenge (Sector Abunzi)',
-      tagline: 'Mediation Appeals',
-      description: 'Appeals against Cell Abunzi decisions must be filed here within 30 days of the ruling.',
-      icon: 'account_balance',
-    },
-    {
-      level: '4',
-      title: "Urukiko rw'Ibanze (Primary Court)",
-      tagline: 'Judicial Court of First Instance',
-      description: 'Hears formal lawsuits if Sector Abunzi mediation fails, or for claims exceeding FRW 3,000,000.',
-      icon: 'gavel',
-    },
-  ];
+// The dispute ladder, drawn from the steps an admin published. No step text is typed here. When
+// no step is published the component draws nothing, so an empty box never shows.
+// The parent decides when it appears: the office in the answer must be an Abunzi committee.
+// `defaultOpen` opens it at once. It is closed by default inside an answer.
+export default function RwandaJurisdictionLadder({ defaultOpen = false }) {
+  const { data: steps } = useApi('/directory/ladder');
+  if (!steps?.length) return null;
 
   return (
-    <section aria-labelledby="rwandan-ladder-heading" className={`rounded-card border border-border bg-surface p-6 ${className}`}>
-      <div className="flex items-center gap-3">
-        <Icon name="balance" className="text-2xl text-primary" />
-        <div>
-          <h2 id="rwandan-ladder-heading" className="font-head text-2xl text-primary">
-            Rwanda Dispute Ladder
-          </h2>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Urwego rw'Ubuhuza n'Inkiko · Law N° 37/2016
-          </p>
-        </div>
-      </div>
-
-      <p className="mt-3 text-sm text-muted-foreground">
-        In Rwanda, ordinary civil and tenancy disputes cannot jump straight to court. Follow the statutory progression below:
-      </p>
-
-      <ol className="mt-6 flex flex-col gap-4 [counter-reset:ladder]">
-        {tiers.map((tier) => (
-          <li
-            key={tier.level}
-            className={`relative rounded-card border p-4 transition-colors ${
-              tier.highlight
-                ? 'border-primary bg-primary-subtle'
-                : 'border-border bg-surface'
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-sans text-xs font-bold ${
-                  tier.highlight
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted-foreground/20 text-primary'
-                }`}
-              >
-                {tier.level}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <h3 className="font-head text-lg text-primary">{tier.title}</h3>
-                  <span className="text-xs font-semibold text-warning-strong">
-                    {tier.tagline}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm text-ink">{tier.description}</p>
-              </div>
+    <details open={defaultOpen} className={`group mt-6 ${CARD}`}>
+      <summary className="flex min-h-touch cursor-pointer list-none items-center justify-between gap-3 font-head text-[15px] leading-[1.3] text-ink">
+        <span>Dispute ladder</span>
+        <span className="text-sm font-semibold text-info group-open:hidden">Show the steps</span>
+        <span className="hidden text-sm font-semibold text-info group-open:inline">Hide the steps</span>
+      </summary>
+      <p className="mt-2 text-sm text-muted-foreground">Follow the steps in order.</p>
+      <ol className="mt-4 flex flex-col gap-3">
+        {steps.map((step) => (
+          <li key={step.id} className="flex gap-3 rounded-card bg-chrome-raised p-4">
+            <span aria-hidden="true" className="font-head text-[16px] text-muted-foreground">{step.position}</span>
+            <div className="min-w-0">
+              <h3 className="font-head text-[16px] leading-[1.3] text-ink">{step.title}</h3>
+              {step.tagline && <p className="mt-1 text-sm font-semibold text-muted-foreground">{step.tagline}</p>}
+              {step.description && <p className="mt-2 text-sm">{step.description}</p>}
+              {step.law_cited && <p className="mt-2 font-mono text-xs text-muted-foreground">{step.law_cited}</p>}
             </div>
           </li>
         ))}
       </ol>
-
-      <div className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
-        <p>
-          <strong className="text-primary">Important note:</strong> Disputes involving registered commercial companies or government bodies bypass Abunzi and proceed to the competent Commercial Court or MAJ.
-        </p>
-      </div>
-    </section>
+    </details>
   );
 }
