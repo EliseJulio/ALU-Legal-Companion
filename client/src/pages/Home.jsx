@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity } from '@/lib/auth';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
 import { DOMAINS } from '@/lib/directory';
 import OwnerOnly from '@/components/OwnerOnly';
@@ -33,10 +34,10 @@ function NoOpenMatters({ hasAny }) {
 // The student's home: what is open, what needs them and how their documents stand. Every figure is
 // worked out in lib/overview.js from the lists below, which the server already answers to the owner only.
 function HomeBoard({ user }) {
-  const matters = useApi('/matters');
-  const progress = useApi('/matters/progress');
-  const reminders = useApi('/matters/reminders');
-  const bookings = useApi('/bookings/mine');
+  const matters = useApi('/matters', LIVE);
+  const progress = useApi('/matters/progress', LIVE);
+  const reminders = useApi('/matters/reminders', LIVE);
+  const bookings = useApi('/bookings/mine', LIVE);
   const bookmarks = useApi('/bookmarks');
   const routes = useApi('/directory/routes');
 

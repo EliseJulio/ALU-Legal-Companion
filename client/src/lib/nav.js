@@ -20,6 +20,7 @@ export const PUBLIC_LINKS = [
 const MEMBER_LINKS = [
   { to: '/home', label: 'Home', icon: 'home', end: true, short: 'Home' },
   { to: '/matters', label: 'My matters', icon: 'folder', quick: true, short: 'Matters' },
+  { to: '/appointments', label: 'Appointments', icon: 'calendar_clock', short: 'Appointments' },
   { to: '/calendar', label: 'Calendar', icon: 'calendar_month', quick: true, short: 'Calendar' },
   { to: '/saved', label: 'Saved resources', icon: 'bookmark', quick: true, short: 'Saved' },
   { to: '/my-activity', label: 'My activity', icon: 'schedule' },

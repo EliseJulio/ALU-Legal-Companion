@@ -21,6 +21,12 @@ const ROLE_WORDS = { student: 'Student', staff: 'Staff', legal_expert: 'Legal ex
 function NameForm({ current }) {
   const { signIn } = useAuth();
   const [name, setName] = useState(current);
+  // The name can arrive from the server after the box is shown. The box then takes it.
+  const [seen, setSeen] = useState(current);
+  if (current !== seen) {
+    setSeen(current);
+    setName(current);
+  }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
@@ -245,7 +251,7 @@ export default function AccountSettings() {
       <div className="mt-8 grid gap-6 wide:grid-cols-12">
         <div className="min-w-0 wide:col-span-8">
           <div className={CARD}>
-            <NameForm current={user.name} />
+            <NameForm current={me?.name ?? user.name} />
             <EmailForm onRequested={refetch} />
             <PasswordForm />
           </div>

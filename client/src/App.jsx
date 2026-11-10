@@ -35,6 +35,7 @@ const MyMatters = lazyPage(() => import('@/pages/MyMatters'));
 const NewMatter = lazyPage(() => import('@/pages/NewMatter'));
 const MatterDetail = lazyPage(() => import('@/pages/MatterDetail'));
 const Calendar = lazyPage(() => import('@/pages/Calendar'));
+const Appointments = lazyPage(() => import('@/pages/Appointments'));
 const Directory = lazyPage(() => import('@/pages/Directory'));
 const ProviderDetail = lazyPage(() => import('@/pages/ProviderDetail'));
 const BookProvider = lazyPage(() => import('@/pages/BookProvider'));
@@ -139,7 +140,7 @@ export default function App() {
         <Route path="/matters/new" element={<NewMatter />} />
         <Route path="/matters/:id" element={<MatterDetail />} />
         <Route path="/calendar" element={<Calendar />} />
-        <Route path="/appointments" element={<AppointmentsRedirect />} />
+        <Route path="/appointments" element={<Appointments />} />
         <Route path="/directory" element={<Directory />} />
         <Route path="/directory/book/:id" element={<BookProvider />} />
         <Route path="/directory/booking-check" element={<CheckBooking />} />

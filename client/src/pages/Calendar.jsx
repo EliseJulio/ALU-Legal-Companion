@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity, hasRole } from '@/lib/auth';
 import { useNow } from '@/lib/useNow';
@@ -15,8 +16,8 @@ import { BUTTON_OUTLINE, PAGE_TITLE, CARD } from '@/lib/ui';
 // Both lists come from the server for this account only.
 // A list that fails is named. The other list still shows.
 function CalendarBoard() {
-  const bookings = useApi('/bookings/mine');
-  const matters = useApi('/matters');
+  const bookings = useApi('/bookings/mine', LIVE);
+  const matters = useApi('/matters', LIVE);
   const today = useNow();
 
   const items = useMemo(

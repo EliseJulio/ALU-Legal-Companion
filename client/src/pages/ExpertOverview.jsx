@@ -1,5 +1,6 @@
 import { useAuth } from '@/lib/AuthContext';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
 import FigureStrip from '@/components/overview/FigureStrip';
 import NeedsYou from '@/components/overview/NeedsYou';
@@ -12,9 +13,9 @@ import { readableSlot } from '@/lib/bookings';
 // The figures and rows say only anonymous or signed-in. They never show a name or an anonymous token.
 export default function ExpertOverview() {
   const { user } = useAuth();
-  const questions = useApi('/questions/open');
-  const bookings = useApi('/bookings/expert');
-  const shared = useApi('/matters/shared');
+  const questions = useApi('/questions/open', LIVE);
+  const bookings = useApi('/bookings/expert', LIVE);
+  const shared = useApi('/matters/shared', LIVE);
   const summary = useApi('/questions/summary');
 
   const now = useNow();

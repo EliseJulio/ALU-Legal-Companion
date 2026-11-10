@@ -18,7 +18,7 @@ createRoot(document.getElementById('root')).render(
   <ErrorBoundary>
     <StrictMode>
       <BrowserRouter>
-        <AuthProvider>
+        <AuthProvider syncSession>
           <App />
         </AuthProvider>
       </BrowserRouter>

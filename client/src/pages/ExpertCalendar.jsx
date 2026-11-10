@@ -5,6 +5,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import ScheduleCalendar from '@/components/ScheduleCalendar';
 import ExpertConsultRow from '@/components/ExpertConsultRow';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
 import { CONSULT_LEGEND, expertItems } from '@/lib/schedule';
 import { PAGE_TITLE } from '@/lib/ui';
@@ -14,7 +15,7 @@ import { PAGE_TITLE } from '@/lib/ui';
 // A lawyer owns no matters and questions have no date so neither is on this page.
 // The actions are on each row.
 export default function ExpertCalendar() {
-  const { data: bookings, error, loading, refetch } = useApi('/bookings/expert');
+  const { data: bookings, error, loading, refetch } = useApi('/bookings/expert', LIVE);
   const now = useNow();
 
   const items = useMemo(() => expertItems(bookings ?? [], now), [bookings, now]);

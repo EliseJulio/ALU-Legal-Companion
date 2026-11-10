@@ -4,6 +4,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import ScheduleCalendar from '@/components/ScheduleCalendar';
 import { ScheduleMark } from '@/components/ScheduleItem';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
 import { CONSULT_LEGEND, adminItems, longDay } from '@/lib/schedule';
 import { PAGE_TITLE } from '@/lib/ui';
@@ -32,7 +33,7 @@ function ViewOnlyRow({ item }) {
 // The rows come from GET /api/admin/bookings. It holds only the id and the slot and the status and the provider's name.
 // The calendar waits for the list so an empty month while it loads cannot read as no consultations.
 export default function AdminCalendar() {
-  const { data, error, loading } = useApi('/admin/bookings');
+  const { data, error, loading } = useApi('/admin/bookings', LIVE);
   const now = useNow();
   const items = useMemo(() => adminItems(data ?? [], now), [data, now]);
 

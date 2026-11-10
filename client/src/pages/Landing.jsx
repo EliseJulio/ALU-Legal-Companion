@@ -305,7 +305,7 @@ export default function Landing() {
               {urgent.map((c) => (
                 <li key={c.name}>
                   <a href={`tel:${c.contact.replace(/\s+/g, '')}`} className={`inline-flex min-h-touch min-w-touch items-center gap-2 ${RING_ON_WARNING}`}>
-                    {c.name}: <span className="font-mono text-base font-bold text-primary-text">{c.contact}</span>
+                    {c.name}: <span className="font-mono text-base font-bold text-alert-text">{c.contact}</span>
                   </a>
                 </li>
               ))}

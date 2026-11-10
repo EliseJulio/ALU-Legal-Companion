@@ -43,6 +43,15 @@ export function saveSession({ token, user }) {
   }
 }
 
+// Keeps a fresh copy of the user. The token stays as it is.
+export function saveUser(user) {
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(publicUser(user)));
+  } catch {
+    // Private mode. The copy lasts for this tab only.
+  }
+}
+
 export function readSession() {
   // The token decides. A stored user without a token is signed out.
   if (!getToken()) return null;

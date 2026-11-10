@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
 import { readableDay } from '@/lib/dates';
@@ -11,7 +12,7 @@ import { CARD, RING, PAGE_TITLE } from '@/lib/ui';
 // Matters that students and staff chose to share with the directory entry linked to this
 // account. The owner is never named here. Opening one shows the record and a box for a note.
 export default function ExpertMatters() {
-  const { data, error, loading } = useApi('/matters/shared');
+  const { data, error, loading } = useApi('/matters/shared', LIVE);
   // A reply that is not a list (for example an error body) is shown as no matters, not a crash.
   const matters = Array.isArray(data) ? data : null;
 
