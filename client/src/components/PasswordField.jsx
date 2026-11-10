@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FIELD, RING } from '@/lib/ui';
+import { FORM_FIELD, CHECKBOX, RING } from '@/lib/ui';
 
 // A password box with a "Show password" tick box under it. A tick box shows its state to the eye
 // and to a screen reader, and it never sends the form. The label is the same whether it is ticked
@@ -18,16 +18,16 @@ export default function PasswordField({
   const flip = () => (onShownChange ?? setOwn)(!visible);
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium">{label}</label>
+      <label htmlFor={id} className="block text-sm font-semibold">{label}</label>
       {hint && <p id={hintId} className="mt-1 text-sm text-muted-foreground">{hint}</p>}
       <input
         id={id}
         type={visible ? 'text' : 'password'}
-        aria-describedby={hintId}
         autoCapitalize="none"
         spellCheck={false}
-        className={FIELD}
+        className={FORM_FIELD}
         {...props}
+        aria-describedby={[hintId, props['aria-describedby']].filter(Boolean).join(' ') || undefined}
       />
       {toggle && (
         <label htmlFor={`${id}-show`} className="mt-1 flex min-h-touch cursor-pointer items-center gap-3 text-sm">
@@ -37,7 +37,7 @@ export default function PasswordField({
             checked={visible}
             aria-controls={controls ?? id}
             onChange={flip}
-            className={`h-5 w-5 shrink-0 accent-primary ${RING}`}
+            className={`${CHECKBOX} ${RING}`}
           />
           <span>{toggleLabel}</span>
         </label>
