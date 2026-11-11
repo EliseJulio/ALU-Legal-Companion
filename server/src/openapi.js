@@ -149,6 +149,7 @@ const schemas = {
     answer: text('The answer in plain text. Present only when answered is true.', { nullable: true }),
     sources: arrayOf(obj({ id: whole('The guide number.'), title: text('The guide title.') })),
     message: text('Why there is no answer. Present only when answered is false.', { nullable: true }),
+    reason: text('Which step stopped the answer: no_match (no guide found), not_covered (the guides do not hold it) or figure_check (the answer had a figure the guides lack). Present only when answered is false.', { nullable: true }),
   }, ['answered']),
 
   ServiceBlock: obj({

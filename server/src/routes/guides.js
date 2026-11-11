@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam } from '../middleware/validate.js';
 import { recordReview } from './reviewSteps.js';
 import { validateService } from '../services/guideService.js';
+import { leftoverNote } from '../services/guideNotes.js';
 import { DOMAINS, normalizeDomain } from '../services/domains.js';
 
 const router = Router();
@@ -173,6 +174,12 @@ router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res)
 
 // POST /api/guides/:id/publish : the admin publishes a draft directly.
 router.post('/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  // A note left for the editor must not go public. The guide stays a draft until it is removed.
+  const [draft] = await q(
+    `SELECT title, summary, situation, law_says, your_rights, steps, get_help, source_law
+       FROM guides WHERE id = $1 AND status <> 'published'`, [req.params.id]);
+  const note = draft ? leftoverNote(draft) : null;
+  if (note) return res.status(400).json({ error: note });
   const [row] = await q(
     `UPDATE guides SET status = 'published', verified_by = $1, verified_at = now(), updated_at = now()
       WHERE id = $2 AND status <> 'published' RETURNING id, status`,

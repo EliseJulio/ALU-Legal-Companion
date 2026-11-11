@@ -1,12 +1,14 @@
 import Icon from '@/components/Icon';
 import { secureAddress } from '@/lib/url';
+import { instrumentOf } from '@/lib/sourceKind';
 import { RING } from '@/lib/ui';
 
-// A callout that cites enacted law from the Official Gazette (Inyandiko y'Amategeko).
-// It links the guide's legal section to the statute.
+// A callout that cites the official source of a guide from the Official Gazette (Inyandiko y'Amategeko).
+// It links the guide's legal section to the text.
 export default function OfficialGazetteCallout({ sourceLaw, sourceUrl }) {
   if (!sourceLaw) return null;
   const lawLink = secureAddress(sourceUrl);
+  const { badge, note } = instrumentOf(sourceLaw);
 
   return (
     <aside aria-label="Official Rwandan statutory reference" className="mb-4 rounded-card bg-chrome-raised p-4 text-xs text-ink">
@@ -17,13 +19,13 @@ export default function OfficialGazetteCallout({ sourceLaw, sourceUrl }) {
           <span className="font-normal text-muted-foreground">· Inyandiko y'Amategeko</span>
         </div>
         <span className="rounded-control bg-primary-subtle px-2.5 py-0.5 font-mono text-xs font-medium text-primary-text">
-          Enacted statute
+          {badge}
         </span>
       </div>
       <div className="mt-2.5">
         <p className="font-mono text-xs font-semibold leading-relaxed text-ink">Statutory basis: {sourceLaw}</p>
         <p className="mt-1 text-muted-foreground">
-          Enacted by the Parliament of Rwanda. Codified and published under the authority of the Republic of Rwanda.
+          {note}
         </p>
         {lawLink && (
           <a
