@@ -3,13 +3,15 @@
 import { q } from '../db.js';
 
 // A guide must score at least this much to be used. Scores below it are matches on one common word.
-const MIN_RANK = 0.3;
+// A word in the title counts most and one in the opening counts next. That puts the guide a question
+// is about ahead of a long guide that only shares common words. The bar is set for that scale.
+const MIN_RANK = 0.8;
 // The most guides sent to the model for one question.
 const MAX_GUIDES = 3;
 // The most characters of one guide sent to the model.
-const MAX_EXCERPT_CHARS = 6000;
+const MAX_EXCERPT_CHARS = 12000;
 // The longest the model may take before the request is given up.
-const TIMEOUT_MS = 10000;
+const TIMEOUT_MS = 15000;
 const DEFAULT_DAILY_LIMIT = 200;
 const NOT_COVERED_NOTE = 'The guides do not cover this';
 
@@ -20,6 +22,7 @@ const SYSTEM_INSTRUCTION = [
   'Answer ONLY from the guide excerpts in the user message. Never use any other knowledge.',
   'Write plain English in at most 120 words.',
   'Never invent an article, law, number, fee, deadline or office. Use only what the excerpts state.',
+  'If the excerpts say that no such rule or duty exists, say that plainly. That is an answer.',
   `If the excerpts do not contain the answer, reply with exactly: ${NOT_COVERED_NOTE}.`,
   'Never give advice about a specific person\'s case.',
   'End by telling the person to use the Directory or to ask a legal expert for help with their own case.',
@@ -28,8 +31,14 @@ const SYSTEM_INSTRUCTION = [
 ].join(' ');
 
 // Thrown for every reason the answer cannot be given: no setup or the daily cap or a failed model call.
-// The route turns it into one message that gives nothing away.
-export class AskAiUnavailable extends Error {}
+// `kind` says what the reader may be told. 'quota' means the limit was reached and a retry later works.
+// 'busy' means the model is overloaded for the moment. Anything else gives nothing away.
+export class AskAiUnavailable extends Error {
+  constructor(message, kind = 'unavailable') {
+    super(message);
+    this.kind = kind;
+  }
+}
 
 // Reads the setup from the environment on each call, so a change in .env is seen after a restart.
 // GEMINI_API_BASE is the address the calls go to. It defaults to Google's own and is changed only
@@ -64,8 +73,9 @@ function reserveModelCall() {
 export async function findGuides(question) {
   const words = [...new Set((question.toLowerCase().match(/[a-z0-9]+/g) || []).filter((w) => w.length > 2))].slice(0, 30);
   if (words.length === 0) return [];
-  const doc = `to_tsvector('english', g.title || ' ' || g.situation || ' ' || g.law_says || ' '
-    || g.your_rights || ' ' || g.steps || ' ' || g.get_help)`;
+  const doc = `(setweight(to_tsvector('english', g.title), 'A')
+    || setweight(to_tsvector('english', g.situation), 'B')
+    || setweight(to_tsvector('english', g.law_says || ' ' || g.your_rights || ' ' || g.steps || ' ' || g.get_help), 'C'))`;
   const rows = await q(
     `SELECT g.id, g.title, g.situation, g.law_says, g.your_rights, g.steps, g.get_help,
             ts_rank_cd(${doc}, to_tsquery('english', $1)) AS rank
@@ -119,19 +129,32 @@ function stripLinks(text) {
 // One call to Gemini. The key is sent in a header, never in the address.
 async function callGemini(cfg, userText) {
   const url = `${cfg.base}/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`;
-  const body = {
-    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-    contents: [{ role: 'user', parts: [{ text: userText }] }],
-    // Thinking is off. Hidden thinking tokens would use up the answer budget and cut the answer short.
-    generationConfig: { temperature: 0.2, maxOutputTokens: 800, thinkingConfig: { thinkingBudget: 0 } },
-  };
-  const res = await fetch(url, {
+  const send = (withThinkingOff) => fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': cfg.apiKey },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+      contents: [{ role: 'user', parts: [{ text: userText }] }],
+      // Thinking is off where the model allows it. Hidden thinking tokens would use up the answer budget.
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 800,
+        ...(withThinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
+    }),
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
-  if (!res.ok) throw new AskAiUnavailable(`model answered ${res.status}`);
+  let res = await send(true);
+  // Some models refuse the thinking setting with a 400. The call is repeated once without it.
+  if (res.status === 400) res = await send(false);
+  if (!res.ok) {
+    // Google's reason is logged (never the key or the question) so a failure can be diagnosed.
+    let reason = '';
+    try { reason = String((await res.json())?.error?.message ?? '').slice(0, 200); } catch { /* no body */ }
+    console.error(`[ask-ai] model answered ${res.status}: ${reason}`);
+    const kind = res.status === 429 ? 'quota' : res.status >= 500 ? 'busy' : 'unavailable';
+    throw new AskAiUnavailable(`model answered ${res.status}`, kind);
+  }
   const data = await res.json();
   const parts = data?.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => (typeof p?.text === 'string' ? p.text : '')).join('').trim();
@@ -163,6 +186,14 @@ export function answerIsGrounded(answer, excerpts) {
     && known(LAW_NUMBER, (m) => m[1])(answer);
 }
 
+// A refusal says which step stopped the answer. The reason is one word. Nothing about the question is kept.
+// no_match: the search found no guide. not_covered: the model said the guides do not hold the answer.
+// figure_check: the answer held a number or a law the guides do not have, so it was dropped.
+function refused(reason) {
+  console.info('[ask-ai] refused:', reason);
+  return { answered: false, message: NOT_ANSWERED, reason };
+}
+
 // Answers a question from the published guides.
 // Returns { answered: false, message } when no guide matches or the model says the guides do not cover the question.
 // Returns { answered: true, answer, sources } otherwise.
@@ -171,9 +202,9 @@ export async function askAi(question) {
   if (!cfg.available) throw new AskAiUnavailable('not configured');
 
   const guides = await findGuides(question);
-  if (guides.length === 0) return { answered: false, message: NOT_ANSWERED };
+  if (guides.length === 0) return refused('no_match');
 
-  if (!reserveModelCall()) throw new AskAiUnavailable('daily limit reached');
+  if (!reserveModelCall()) throw new AskAiUnavailable('daily limit reached', 'quota');
 
   let answer;
   try {
@@ -182,11 +213,12 @@ export async function askAi(question) {
     if (err instanceof AskAiUnavailable) throw err;
     // Only the error's name is logged. Its message can carry upstream detail.
     console.error('[ask-ai] model call failed:', err?.name);
-    throw new AskAiUnavailable('model call failed');
+    // A call that ran out of time is a busy model. The reader may try again.
+    throw new AskAiUnavailable('model call failed', err?.name === 'TimeoutError' ? 'busy' : 'unavailable');
   }
 
-  if (answer.startsWith(NOT_COVERED_NOTE)) return { answered: false, message: NOT_ANSWERED };
-  if (!answerIsGrounded(answer, guides.map(excerptOf))) return { answered: false, message: NOT_ANSWERED };
+  if (answer.startsWith(NOT_COVERED_NOTE)) return refused('not_covered');
+  if (!answerIsGrounded(answer, guides.map(excerptOf))) return refused('figure_check');
   return {
     answered: true,
     answer,

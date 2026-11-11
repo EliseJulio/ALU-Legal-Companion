@@ -142,6 +142,23 @@ export default function BookProvider() {
     );
   }
 
+  // An office that takes no online bookings gets no form. The server refuses the request as well.
+  if (provider && provider.bookable === false) {
+    return (
+      <div>
+        <Breadcrumb trail={[{ label: 'Home', to: '/' }, { label: 'Directory', to: '/directory' }]} current="Request consultation" />
+        <h1 className={`mt-6 ${PAGE_TITLE}`}>This office does not take online bookings</h1>
+        <div className={`mt-4 ${CARD}`}>
+          <p className="text-sm">{provider.name} is contact-direct. See how to reach them, or choose a lawyer who takes bookings.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link to={`/directory/${providerId}`} className={BUTTON_PRIMARY}>See how to contact them</Link>
+            <Link to="/directory" className={BUTTON_OUTLINE}>Back to the directory</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Home', to: '/' }, { label: 'Directory', to: '/directory' }]} current="Request consultation" />

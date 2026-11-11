@@ -9,6 +9,7 @@ It brings together five things:
 - **Organisations** that solve legal problems such as Abunzi committees, labour inspectors and legal aid offices.
 - **Recommendations** that tell a person which body a matter must go to first with the steps and the deadline.
 - **Tracking and follow-ups** for a person's own matters with reminders before a deadline.
+- **Ask AI**, a small feature that answers a question in a few sentences using only the published guides. It stores nothing, names its source guides and refuses when no guide matches. It needs a Gemini API key (see Deployment).
 
 Capstone project by Elise Julio HAKIZIMANA, BSc Software Engineering, African Leadership University, Rwanda.
 
@@ -59,13 +60,13 @@ server/
     routes/       one file for each part of the API (auth, directory, guides, matters, documents, ...)
     services/     the rules: routing, reminders, anonymous code, document encryption, email, search
     middleware/   login and roles, rate limits, input checks
-    migrations/   26 numbered SQL files that build the 17 tables
+    migrations/   32 numbered SQL files that build the 20 tables
     openapi.js    the Swagger description of every route
   tests/          integration and unit tests against a real database
 client/
   src/
-    pages/        one file for each screen (41)
-    components/   parts used by many screens (34)
+    pages/        one file for each screen (56)
+    components/   parts used by many screens (over 80)
     lib/          the API caller, login state, dates and small helpers
   tests/          component tests and browser tests
 docs1/            API specification, database design, test plan and the technical report
@@ -175,6 +176,7 @@ Settings for the API on the host:
 - `REMINDERS`: leave empty to run the reminder check inside one server. If the host runs more than one copy of the server set it to `off` and run `npm run reminders` from a scheduled job once an hour. Otherwise reminders could be sent twice.
 - `NODE_ENV`: `production`. The server then refuses to start with no `CORS_ORIGINS` and never prints an email link in its log.
 - `DOCUMENT_KEY`: 64 hex characters that encrypt the documents people attach to a matter. With none, uploads answer 503. Keep a copy somewhere safe. If it is lost, every stored document is lost with it.
+- `GEMINI_API_KEY` and `GEMINI_MODEL`: optional. They switch on Ask AI. With either missing, Ask AI answers that it is not available and the rest of the site is unaffected. Use a model that accepts the request, for example `gemini-3.1-flash-lite`. `ASK_AI_DAILY_LIMIT` caps model calls a day (default 200).
 - `SEED_ADMIN_PASSWORD`, `SEED_EXPERT_PASSWORD` and `SEED_STUDENT_PASSWORD`: the passwords the seed gives the three demo accounts. Set your own before the first seed so the demo passwords never exist on a live database.
 
 First release checklist:
@@ -190,7 +192,7 @@ First release checklist:
 
 - [`docs1/ALU_Legal_Companion_Technical_Report.pdf`](docs1/ALU_Legal_Companion_Technical_Report.pdf): scope against the proposal, how it works, testing and code quality
 - [`docs1/API_SPEC.md`](docs1/API_SPEC.md): who may call each route and what it returns
-- [`docs1/ERD.md`](docs1/ERD.md): the 17 tables and the rules the database enforces itself
+- [`docs1/ERD.md`](docs1/ERD.md): the 20 tables and the rules the database enforces itself
 - [`docs1/TEST_PLAN.md`](docs1/TEST_PLAN.md): what is tested, what the tests found and what is not tested
 - [`server/README.md`](server/README.md): the API, its settings and the eight rules it enforces
 - [`client/README.md`](client/README.md): the website, its pages and its design rules

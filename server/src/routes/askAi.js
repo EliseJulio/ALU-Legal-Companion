@@ -7,6 +7,10 @@ import { askAi, config, AskAiUnavailable } from '../services/askAi.js';
 const router = Router();
 
 const UNAVAILABLE = 'Ask AI is not available right now.';
+const QUOTA = 'Ask AI has reached its limit for now. Please try again in a few minutes.';
+const BUSY = 'Ask AI is busy right now. Please try again in a moment.';
+// Seconds a person should wait after the limit was reached.
+const RETRY_AFTER = 120;
 const MIN_QUESTION = 5;
 const MAX_QUESTION = 500;
 
@@ -30,7 +34,13 @@ router.post('/', askAiLimiter, async (req, res, next) => {
     if (!config().available) return res.status(503).json({ error: UNAVAILABLE });
     return res.json(await askAi(question));
   } catch (err) {
-    if (err instanceof AskAiUnavailable) return res.status(503).json({ error: UNAVAILABLE });
+    if (err instanceof AskAiUnavailable) {
+      if (err.kind === 'quota') {
+        res.set('Retry-After', String(RETRY_AFTER));
+        return res.status(429).json({ error: QUOTA });
+      }
+      return res.status(503).json({ error: err.kind === 'busy' ? BUSY : UNAVAILABLE });
+    }
     return next(err);
   }
 });
