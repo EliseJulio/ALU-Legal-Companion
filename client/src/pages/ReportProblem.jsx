@@ -17,7 +17,8 @@ const MIN_MESSAGE = 10;
 const TAB_RING = 'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-focus has-[:focus-visible]:ring-offset-2';
 
 // Anyone can report a problem, with or without an account. The report never carries a user id.
-// "Where did you see it?" comes from the address (?about=guide:12) and is read only.
+// "Where did you see it?" is filled from the address (?about=guide:12) and then read only.
+// With no address or after Clear the reader types it. A typed place is sent as a page with that label.
 export default function ReportProblem() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -31,6 +32,8 @@ export default function ReportProblem() {
   // The place the report is about. It can be cleared if the reader meant something else.
   const [where, setWhere] = useState('');
   const [aboutCleared, setAboutCleared] = useState(false);
+  const [typed, setTyped] = useState('');
+  const filled = Boolean(about) && !aboutCleared;
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [errorCount, setErrorCount] = useState(0);
@@ -82,7 +85,11 @@ export default function ReportProblem() {
     setSending(true);
     try {
       const body = { type, message: message.trim(), reply_by: replyBy };
-      if (about && !aboutCleared) {
+      if (!filled && typed.trim()) {
+        body.about_kind = 'page';
+        body.about_label = typed.trim().slice(0, 200);
+      }
+      if (filled) {
         body.about_kind = about.kind;
         if (about.kind !== 'page') body.about_id = about.id;
         // Only the title is sent. The admin page adds the words "Guide:" and the rest itself.
@@ -147,14 +154,20 @@ export default function ReportProblem() {
               <label htmlFor="report-where" className="block text-sm font-semibold">Where did you see it?</label>
               <input
                 id="report-where"
-                readOnly
-                value={aboutCleared ? '' : where}
+                type="text"
+                readOnly={filled}
+                maxLength={200}
+                value={filled ? where : typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder={filled ? undefined : 'A guide, an office or a page'}
                 aria-describedby="report-where-hint"
                 className={FORM_FIELD}
               />
               <p id="report-where-hint" className="mt-1 text-sm text-muted-foreground">
-                Filled in from the page you came from. Clear it if it is about something else.
-                {where && !aboutCleared && (
+                {filled
+                  ? 'Filled in from the page you came from. Clear it if it is about something else.'
+                  : 'Optional. Say which guide or office or page it was about.'}
+                {where && filled && (
                   <button type="button" onClick={() => setAboutCleared(true)} className={`ml-2 inline-flex min-h-touch items-center font-semibold text-primary-text ${RING}`}>
                     Clear
                   </button>

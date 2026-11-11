@@ -1,12 +1,13 @@
 import { apiGet } from '@/lib/api';
 import { canOwnActivity, hasRole } from '@/lib/auth';
 import { readableDay } from '@/lib/dates';
+import { typeName } from '@/lib/reports';
 
 // The bell lists what the app already tells a person.
 // A student sees reminders and accepted appointments and answered questions and checked documents.
 // A legal expert sees requests and questions and files waiting for them.
 // No endpoint was added for it. Every item comes from a list the person can already read.
-// An admin has no list of this kind so the bell is empty for them.
+// An admin sees the reports nobody has opened yet. The bell names the kind of report and never its words.
 
 // Matters whose history is read for checked documents. More than this is slow for a bell.
 const MAX_MATTERS_CHECKED = 10;
@@ -44,6 +45,20 @@ export function saveReadIds(userId, ids) {
 
 // Each item has an id (stable so a read item stays read) and a title and a line of text.
 // It also has the page it opens and `at`. That is the time it happened when the server gives one.
+
+// Reports nobody has opened yet. A safety concern that is still open is shown first and says so.
+// The message of a report is private to the admin page so it is not put in the bell.
+export function reportItems(data) {
+  return (data?.reports ?? [])
+    .filter((r) => !r.read_at && r.status !== 'resolved')
+    .map((r) => ({
+      id: `report-${r.id}`,
+      title: r.type === 'safety' ? 'A safety report is waiting' : 'A report was sent',
+      text: typeName(r.type),
+      to: `/admin/reports?report=${r.id}`,
+      at: r.created_at ?? null,
+    }));
+}
 
 // A reminder that was sent or the next one that is waiting.
 export function reminderItems(rows) {
@@ -109,8 +124,8 @@ export function requestItems(rows) {
     .map((b) => ({
       id: `request-${b.id}`,
       title: 'A consultation was requested',
-      text: 'Open the calendar to accept or decline it.',
-      to: `/expert/calendar#consult-${b.id}`,
+      text: 'Open Appointments to accept or decline it.',
+      to: `/expert/appointments#consult-${b.id}`,
       at: b.created_at ?? null,
     }));
 }
@@ -180,9 +195,16 @@ function expertSources() {
 }
 
 // The sources for this role. A visitor has none. An admin has none.
+function adminSources() {
+  return [
+    () => apiGet('/admin/reports').then((data) => ({ items: reportItems(data), failed: false })),
+  ];
+}
+
 export function sourcesFor(who) {
   if (canOwnActivity(who)) return studentSources();
   if (hasRole(who, ['legal_expert'])) return expertSources();
+  if (hasRole(who, ['admin'])) return adminSources();
   return [];
 }
 

@@ -32,6 +32,7 @@ const MEMBER_LINKS = [
 const EXPERT_LINKS = [
   { to: '/expert', label: 'Overview', icon: 'dashboard', end: true, quick: true, short: 'Overview' },
   { to: '/expert/questions', label: 'Questions', icon: 'chat_bubble', end: true, quick: true, short: 'Questions' },
+  { to: '/expert/appointments', label: 'Appointments', icon: 'calendar_clock', short: 'Appointments' },
   { to: '/expert/calendar', label: 'Calendar', icon: 'calendar_month', quick: true, short: 'Calendar' },
   { to: '/expert/matters', label: 'Shared matters', icon: 'group', quick: true, short: 'Shared' },
 ];
@@ -39,6 +40,7 @@ const EXPERT_LINKS = [
 const ADMIN_LINKS = [
   { to: '/admin', label: 'Overview', icon: 'dashboard', end: true, quick: true, short: 'Overview' },
   { to: '/admin/calendar', label: 'Calendar', icon: 'calendar_month', short: 'Calendar' },
+  { to: '/admin/appointments', label: 'Appointments', icon: 'calendar_clock', short: 'Appointments' },
   { to: '/admin/guides', label: 'Guides', icon: 'menu_book', quick: true, short: 'Guides' },
   { to: '/admin/providers', label: 'Directory entries', icon: 'folder', quick: true, short: 'Directory' },
   { to: '/admin/routes', label: 'Routes', icon: 'route', quick: true, short: 'Routes' },

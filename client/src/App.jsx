@@ -66,6 +66,8 @@ const ExpertOverview = lazyPage(() => import('@/pages/ExpertOverview'));
 const ExpertQuestions = lazyPage(() => import('@/pages/ExpertQuestions'));
 const ExpertCalendar = lazyPage(() => import('@/pages/ExpertCalendar'));
 const AdminCalendar = lazyPage(() => import('@/pages/AdminCalendar'));
+const AdminAppointments = lazyPage(() => import('@/pages/AdminAppointments'));
+const ExpertAppointments = lazyPage(() => import('@/pages/ExpertAppointments'));
 const ExpertMatters = lazyPage(() => import('@/pages/ExpertMatters'));
 
 // The router does not reset the scroll position when the page changes. Without this a person
@@ -98,7 +100,7 @@ export default function App() {
         <Route path="/redeem-invite" element={<RedeemInvite />} />
         <Route path="/admin" element={<Admin><AdminDashboard /></Admin>} />
         <Route path="/admin/calendar" element={<Admin><AdminCalendar /></Admin>} />
-        <Route path="/admin/appointments" element={<AppointmentsRedirect to="/admin/calendar" />} />
+        <Route path="/admin/appointments" element={<Admin><AdminAppointments /></Admin>} />
         <Route path="/admin/guides" element={<Admin><AdminGuides /></Admin>} />
         <Route path="/admin/guides/new" element={<Admin><AdminGuideEditor /></Admin>} />
         <Route path="/admin/guides/:id" element={<Admin><AdminGuideEditor /></Admin>} />
@@ -122,8 +124,8 @@ export default function App() {
         <Route path="/expert" element={<Expert><ExpertOverview /></Expert>} />
         <Route path="/expert/questions" element={<Expert><ExpertQuestions /></Expert>} />
         <Route path="/expert/calendar" element={<Expert><ExpertCalendar /></Expert>} />
-        <Route path="/expert/appointments" element={<AppointmentsRedirect to="/expert/calendar" />} />
-        <Route path="/expert/bookings" element={<AppointmentsRedirect to="/expert/calendar" />} />
+        <Route path="/expert/appointments" element={<Expert><ExpertAppointments /></Expert>} />
+        <Route path="/expert/bookings" element={<AppointmentsRedirect to="/expert/appointments" />} />
         <Route path="/expert/matters" element={<Expert><ExpertMatters /></Expert>} />
         <Route path="/my-activity" element={<MyActivity />} />
         <Route path="/call/:id" element={<JoinCall />} />
