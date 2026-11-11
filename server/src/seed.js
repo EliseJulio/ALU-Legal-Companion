@@ -124,7 +124,7 @@ console.log(`✓ directory: ${ENTRIES.length} entries queued for the admin to pu
 
 // Where each kind of matter goes first. These also go in as drafts.
 const ROUTES = [
-  { matter_type: 'small_civil_claim', forum: 'Abunzi committee of your cell',
+  { matter_type: 'small_civil_claim', area: 'tenancy', forum: 'Abunzi committee of your cell',
     title: 'Someone owes me money, kept my deposit or broke an agreement (up to Frw 3,000,000)',
     keywords: 'deposit landlord rent tenant debt loan money owed broke agreement contract neighbour refund',
     legal_basis: 'Law No. 37/2016, Art. 10. The Ministry of Justice treats Abunzi mediation as a step before court.',
