@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { apiBlob, apiGet, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { LIVE } from '@/lib/live';
 import { REPORT_TYPES, REPORT_STATUSES, typeName, aboutText, shortDay } from '@/lib/reports';
 import Breadcrumb from '@/components/Breadcrumb';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -124,13 +125,15 @@ function Detail({ id, onSaved, onOpened }) {
 export default function AdminReports() {
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
-  const [selected, setSelected] = useState(null);
+  // A link from the bell can name the report: ?report=ID. That one is open when the page loads.
+  const [params] = useSearchParams();
+  const [selected, setSelected] = useState(() => Number(params.get('report')) || null);
   const [downloading, setDownloading] = useState(false);
   const [downloadNote, setDownloadNote] = useState('');
   const [downloadError, setDownloadError] = useState(null);
 
   const query = [status && `status=${status}`, type && `type=${type}`].filter(Boolean).join('&');
-  const { data, error, loading, refetch } = useApi(`/admin/reports${query ? `?${query}` : ''}`);
+  const { data, error, loading, refetch } = useApi(`/admin/reports${query ? `?${query}` : ''}`, LIVE);
   const counts = data?.counts;
 
   // The file is fetched with the login, because a plain link cannot send it. The filters are the

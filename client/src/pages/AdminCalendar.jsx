@@ -11,7 +11,7 @@ import { PAGE_TITLE } from '@/lib/ui';
 
 // One item for the admin. It names the provider and the state and nothing else.
 // There is no action and no requester and no topic on this page. The admin's rows do not carry those fields.
-function ViewOnlyRow({ item }) {
+export function ViewOnlyRow({ item }) {
   return (
     <div className="flex items-start gap-3">
       <div className="mt-1.5">
