@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { useOptionalUser } from '@/lib/AuthContext';
 import { secureAddress } from '@/lib/url';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
+import CallRoom from '@/components/CallRoom';
 import {
   BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, CARD, PAGE_TITLE, FORM_FIELD, RING, CHECKBOX,
 } from '@/lib/ui';
@@ -34,6 +35,7 @@ export default function JoinCall() {
   const { id } = useParams();
   const user = useOptionalUser();
   const location = useLocation();
+  const navigate = useNavigate();
   const passedCode = typeof location.state?.code === 'string' ? location.state.code : '';
 
   const [typedCode, setTypedCode] = useState('');
@@ -70,11 +72,13 @@ export default function JoinCall() {
       <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Join your consultation" />
       <h1 className={`mt-6 ${PAGE_TITLE}`}>Join your consultation</h1>
 
-      <div className={`mt-4 max-w-reading ${CARD}`}>
-        <p>The call starts only when you press Join. Nothing is recorded. The room name is random and used once.</p>
-      </div>
+      {reply?.provider !== 'own' && (
+        <div className={`mt-4 max-w-reading ${CARD}`}>
+          <p>The call starts only when you press Join. Nothing is recorded. The room name is random and used once.</p>
+        </div>
+      )}
 
-      {!user && !passedCode && (
+      {!user && !passedCode && reply?.provider !== 'own' && (
         <div className="mt-6 max-w-form">
           <label htmlFor="join-code" className="block text-sm font-semibold">Your booking code</label>
           <input
@@ -143,6 +147,16 @@ export default function JoinCall() {
         )}
       </div>
 
+      {reply?.provider === 'own' && (
+        <CallRoom
+          key={reply.ticket}
+          reply={reply}
+          audioOnly={audioOnly}
+          onLeft={() => navigate(leaveTo)}
+          onRetry={() => setReply(null)}
+        />
+      )}
+
       {reply?.provider === 'daily' && frame && (
         <section className="mt-4" aria-label="Video consultation">
           <p className="max-w-reading text-sm font-semibold text-ink">
@@ -159,9 +173,11 @@ export default function JoinCall() {
         </section>
       )}
 
-      <p className="mt-6 text-sm">
-        <Link to={leaveTo} className={`${BUTTON_OUTLINE}`}>Leave the call</Link>
-      </p>
+      {reply?.provider !== 'own' && (
+        <p className="mt-6 text-sm">
+          <Link to={leaveTo} className={`${BUTTON_OUTLINE}`}>Leave the call</Link>
+        </p>
+      )}
     </div>
   );
 }

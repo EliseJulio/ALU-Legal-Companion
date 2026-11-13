@@ -1,0 +1,106 @@
+# Render Blueprint: the database, the API server and the website.
+# Values marked "sync: false" are asked for in the Render dashboard. None of them are kept here.
+
+# The database was made by hand in the Render dashboard, so it is not created here.
+
+services:
+  # The API. Always on, because it checks for due reminders once an hour from inside the server.
+  - type: web
+    name: alu-legal-api
+    runtime: node
+    region: frankfurt
+    plan: starter
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    preDeployCommand: npm run migrate
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Paste the "Internal Database URL" from the database's Info page.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TRUST_PROXY
+        value: "1"
+      # The website address, for example https://alu-legal-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
+      # The same website address. Email links are built from it.
+      - key: APP_URL
+        sync: false
+      # 64 hex characters. Make one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - key: DOCUMENT_KEY
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # Passwords for the accounts that "npm run seed" creates. Use strong ones.
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_EXPERT_PASSWORD
+        sync: false
+      - key: SEED_STUDENT_PASSWORD
+        sync: false
+      # Calls held inside the platform. With the first two empty the call uses Daily or Meet.
+      # The secret is 32 or more characters and is the same one set on the signaling Worker.
+      - key: CALL_TICKET_SECRET
+        sync: false
+      # The Worker address starting with wss://
+      - key: CALL_SIGNAL_URL
+        sync: false
+      # Cloudflare TURN key. Without them the call uses the free STUN address only.
+      - key: CALL_TURN_KEY_ID
+        sync: false
+      - key: CALL_TURN_API_TOKEN
+        sync: false
+
+  # The website. Every path goes to index.html so a refresh on /directory still works.
+  - type: web
+    name: alu-legal-web
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    # Security headers for every page. The page holds the sign-in token, so these matter.
+    # Script: the one inline script in client/index.html (the theme, set before first paint) is
+    # allowed by its hash. If that script changes, recompute the hash. The test
+    # client/tests/lib/securityHeaders.test.js fails until this value matches.
+    # Style: 'self' only. React sets style="" through the browser's style object, which a CSP
+    # does not block, and there is no <style> tag or style="" in the built HTML.
+    # connect-src: the API address, which must match VITE_API_URL below (without /api). If the
+    # API moves to another address, change it here too or every API call is blocked.
+    # frame-src: the Google map that the Show map button opens (client/src/components/MapCard.jsx),
+    # and the video call frame from daily.co (client/src/pages/JoinCall.jsx).
+    # connect-src also allows daily.co for the call's own connections and the signaling Worker
+    # for calls held inside the platform. It must match CALL_SIGNAL_URL on the API.
+    # Permissions-Policy allows the camera and microphone only for this site and for the one Daily
+    # account. Permissions-Policy takes exact addresses and not wildcards, so replace
+    # alulegalcompanion with the DAILY_DOMAIN value. Location stays off.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'sha256-RuUEG607e5s/uxYD1Fy4bak+b/zDGkFWmQW/EjaK1aU='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://alu-legal-companion.onrender.com https://*.daily.co wss://*.daily.co wss://alu-call-signaling.j-hakiziman1.workers.dev; frame-src https://www.google.com https://*.daily.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(self "https://alulegalcompanion.daily.co"), microphone=(self "https://alulegalcompanion.daily.co"), geolocation=()
+    envVars:
+      # The API address ending in /api, for example https://alu-legal-companion.onrender.com/api (the CSP connect-src above must name the same site)
+      - key: VITE_API_URL
+        sync: false

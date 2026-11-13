@@ -10,6 +10,7 @@ import { newSubmitLimiter, newTokenLookupLimiter } from '../middleware/rateLimit
 import { makeAnonToken, normalizeAnonToken, hashAnonToken } from '../services/anonToken.js';
 import { bookingAccepted } from '../services/notify.js';
 import { dailyAvailable, roomsPerDay, createRoom, createToken, roomUrl } from '../services/dailyRooms.js';
+import { callConfigured, roomNameFor, signTicket, signalUrl, iceServers } from '../services/callTickets.js';
 
 const router = Router();
 
@@ -247,6 +248,21 @@ router.post('/:id/join', joinLimiter, optionalAuth, requireIntParam('id'), async
   // A request that is not accepted has no call. Its Meet link is never sent.
   if (row.status !== 'accepted') {
     return res.status(409).json({ error: 'This consultation has not been accepted yet, so there is no call to join.' });
+  }
+
+  // A call held inside the platform comes first. The lawyer is the host and everyone else is a guest.
+  if (callConfigured()) {
+    const ownRoom = roomNameFor(row.id);
+    const role = expert ? 'host' : 'guest';
+    return res.json({
+      provider: 'own',
+      room: ownRoom,
+      role,
+      ticket: signTicket({ room: ownRoom, role, audio: audioOnly }),
+      signal_url: `${signalUrl()}/room/${ownRoom}`,
+      ice_servers: await iceServers(),
+      audioOnlyAllowed: true,
+    });
   }
 
   const room = dailyAvailable() ? await claimRoom(row.id) : { reason: 'daily_unavailable' };

@@ -315,7 +315,12 @@ const schemas = {
     anon_token: text('Shown once. It cannot be recovered.'), warning: text('A reminder to save the token.'),
   }),
   JoinReply: obj({
-    provider: oneOf(['daily', 'meet', 'none'], 'daily: join inside the platform. meet: open the Google Meet link. none: no call is set up.'),
+    provider: oneOf(['own', 'daily', 'meet', 'none'], 'own: a call held inside the platform. daily: join a Daily room. meet: open the Google Meet link. none: no call is set up.'),
+    room: text('Only for own. The private room name.', { nullable: true }),
+    role: oneOf(['host', 'guest'], 'Only for own. The lawyer is the host and everyone else is a guest.'),
+    ticket: text('Only for own. A signed ticket for one room and one role. It holds no name or email.', { nullable: true }),
+    signal_url: text('Only for own. The secure WebSocket address of the signaling service for this room.', { nullable: true }),
+    ice_servers: { type: 'array', description: 'Only for own. The STUN and relay servers the browser uses to find a route. The relay credentials last four hours.', items: { type: 'object' } },
     url: text('The room address (daily) or the Meet link (meet).', { nullable: true }),
     token: text('Only for daily. The person\'s own token for the room.', { nullable: true }),
     audioOnlyAllowed: flag('Only for daily. Always true.'),
