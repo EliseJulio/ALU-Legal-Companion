@@ -23,4 +23,3 @@ __pycache__/
 # Encrypted documents people attach to their matters
 server/uploads/
 
-render.yaml

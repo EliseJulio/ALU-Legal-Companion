@@ -1,0 +1,17 @@
+name = "alu-call-signaling"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[durable_objects.bindings]]
+name = "CALL_ROOM"
+class_name = "CallRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CallRoom"]
+
+[vars]
+# The site origins allowed to open a call, comma separated.
+ALLOWED_ORIGINS = "https://alu-legal-companion-qu8w.onrender.com"
+
+# CALL_TICKET_SECRET is set with: wrangler secret put CALL_TICKET_SECRET
