@@ -116,6 +116,8 @@ export class CallRoom {
         return this.send(this.otherRole(meta.role), { type: 'signal', data: d });
       }
       case 'bye':
+        // A deliberate leave ends the admission. A dropped connection keeps it.
+        if (meta.role && this.slots[meta.role] === ws) this.admitted = false;
         this.leave(ws, meta);
         return ws.close(1000, 'bye');
       default:

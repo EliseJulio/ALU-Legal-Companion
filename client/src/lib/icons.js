@@ -4,7 +4,7 @@
 import {
   Bell, BadgeCheck, Bookmark, BookOpen, Briefcase, Calendar, CalendarClock, Car, Check, ChartColumn, Download, Flag, Inbox,
   ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, Ellipsis, Globe, House, Landmark, ListChecks, LogIn,
-  LogOut, Lock, Mail, MapPin, Menu, MessageSquare, Mic, MicOff, Monitor, Moon,
+  LogOut, Lock, Mail, MapPin, Menu, Maximize, MessageSquare, Mic, MicOff, Minimize, Monitor, Moon, SwitchCamera,
   Phone, PhoneOff, Route, Scale, Search, Shield, Sparkles, Store, Sun, TriangleAlert, User, Users, Video, VideoOff, X,
 } from 'lucide-react';
 
@@ -60,4 +60,7 @@ export const ICONS = {
   videocam: Video,
   videocam_off: VideoOff,
   call_end: PhoneOff,
+  fullscreen: Maximize,
+  fullscreen_exit: Minimize,
+  switch_camera: SwitchCamera,
 };

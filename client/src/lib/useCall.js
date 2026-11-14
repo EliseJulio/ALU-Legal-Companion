@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { callReducer, initialCall } from '@/lib/callState';
 import { openSignal } from '@/lib/callSignal';
+import { cameraSends, nextCamera } from '@/lib/callMedia';
 
 const RETRY_MS = [1000, 2000, 4000, 8000];
 const DROP_GRACE_MS = 4000;
@@ -53,7 +54,7 @@ function mediaErrorKind(err) {
   return 'media';
 }
 
-export function useCall({ reply, audioOnly }) {
+export function useCall({ reply, audioOnly, startMuted }) {
   const polite = reply.role === 'guest';
   const [state, dispatch] = useReducer(callReducer, reply.role, initialCall);
   const [local, setLocal] = useState(null);
@@ -61,6 +62,8 @@ export function useCall({ reply, audioOnly }) {
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(!audioOnly);
   const [notice, setNotice] = useState(null);
+  const [canFlip, setCanFlip] = useState(false);
+  const [facing, setFacing] = useState('user');
   const ref = useRef(null);
   if (ref.current === null) {
     ref.current = {
@@ -73,8 +76,16 @@ export function useCall({ reply, audioOnly }) {
   const sendSignal = useCallback((data) => c.link?.send({ type: 'signal', data }), [c]);
   const sendPeerState = useCallback(() => {
     const track = c.stream?.getAudioTracks()[0];
-    sendSignal({ peerState: { mic: track ? track.enabled : false, cam: Boolean(c.video && c.video.readyState === 'live') } });
+    sendSignal({ peerState: { mic: track ? track.enabled : false, cam: cameraSends(c.video) } });
   }, [c, sendSignal]);
+
+  // A camera that is open but sends no frames is told to you and to the other person.
+  const watchCamera = useCallback((track) => {
+    if (!track) return;
+    track.onmute = () => { setNotice('camera-stalled'); sendPeerState(); };
+    track.onunmute = () => { setNotice((n) => (n === 'camera-stalled' ? null : n)); sendPeerState(); };
+    if (track.muted) track.onmute();
+  }, [sendPeerState]);
 
   const closeMedia = useCallback(() => {
     clearTimeout(c.dropTimer);
@@ -112,12 +123,15 @@ export function useCall({ reply, audioOnly }) {
         if (data.candidate) await pc.addIceCandidate(data.candidate);
       } else if (data.peerState) {
         dispatch({ type: 'peer-state', mic: data.peerState.mic, cam: data.peerState.cam });
+      } else if (data.ended && polite) {
+        closeMedia();
+        dispatch({ type: 'host-ended' });
       }
     } catch (err) {
-      // A candidate for an ignored offer is expected to fail. Other errors show in the connection state.
+      // Candidates for an ignored offer fail as expected. Real problems show as a lost connection.
       if (!c.ignore) console.warn('[call] a setup message was not applied:', err?.name);
     }
-  }, [c, polite, sendSignal]);
+  }, [c, closeMedia, polite, sendSignal]);
 
   const startSession = useCallback(async () => {
     const mine = c.session + 1;
@@ -134,8 +148,11 @@ export function useCall({ reply, audioOnly }) {
     setNotice(media.noCamera ? 'no-camera' : null);
     c.stream = media.stream;
     c.video = media.stream.getVideoTracks()[0] || null;
+    watchCamera(c.video);
+    setFacing(c.video?.getSettings?.().facingMode || 'user');
     setLocal(media.stream);
-    setMic(true);
+    media.stream.getAudioTracks().forEach((t) => { t.enabled = !startMuted; });
+    setMic(!startMuted);
     setCam(Boolean(c.video));
 
     const pc = new RTCPeerConnection({ iceServers: reply.ice_servers });
@@ -180,7 +197,7 @@ export function useCall({ reply, audioOnly }) {
     };
 
     for (const queued of c.queue.splice(0)) await handleSignal(queued);
-  }, [c, audioOnly, closeMedia, handleSignal, polite, reply.ice_servers, sendPeerState, sendSignal]);
+  }, [c, audioOnly, closeMedia, handleSignal, polite, reply.ice_servers, sendPeerState, sendSignal, startMuted, watchCamera]);
 
   // The link to the signaling service. A dropped link is retried while the call goes on.
   useEffect(() => {
@@ -266,6 +283,7 @@ export function useCall({ reply, audioOnly }) {
       c.video = null;
       await c.videoSender.replaceTrack(null);
       setCam(false);
+      setNotice((n) => (n === 'camera-stalled' ? null : n));
       sendPeerState();
       return;
     }
@@ -273,6 +291,7 @@ export function useCall({ reply, audioOnly }) {
       const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
       const track = fresh.getVideoTracks()[0];
       c.video = track;
+      watchCamera(track);
       c.stream.addTrack(track);
       await c.videoSender.replaceTrack(track);
       setCam(true);
@@ -281,15 +300,74 @@ export function useCall({ reply, audioOnly }) {
     } catch (err) {
       setNotice(err?.name === 'NotAllowedError' ? 'camera-blocked' : 'no-camera');
     }
-  }, [c, sendPeerState]);
+  }, [c, sendPeerState, watchCamera]);
+
+  // Whether this device has a second camera to flip to. The list is only complete once the
+  // camera has been allowed, so it is checked again when the call starts.
+  useEffect(() => {
+    const devices = navigator.mediaDevices;
+    if (!devices?.enumerateDevices) return undefined;
+    let alive = true;
+    const check = () => devices.enumerateDevices()
+      .then((list) => { if (alive) setCanFlip(nextCamera(list, null) !== null); })
+      .catch(() => {});
+    check();
+    devices.addEventListener?.('devicechange', check);
+    return () => {
+      alive = false;
+      devices.removeEventListener?.('devicechange', check);
+    };
+  }, [local]);
+
+  // Flips to the next camera. The old one stops first since a phone cannot run two.
+  // If the new one fails the old one opens again.
+  const switchCamera = useCallback(async () => {
+    if (!c.videoSender || !c.stream || !c.video || c.flipping) return;
+    c.flipping = true;
+    try {
+      const old = c.video;
+      const oldId = old.getSettings().deviceId;
+      const nextId = nextCamera(await navigator.mediaDevices.enumerateDevices(), oldId);
+      if (!nextId) return;
+      c.stream.removeTrack(old);
+      old.stop();
+      const open = async (id) => {
+        try {
+          const got = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: id } } });
+          return got.getVideoTracks()[0] || null;
+        } catch {
+          return null;
+        }
+      };
+      const track = (await open(nextId)) || (await open(oldId));
+      if (!track) {
+        c.video = null;
+        await c.videoSender.replaceTrack(null);
+        setCam(false);
+        setNotice('no-camera');
+        sendPeerState();
+        return;
+      }
+      c.video = track;
+      watchCamera(track);
+      c.stream.addTrack(track);
+      await c.videoSender.replaceTrack(track);
+      setFacing(track.getSettings().facingMode || 'user');
+      setNotice(track.getSettings().deviceId === nextId ? null : 'flip-failed');
+      sendPeerState();
+    } finally {
+      c.flipping = false;
+    }
+  }, [c, sendPeerState, watchCamera]);
 
   const leave = useCallback(() => {
     c.left = true;
     clearTimeout(c.retryTimer);
+    if (!polite) c.link?.send({ type: 'signal', data: { ended: true } });
     c.link?.leave();
     closeMedia();
     dispatch({ type: 'leave' });
-  }, [c, closeMedia]);
+  }, [c, closeMedia, polite]);
 
-  return { state, local, remote, mic, cam, notice, admit, deny, toggleMic, toggleCam, leave };
+  return { state, local, remote, mic, cam, notice, canFlip, facing, admit, deny, toggleMic, toggleCam, switchCamera, leave };
 }
