@@ -45,6 +45,7 @@ const Search = lazyPage(() => import('@/pages/Search'));
 const ReportProblem = lazyPage(() => import('@/pages/ReportProblem'));
 const ReportSent = lazyPage(() => import('@/pages/ReportSent'));
 const ReportCheck = lazyPage(() => import('@/pages/ReportCheck'));
+const Privacy = lazyPage(() => import('@/pages/Privacy'));
 const NotFound = lazyPage(() => import('@/pages/NotFound'));
 const AdminDashboard = lazyPage(() => import('@/pages/AdminDashboard'));
 const AdminGuides = lazyPage(() => import('@/pages/AdminGuides'));
@@ -153,6 +154,7 @@ export default function App() {
         <Route path="/report" element={<ReportProblem />} />
         <Route path="/report/sent" element={<ReportSent />} />
         <Route path="/report/check" element={<ReportCheck />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/emergency" element={<Emergency />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
