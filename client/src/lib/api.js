@@ -60,7 +60,7 @@ export class ApiError extends Error {
 // `anonymous: true` leaves the login out of the request. An anonymous page must say so itself.
 // The server would ignore the login on those routes. Still the page should never send a
 // credential that an anonymous request does not need.
-async function request(method, path, body, { anonymous = false, raw = false, form = false } = {}) {
+async function request(method, path, body, { anonymous = false, raw = false, form = false, keepLogin = false } = {}) {
   const headers = { Accept: 'application/json' };
   // `raw` sends a file as the body itself. That is how a matter document is uploaded.
   // `form` sends a FormData. The browser writes the Content-Type itself, with the boundary.
@@ -100,7 +100,8 @@ async function request(method, path, body, { anonymous = false, raw = false, for
   // 401 means the login is gone or not valid so it is dropped and the next request is made as
   // a visitor. 403 means the login is fine and the role is wrong. It must be kept. Clearing it
   // would sign an admin out for opening one page.
-  if (res.status === 401) {
+  // `keepLogin` is for a request where 401 means a wrong password and the login is still good.
+  if (res.status === 401 && !keepLogin) {
     clearToken();
     announceSessionExpired();
   }
@@ -116,7 +117,8 @@ async function request(method, path, body, { anonymous = false, raw = false, for
 export const apiGet = (path, options) => request('GET', path, undefined, options);
 export const apiPost = (path, body = {}, options) => request('POST', path, body, options);
 export const apiPut = (path, body = {}) => request('PUT', path, body);
-export const apiDelete = (path) => request('DELETE', path);
+// A body is optional. Deleting an account sends the password in it.
+export const apiDelete = (path, body, options) => request('DELETE', path, body, options);
 export const apiUpload = (path, file) => request('POST', path, file, { raw: true });
 export const apiPostForm = (path, formData) => request('POST', path, formData, { form: true });
 

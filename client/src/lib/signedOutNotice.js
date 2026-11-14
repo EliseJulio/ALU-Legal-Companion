@@ -29,3 +29,30 @@ export function clearSignedOutOffline() {
     /* Nothing to clear. */
   }
 }
+
+// An account that was just deleted. The landing page confirms it once, the same way.
+const DELETED_KEY = 'alc.account-deleted';
+
+export function rememberAccountDeleted() {
+  try {
+    sessionStorage.setItem(DELETED_KEY, '1');
+  } catch {
+    /* Storage is blocked. The notice is not shown. */
+  }
+}
+
+export function readAccountDeleted() {
+  try {
+    return sessionStorage.getItem(DELETED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function clearAccountDeleted() {
+  try {
+    sessionStorage.removeItem(DELETED_KEY);
+  } catch {
+    /* Nothing to clear. */
+  }
+}

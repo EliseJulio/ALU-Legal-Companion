@@ -36,6 +36,13 @@ export function AuthProvider({ children, syncSession = false }) {
     return reached;
   }, []);
 
+  // Ends the session in this browser only. It is for an account that no longer exists on the server,
+  // so there is no session there to end and no request is made.
+  const forgetSession = useCallback(() => {
+    clearSession();
+    setUser(null);
+  }, []);
+
   // A session can also end without anyone choosing it. The token lasts 7 days and the server
   // may refuse it. api.js drops the token and announces it. This is where the screen catches up.
   useEffect(() => onSessionExpired(() => setUser(null)), []);
@@ -62,7 +69,7 @@ export function AuthProvider({ children, syncSession = false }) {
     return () => { cancelled = true; };
   }, [syncSession, userId, tick]);
 
-  const value = useMemo(() => ({ user, signIn, signOut }), [user, signIn, signOut]);
+  const value = useMemo(() => ({ user, signIn, signOut, forgetSession }), [user, signIn, signOut, forgetSession]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
