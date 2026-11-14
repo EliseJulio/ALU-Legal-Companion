@@ -68,6 +68,7 @@ draft  --publish (admin)-->  published
 | `POST /auth/logout` | signed in | | 204. Ends every session of the account |
 | `GET /auth/me` | signed in | | `{ id, name, email, role, email_verified_at, created_at }` |
 | `PUT /auth/me` | signed in | `name` | `{ token, user }`. Only the name is read |
+| `DELETE /auth/me` | student or staff | `password`, `confirm: true` | `{ ok: true }`. Erases the account (Law 058/2021 Art. 23): matters with their stored files, saved guides, sign-in tokens and own questions are deleted; a booking stays for the provider with `user_id` and `topic` cleared. 400 no password or no confirm, 401 wrong password, 403 for a lawyer or admin (ask an admin), 500 if a file could not be removed (nothing is erased, retry). The old token then gets 401 |
 | `POST /auth/change-password` | signed in | `current_password`, `new_password` | `{ token, user }`. 400 for a wrong current password. Ends the other sessions |
 | `POST /auth/forgot-password` | anyone | `email` | The same `{ message }` for every address |
 | `POST /auth/reset-password` | anyone | `token`, `password` | `{ token, user }`. Ends every older session |

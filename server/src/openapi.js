@@ -496,6 +496,12 @@ const OPS = [
     desc: 'Only the name is read. A role or an email in the body changes nothing.',
     roles: ANYONE_SIGNED_IN, body: obj({ name: text('1 to 100 characters.') }, ['name']), reply: [200, 'Saved. A fresh token comes with it.', ref('Session')], errors: [400],
   }),
+  op('delete', '/auth/me', 'Accounts', 'Erase my account', {
+    desc: 'Students and staff only. Deletes the account, its matters with their stored files, saved guides, sign-in tokens and questions. A booking stays for the provider with no link to the person and no topic. Lawyers and admins get 403 and ask an admin. 401 for a wrong password.',
+    roles: OWNERS, limited: true, errors: [400, 401, 403, 500],
+    body: obj({ password: text('The password now.'), confirm: flag('Must be true.') }, ['password', 'confirm']),
+    reply: [200, 'Erased. The old token stops working.', obj({ ok: flag('Always true.') })],
+  }),
   op('post', '/auth/logout', 'Accounts', 'Sign out everywhere', {
     desc: 'Ends every session the account has.', roles: ANYONE_SIGNED_IN, reply: [204, 'Signed out.'],
   }),
