@@ -6,6 +6,7 @@ import { secureAddress } from '@/lib/url';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import CallRoom from '@/components/CallRoom';
+import JoinPreview from '@/components/JoinPreview';
 import {
   BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, CARD, PAGE_TITLE, FORM_FIELD, RING, CHECKBOX,
 } from '@/lib/ui';
@@ -40,6 +41,7 @@ export default function JoinCall() {
 
   const [typedCode, setTypedCode] = useState('');
   const [audioOnly, setAudioOnly] = useState(false);
+  const [startMuted, setStartMuted] = useState(false);
   const [reply, setReply] = useState(null);
   const [error, setError] = useState(null);
   const [joining, setJoining] = useState(false);
@@ -69,8 +71,8 @@ export default function JoinCall() {
 
   return (
     <div>
-      <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Join your consultation" />
-      <h1 className={`mt-6 ${PAGE_TITLE}`}>Join your consultation</h1>
+      {reply?.provider !== 'own' && <Breadcrumb trail={[{ label: 'Home', to: '/' }]} current="Join your consultation" />}
+      <h1 className={reply?.provider === 'own' ? 'sr-only' : `mt-6 ${PAGE_TITLE}`}>Join your consultation</h1>
 
       {reply?.provider !== 'own' && (
         <div className={`mt-4 max-w-reading ${CARD}`}>
@@ -97,26 +99,30 @@ export default function JoinCall() {
       )}
 
       {!reply && (
-        <div className="mt-6 max-w-form space-y-4">
-          <p className="text-sm text-muted-foreground">{connectionLine()}</p>
-          <label className={`flex min-h-touch cursor-pointer items-center gap-3 rounded-control font-semibold text-ink ${RING}`}>
-            <input
-              type="checkbox"
-              role="switch"
-              checked={audioOnly}
-              onChange={(e) => setAudioOnly(e.target.checked)}
-              className={`${CHECKBOX} ${RING}`}
-            />
-            <span>Audio only (uses less data)</span>
-          </label>
-          <button
-            type="button"
-            onClick={join}
-            aria-disabled={joining || undefined}
-            className={`w-full sm:w-auto ${joining ? BUTTON_DISABLED : BUTTON_LG_PRIMARY}`}
-          >
-            {joining ? 'Joining…' : 'Join the call'}
-          </button>
+        // The preview sits beside the Join controls on a wide screen and above them on a phone.
+        <div className="mt-6 grid gap-6 md:grid-cols-2 md:items-start">
+          <JoinPreview audioOnly={audioOnly} onAudioOnly={setAudioOnly} startMuted={startMuted} onStartMuted={setStartMuted} />
+          <div className="max-w-form space-y-4">
+            <p className="text-sm text-muted-foreground">{connectionLine()}</p>
+            <label className={`flex min-h-touch cursor-pointer items-center gap-3 rounded-control font-semibold text-ink ${RING}`}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={audioOnly}
+                onChange={(e) => setAudioOnly(e.target.checked)}
+                className={`${CHECKBOX} ${RING}`}
+              />
+              <span>Audio only (uses less data)</span>
+            </label>
+            <button
+              type="button"
+              onClick={join}
+              aria-disabled={joining || undefined}
+              className={`w-full sm:w-auto ${joining ? BUTTON_DISABLED : BUTTON_LG_PRIMARY}`}
+            >
+              {joining ? 'Joining…' : 'Join the call'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -152,6 +158,7 @@ export default function JoinCall() {
           key={reply.ticket}
           reply={reply}
           audioOnly={audioOnly}
+          startMuted={startMuted}
           onLeft={() => navigate(leaveTo)}
           onRetry={() => setReply(null)}
         />

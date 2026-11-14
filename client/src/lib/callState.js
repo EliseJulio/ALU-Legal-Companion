@@ -10,6 +10,7 @@ export function initialCall(role) {
     reconnecting: false,
     signalLost: false,
     peer: { mic: true, cam: true },
+    peerLeft: false,
     reason: null,
     error: null,
   };
@@ -22,7 +23,7 @@ function onReady(state, e) {
   const base = { ...state, signalLost: false };
   if (state.phase === 'live') return base;
   if (e.admitted && e.peer) return { ...base, phase: 'starting' };
-  if (state.role === 'host') return { ...base, phase: e.peer ? 'knock' : 'lobby' };
+  if (state.role === 'host') return { ...base, phase: e.peer ? 'knock' : 'lobby', peerLeft: e.peer ? false : state.peerLeft };
   return { ...base, phase: 'waiting' };
 }
 
@@ -32,15 +33,18 @@ export function callReducer(state, e) {
       return onReady(state, e);
     case 'knock':
       return state.role === 'host' && state.phase !== 'live' && state.phase !== 'starting'
-        ? { ...state, phase: 'knock' } : state;
+        ? { ...state, phase: 'knock', peerLeft: false } : state;
     case 'admitted':
     case 'start':
-      return { ...state, phase: 'starting' };
+      return { ...state, phase: 'starting', peerLeft: false };
     case 'denied':
       return { ...state, phase: 'denied' };
     case 'peer-left':
-      if (state.role === 'host') return { ...state, phase: 'lobby', reconnecting: false };
+      if (state.phase === 'ended') return state;
+      if (state.role === 'host') return { ...state, phase: 'lobby', reconnecting: false, peerLeft: true };
       return { ...state, phase: 'ended', reason: 'peer-left' };
+    case 'host-ended':
+      return { ...state, phase: 'ended', reason: 'host-ended' };
     case 'connected':
       return { ...state, phase: 'live', reconnecting: false };
     case 'media-lost':
