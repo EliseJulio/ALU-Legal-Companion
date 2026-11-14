@@ -1,7 +1,7 @@
 // Auth routes: register and verify the email and resend the link and log in and log out.
 // Also password reset and password change and the account a person manages themselves.
 import { Router } from 'express';
-import { q } from '../db.js';
+import { q, pool } from '../db.js';
 import {
   signToken, isAllowedEmail, normalizeEmail, ALLOWED_DOMAINS, requireAuth, revokeSessions,
 } from '../middleware/auth.js';
@@ -9,6 +9,7 @@ import { loginEmailLimiter, emailLimiter, authIpLimiter } from '../middleware/ra
 import { hashPassword, checkPassword } from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail, mailAvailable } from '../services/mailer.js';
+import { removeMatterFiles } from '../services/documentStore.js';
 import { consumeInvite, releaseInvite, inviteStatus } from '../services/invites.js';
 
 const router = Router();
@@ -241,6 +242,52 @@ router.get('/me', requireAuth(), async (req, res) => {
 router.post('/logout', requireAuth(), async (req, res) => {
   await revokeSessions(req.user.id);
   res.status(204).end();
+});
+
+// DELETE /api/auth/me { password, confirm: true }: a student or staff member erases their own account.
+// Matters go with their files first. Saved guides and sign-in tokens and own questions go too.
+// A booking stays for the lawyer with no person and no topic.
+// Lawyers and admins are tied to published records so an admin closes theirs.
+router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), async (req, res) => {
+  if (!['student', 'staff'].includes(req.user.role)) {
+    return res.status(403).json({
+      error: 'Accounts for lawyers and admins are tied to published records. Ask an admin to close yours.',
+    });
+  }
+  const { password, confirm } = req.body || {};
+  if (confirm !== true || typeof password !== 'string' || !password) {
+    return res.status(400).json({ error: 'Enter your password and confirm that you want to erase your account.' });
+  }
+  const [me] = await q('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
+  if (!me || !(await checkPassword(password, me.password_hash))) {
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
+
+  // The files go first. If one cannot be removed the account stays and a retry finishes the job.
+  try {
+    const matters = await q('SELECT id FROM matters WHERE user_id = $1', [me.id]);
+    for (const m of matters) await removeMatterFiles(m.id);
+  } catch {
+    return res.status(500).json({ error: 'Your files could not be removed, so nothing was erased. Please try again.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM matters WHERE user_id = $1', [me.id]);
+    await client.query('DELETE FROM bookmarks WHERE user_id = $1', [me.id]);
+    await client.query('DELETE FROM auth_tokens WHERE user_id = $1', [me.id]);
+    await client.query('DELETE FROM questions WHERE user_id = $1', [me.id]);
+    await client.query('UPDATE bookings SET user_id = NULL, topic = NULL WHERE user_id = $1', [me.id]);
+    await client.query('DELETE FROM users WHERE id = $1', [me.id]);
+    await client.query('COMMIT');
+  } catch {
+    await client.query('ROLLBACK').catch(() => {});
+    return res.status(500).json({ error: 'Your account could not be erased. Nothing was changed. Please try again.' });
+  } finally {
+    client.release();
+  }
+  res.json({ ok: true });
 });
 
 // PUT /api/auth/me: rename yourself. The name is the only field this route reads.
