@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { signInPath } from '@/lib/url';
-import { apiPost, apiPut } from '@/lib/api';
+import { apiDelete, apiPost, apiPut } from '@/lib/api';
+import { rememberAccountDeleted } from '@/lib/signedOutNotice';
 import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/AuthContext';
 import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import PasswordField from '@/components/PasswordField';
+import { CheckField } from '@/components/Field';
 import { readableDate } from '@/lib/dates';
-import { FORM_FIELD, BUTTON_LG_PRIMARY, PAGE_TITLE, CARD } from '@/lib/ui';
+import { FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DESTRUCTIVE, BUTTON_DISABLED, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Each form is a section inside one card on the left, with a line between sections.
 const SECTION = 'border-t border-border py-6 first:border-t-0 first:pt-0';
@@ -221,6 +223,85 @@ function PasswordForm() {
   );
 }
 
+// Deletes the whole account. Only students and staff can. Nothing is sent until the password
+// is typed and the box is ticked. The session is cleared here without asking the server.
+function DeleteAccount({ role }) {
+  const { forgetSession } = useAuth();
+  const navigate = useNavigate();
+  const [password, setPassword] = useState('');
+  const [understood, setUnderstood] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const ready = password !== '' && understood;
+
+  if (role !== 'student' && role !== 'staff') {
+    return (
+      <section className={SECTION} aria-labelledby="delete-heading">
+        <h2 id="delete-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your account is linked to published records. To delete it, ask an admin.
+        </p>
+      </section>
+    );
+  }
+
+  async function remove(event) {
+    event.preventDefault();
+    if (!ready || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiDelete('/auth/me', { password, confirm: true }, { keepLogin: true });
+      rememberAccountDeleted();
+      forgetSession();
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err);
+      setPassword('');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={remove} className={SECTION} aria-labelledby="delete-heading">
+      <h2 id="delete-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
+      <p className="mt-1 text-sm">This deletes:</p>
+      <ul className="mt-1 list-disc space-y-1 pl-6 text-sm">
+        <li>your matters and their documents</li>
+        <li>your saved guides</li>
+        <li>the questions tied to your account</li>
+        <li>the account itself</li>
+      </ul>
+      <p className="mt-2 text-sm font-semibold">This cannot be undone.</p>
+      <PasswordField
+        id="delete-password"
+        label="Password to confirm"
+        className="mt-3"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        shown={false}
+        toggle={false}
+        autoComplete="current-password"
+      />
+      <CheckField
+        id="delete-understood"
+        className="mt-3"
+        label="I understand this cannot be undone"
+        checked={understood}
+        onChange={setUnderstood}
+      />
+      {error && <ErrorNotice error={error} className="mt-3" />}
+      <button
+        type="submit"
+        aria-disabled={!ready || busy || undefined}
+        className={`${ready && !busy ? BUTTON_DESTRUCTIVE : BUTTON_DISABLED} mt-6`}
+      >
+        {busy ? 'Deleting…' : 'Delete my account'}
+      </button>
+    </form>
+  );
+}
+
 // One page for every signed-in role. There is nowhere to enter a phone number, a home address or
 // a student number. The platform keeps as little about a person as it can.
 export default function AccountSettings() {
@@ -256,6 +337,7 @@ export default function AccountSettings() {
             <NameForm current={me?.name ?? user.name} onSaved={refetch} />
             <EmailForm onRequested={refetch} />
             <PasswordForm />
+            <DeleteAccount role={me?.role ?? user.role} />
           </div>
         </div>
 
