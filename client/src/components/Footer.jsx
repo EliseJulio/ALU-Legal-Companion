@@ -9,7 +9,11 @@ import { RING_ON_CANVAS } from '@/lib/ui';
 // The links repeat the public menu. The emergency link is worded differently from the header one so
 // each name is only used once. The layout leaves room under the page on a phone, so the bottom bar
 // never covers this.
-const FOOTER_LINKS = [...PUBLIC_LINKS, { to: '/emergency', label: 'All emergency contacts' }];
+const FOOTER_LINKS = [
+  ...PUBLIC_LINKS,
+  { to: '/emergency', label: 'All emergency contacts' },
+  { to: '/privacy', label: 'Privacy and terms' },
+];
 
 export default function Footer() {
   const user = useOptionalUser();

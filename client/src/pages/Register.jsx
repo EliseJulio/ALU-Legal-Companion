@@ -154,6 +154,11 @@ export default function Register() {
             ))}
           </fieldset>
 
+          <p className="mt-4 text-sm text-muted-foreground">
+            By creating an account you agree to the{' '}
+            <Link to="/privacy" className={`rounded-control font-semibold text-info underline ${RING}`}>privacy and terms page</Link>.
+          </p>
+
           <button
             type="submit"
             aria-disabled={sending || undefined}
