@@ -8,6 +8,17 @@ import { beginPageLoad, endPageLoad } from '@/lib/pagePending';
 // recovered the same way. If storage is blocked the flag cannot be kept, so no reload is tried.
 const FLAG = 'alc.chunk-reload';
 const RELOAD_WAIT_MS = 5000;
+const RELOAD_DELAY_MS = 250;
+
+// True when this tab has not reloaded for a failed page yet. The flag is not set here.
+function canReload() {
+  try {
+    return !sessionStorage.getItem(FLAG);
+  } catch (error) {
+    console.warn('[lazyPage] storage is blocked, so a failed page will not be reloaded', error);
+    return false;
+  }
+}
 
 // True when this tab has not reloaded for a failed page yet. The flag is now set.
 function claimReload() {
@@ -28,6 +39,20 @@ function isFetchFailure(error) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
   const text = `${error?.name ?? ''} ${error?.message ?? ''}`;
   return /ChunkLoadError|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|404|Load failed/i.test(text);
+}
+
+// The reload waits a moment. When the visitor leaves the page the browser cancels its downloads,
+// and a reload then would undo the navigation. The page is gone before the wait ends or pagehide
+// cancels the timer. A page that is really broken stays open and is reloaded.
+function scheduleReload(reload) {
+  const timer = setTimeout(() => {
+    window.removeEventListener('pagehide', cancel);
+    if (claimReload()) reload();
+  }, RELOAD_DELAY_MS);
+  function cancel() {
+    clearTimeout(timer);
+  }
+  window.addEventListener('pagehide', cancel, { once: true });
 }
 
 function clearFlag() {
@@ -63,12 +88,12 @@ export function loadPage(importer, reload = () => window.location.reload()) {
       return module;
     },
     (error) => {
-      if (!isFetchFailure(error) || !claimReload()) {
+      if (!isFetchFailure(error) || !canReload()) {
         finish();
         throw error;
       }
       console.warn('[lazyPage] a page file did not load, reloading once', error);
-      reload();
+      scheduleReload(reload);
       // The page is going away. Waiting keeps the loading message on screen, not the error screen.
       // If the reload never happens, the error screen is shown after a few seconds and not never.
       // The file still counts as downloading during that wait, so the bar stays while the reload runs.
