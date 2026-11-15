@@ -33,7 +33,7 @@ export default function Footer() {
             <Link
               key={to}
               to={to}
-              className={`inline-flex min-h-touch items-center text-sm text-muted-foreground hover:text-ink hover:underline underline-offset-4 ${RING_ON_CANVAS}`}
+              className={`inline-flex min-h-touch min-w-touch items-center text-sm text-muted-foreground hover:text-ink hover:underline underline-offset-4 ${RING_ON_CANVAS}`}
             >
               {label}
             </Link>
