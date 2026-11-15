@@ -14,6 +14,9 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.js',
   fullyParallel: true,
+  // Playwright would start half the processors as workers. On a laptop that saturates it and Firefox
+  // then times out. Four is steady. E2E_WORKERS changes it.
+  workers: Number(process.env.E2E_WORKERS) || 4,
   // The first page after the dev server starts is slow because it builds the code on demand.
   timeout: 30000,
   expect: { timeout: 10000 },
