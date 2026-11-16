@@ -20,5 +20,12 @@ export default defineConfig({
     // Typing a whole sentence one key at a time is slow when several test files run at once.
     testTimeout: 15000,
     hookTimeout: 15000,
+    // npm run test:coverage lists the lines no unit test runs.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{js,jsx}'],
+      exclude: ['src/main.jsx'],
+      reporter: ['text-summary', 'json-summary'],
+    },
   },
 });
