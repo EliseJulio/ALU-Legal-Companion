@@ -6,12 +6,12 @@ This page lists every automated test in the repository. For each test it gives t
 
 | Suite | Tool | Files | Tests | Result | Time |
 |---|---|---|---|---|---|
-| Server | Jest and Supertest, against a real PostgreSQL | 10 | 83 | 83 passed | 73 s |
+| Server | Jest and Supertest, against a real PostgreSQL | 10 | 84 | 84 passed | 167 s |
 | Client | Vitest and Testing Library | 9 | 55 | 55 passed | 15 s |
 | Browser | Playwright, in Chromium, Firefox and WebKit | 5 | 13 in each browser | 13 of 13 in each | 19 s, 37 s and 22 s |
 | Signaling Worker | Vitest | 3 | 79 | 79 passed | 3 s |
 
-The client build and the lint check both finish without errors. No test was skipped and none was retried.
+The client build and the lint check both finish without errors. No test was skipped. In the last server run one batch of test files stopped with no result, a known Windows fault of the test runner, and was run again. Every test then passed.
 
 ## How the tests are run
 
@@ -58,6 +58,7 @@ cd signaling && npm test     # no network needed
 | Server | `integration/sign-in-and-roles.test.js` | Refuses a switched-off account even with the right password. |
 | Server | `integration/sign-in-and-roles.test.js` | Never returns the password hash. |
 | Server | `integration/sign-in-and-roles.test.js` | Signing out ends the token and every other token the account holds. |
+| Server | `integration/sign-in-and-roles.test.js` | Stops someone guessing the current password from a stolen sign-in. |
 | Server | `integration/sign-in-and-roles.test.js` | Asks for a login when there is no token. |
 | Server | `integration/sign-in-and-roles.test.js` | Refuses a token signed with a different secret. |
 | Server | `integration/sign-in-and-roles.test.js` | Refuses an expired token. |
