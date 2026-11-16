@@ -1,6 +1,6 @@
 # Database design
 
-The database is PostgreSQL 16. There are 17 tables. They are made by the numbered files in `server/src/migrations/`. This page is drawn from those files.
+The database is PostgreSQL 16. There are 20 tables. They are made by the numbered files in `server/src/migrations/`. This page is drawn from those files.
 
 ## The tables and how they connect
 
@@ -104,11 +104,14 @@ erDiagram
     }
     bookings {
         int id PK
-        int user_id FK "empty when anonymous"
+        int user_id FK "empty when anonymous or when the person erased their account"
         text anon_token "hash, empty when signed in"
         int provider_id FK
         timestamptz slot
+        text topic "emptied when the person erases their account"
         text status "requested, accepted, declined, completed"
+        text room_name "the Daily room, made the first time it is needed"
+        timestamptz room_created_at
     }
     questions {
         int id PK
@@ -188,11 +191,35 @@ erDiagram
         text when_to_use
         int sort_order
     }
+    dispute_ladder_steps {
+        int id PK
+        int position "the order on screen, 1 to 99"
+        text title
+        text tagline
+        text description
+        text law_cited
+        text status "draft or published"
+    }
+    reports {
+        int id PK
+        text type "info, office, broken, safety or idea"
+        text about_kind "guide, route, provider or page"
+        int about_id
+        text about_label
+        text message
+        text reply_channel "code or email"
+        text code_hash "hash of the one-time code, never the code"
+        text contact_email "kept only until the reply is sent"
+        text status "received, in_progress or resolved"
+        text admin_reply
+        timestamptz read_at
+        timestamptz resolved_at
+    }
 ```
 
 `users` also has a `pending_email` column that holds a new address until its link is used. `matters` has a `checklist_id` that is cleared if the checklist is deleted, so a checklist can never delete a matter.
 
-`directory_reviews` points at a provider, a route or a guide through `record_type` and `record_id`. It is the log of what each expert decided. `emergency_contacts` stands alone. The urgent help page reads it and falls back to a built-in list if it is empty.
+`directory_reviews` points at a provider, a route or a guide through `record_type` and `record_id`. It is the log of what each expert decided. `emergency_contacts` stands alone. The urgent help page reads it and falls back to a built-in list if it is empty. `dispute_ladder_steps` and `reports` also stand alone. A report names the page it is about with `about_kind` and `about_id` but has no foreign key, so a report outlives the record it was about.
 
 ## Rules the database enforces itself
 
@@ -201,7 +228,8 @@ These are written as constraints so that a bug in the code cannot break them.
 | Rule | How |
 |---|---|
 | A published guide, entry, route or checklist always names the person who published it | `CHECK (status <> 'published' OR (verified_by IS NOT NULL AND verified_at IS NOT NULL))` on `guides`, `providers`, `matter_routes` and `document_checklists` |
-| A booking or a question is either signed in or anonymous, never both and never neither | `CHECK ((user_id IS NULL) <> (anon_token IS NULL))` |
+| A question is either signed in or anonymous, never both and never neither | `CHECK ((user_id IS NULL) <> (anon_token IS NULL))` on `questions` |
+| A booking is never both signed in and anonymous. After a person erases their account it has neither, so the lawyer keeps the booking with no name | `CHECK (user_id IS NULL OR anon_token IS NULL)` on `bookings` |
 | An anonymous code is unique and only its hash is stored | a unique index on `anon_token` where it is not null |
 | An expert cannot accept two bookings at the same time | a unique index on `(provider_id, slot)` where the status is `accepted` |
 | Only an entry with an expert account can take bookings | `CHECK (NOT bookable OR user_id IS NOT NULL)` on `providers` |
@@ -213,7 +241,7 @@ These are written as constraints so that a bug in the code cannot break them.
 
 ## Choices worth knowing
 
-- **Accounts are switched off and never deleted.** Guides and entries keep the name of the expert who checked them. A delete would break that link.
+- **Admin and legal expert accounts are switched off and never deleted.** Guides and entries keep the name of the person who published them. A delete would break that link. A student or staff member can erase their own account. That removes their matters, files, saved guides, sign-in links and questions, and a booking they made stays for the lawyer with no name, account or topic.
 - **Dates are plain dates.** `next_due`, `send_on` and `occurred_on` are `DATE`. The server sends them as `YYYY-MM-DD` text so a deadline in Kigali never shifts a day.
 - **Saved guides keep their row** when a guide goes back to draft. The save returns on its own once the guide is verified again.
 - **One-time links are stored as hashes.** A database leak cannot be used to open anyone's link.
