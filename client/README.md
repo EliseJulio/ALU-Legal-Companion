@@ -72,14 +72,14 @@ These come from the research brief and are checked by tests.
 
 The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPjx0cDJyu
 
-- **Colours.** Black, white and blue, in a dark and a light theme. Red is kept for the Emergency numbers link and the Emergency page. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. The values are tokens in `src/index.css` and are written up in [`../docs1/DESIGN_SYSTEM.md`](../docs1/DESIGN_SYSTEM.md). `tests/lib/tokens.test.js` checks the contrast and that no colour is used with an opacity suffix, which Tailwind would silently drop.
+- **Colours.** Black, white and blue, in a dark and a light theme. Red is kept for the Emergency numbers link and the Emergency page. A colour is never the only thing that carries a meaning. A word or an icon always goes with it. The values are tokens in `src/index.css` and are written up in [`../docs1/DESIGN_SYSTEM.md`](../docs1/DESIGN_SYSTEM.md).
 - **Type.** Source Sans 3 for all text and IBM Plex Mono for counts and law citations, both served from `public/fonts/`. The app makes no request to another site on its own.
 - **Touch targets.** Every link and button is at least 44 by 44 pixels. The browser tests measure the menus and bars.
 - **Focus.** Every control shows a ring when it has keyboard focus. The ring styles live in one file, `src/lib/ui.js`, so they cannot drift apart.
 - **Urgent help.** The emergency numbers link is in the header on every page and comes before the menu in the keyboard order. The urgent numbers are written into the page. They show even when the server is down.
 - **Disclaimer.** "Legal information not legal advice." is in the footer of every page.
 - **Anonymous flows.** A one-time code is shown once and the reader must say they saved it. The code is kept in the page and sent in one request. It is never put in the address bar. The page sends an anonymous request without the login, even for a signed-in person.
-- **No AI.** The site has no assistant and no chatbot. A real legal expert answers every question.
+- **Ask AI is optional.** Ask AI answers only from published guides, says when they do not cover a question and points to the Directory or a legal expert. The person must agree before a question is sent to Google. A real legal expert still answers every question sent to one.
 - **One publisher.** An administrator publishes alone. A guide, checklist, route or directory entry is Draft or Published, and editing a published one takes it back to Draft until it is published again. The site shows no "awaiting review" step.
 
 ## How the site talks to the server
@@ -94,8 +94,8 @@ The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPj
 ## Tests
 
 ```bash
-npm test        # the component and unit tests: 138 test files in tests/
-npm run e2e     # the browser tests: 25 spec files in tests/e2e/
+npm test        # the component and unit tests: 9 test files, 55 tests
+npm run e2e     # the browser tests: 5 spec files, 13 tests
 ```
 
 The component tests live in `tests/`. The browser tests live in `tests/e2e/`. They run the real pages in Chromium at 390 pixels wide. The API is replaced in each test by fixed replies from `tests/e2e/support.js`, so no server or database is needed and no test can change real data. The first run starts the dev server by itself.
