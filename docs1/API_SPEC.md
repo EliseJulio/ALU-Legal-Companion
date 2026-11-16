@@ -55,6 +55,7 @@ draft  --publish (admin)-->  published
 | Route | Who | Reply |
 |---|---|---|
 | `GET /health` | anyone | `{ "status": "ok" }` |
+| `GET /openapi.json` | anyone | The description of every route as an OpenAPI file. The same description is shown as a page at `/api/docs` |
 
 ## Accounts (`/auth`)
 
