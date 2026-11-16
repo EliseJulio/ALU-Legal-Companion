@@ -82,6 +82,16 @@ export const loginEmailLimiter = createLimiter({
   requestWasSuccessful: (_req, res) => res.statusCode < 400 || res.statusCode === 403,
 });
 
+// Change password: strict, counted per signed-in account. A stolen sign-in could otherwise guess the
+// current password with no limit. Only failed attempts count, so a person who gets it right never uses it up.
+export const passwordChangeLimiter = createLimiter({
+  max: 10,
+  message: AUTH_MESSAGE,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req, res) => res.statusCode < 400,
+});
+
 // Routes that send an email (resend a verification link or forgot password): strict and per email.
 // The risk is someone filling one person's inbox. These routes always answer 200 on purpose so successful requests count too.
 // The count uses the email that was typed. It never uses whether an account exists.

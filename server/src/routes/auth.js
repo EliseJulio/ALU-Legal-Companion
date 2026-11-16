@@ -5,7 +5,7 @@ import { q, pool } from '../db.js';
 import {
   signToken, isAllowedEmail, normalizeEmail, ALLOWED_DOMAINS, requireAuth, revokeSessions,
 } from '../middleware/auth.js';
-import { loginEmailLimiter, emailLimiter, authIpLimiter } from '../middleware/rateLimit.js';
+import { loginEmailLimiter, emailLimiter, authIpLimiter, passwordChangeLimiter } from '../middleware/rateLimit.js';
 import { hashPassword, checkPassword } from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail, mailAvailable } from '../services/mailer.js';
@@ -308,7 +308,7 @@ router.put('/me', requireAuth(), async (req, res) => {
 
 // POST /api/auth/change-password: ends every other session. The caller keeps this one
 // because the new token carries the new session_version.
-router.post('/change-password', authIpLimiter, requireAuth(), async (req, res) => {
+router.post('/change-password', authIpLimiter, requireAuth(), passwordChangeLimiter, async (req, res) => {
   const { current_password: currentPassword, new_password: newPassword } = req.body || {};
 
   // The new password is checked first so the caller learns the rule without having to

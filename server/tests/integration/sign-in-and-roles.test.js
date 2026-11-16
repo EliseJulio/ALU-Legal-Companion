@@ -105,6 +105,19 @@ describe('signing in and out', () => {
     expect((await request(app).get('/api/auth/me').set('Authorization', auth)).status).toBe(401);
     expect((await request(app).get('/api/auth/me').set(bearer(other))).status).toBe(401);
   });
+
+  it('stops someone guessing the current password from a stolen sign-in', async () => {
+    const { auth } = await makeUser('student', 'guess@alustudent.com');
+    const guess = () => request(app).post('/api/auth/change-password').set('Authorization', auth)
+      .send({ current_password: 'not-the-password', new_password: 'another-password-1' });
+    process.env.RATE_LIMIT_TEST = '1';
+    try {
+      for (let i = 0; i < 10; i += 1) expect((await guess()).status).toBe(400);
+      expect((await guess()).status).toBe(429);
+    } finally {
+      delete process.env.RATE_LIMIT_TEST;
+    }
+  });
 });
 
 describe('refusing a request without a valid token', () => {

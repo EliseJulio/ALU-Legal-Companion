@@ -27,6 +27,7 @@ The base path is `/api`. Every request and reply is JSON. The server README has 
 | Sign in, counted for each email address | 10 failed tries in 15 minutes. A good sign in does not count |
 | Routes that send email, counted for each email address | 5 in 15 minutes |
 | Every account route, counted for each IP address | 100 in 15 minutes |
+| Changing a password, counted for each signed-in account | 10 wrong current passwords in 15 minutes. A right one does not count |
 | Anonymous questions and bookings, for each IP address | 30 in an hour |
 | Looking up an anonymous code, for each IP address | 100 in 15 minutes |
 | Sending a report, for each IP address | 5 in 15 minutes |
