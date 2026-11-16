@@ -90,6 +90,10 @@ export default function Privacy() {
 
       <Section id="where" title="Where your data is held">
         <p>The server and the database are hosted by Render in Frankfurt, Germany. That is outside Rwanda. This is a known limit.</p>
+        <p>
+          Render keeps backups of the database for 30 days. If you delete your account, a copy of your data can stay in a backup
+          for up to 30 days before it is removed.
+        </p>
         <p>Video calls run through Cloudflare with Daily or Google Meet as the fallback. Ask AI uses Google.</p>
       </Section>
 
