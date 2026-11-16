@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AskAI from '@/pages/AskAI';
@@ -48,7 +48,10 @@ describe('Ask AI', () => {
     const u = user();
     const box = await screen.findByLabelText('Your question');
     expect(box).toBeDisabled();
-    await u.click(screen.getByRole('button', { name: 'Ask' }));
+    const ask = screen.getByRole('button', { name: 'Ask' });
+    await u.click(ask);
+    // Submitting the form straight away is what the browser does for Enter. Only the page's own check can stop it.
+    fireEvent.submit(ask.closest('form'));
     await settle();
     expect(asks()).toHaveLength(0);
     await u.click(screen.getByRole('checkbox', { name: 'I understand' }));
