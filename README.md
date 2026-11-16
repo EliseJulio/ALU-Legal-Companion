@@ -31,14 +31,15 @@ Rwanda publishes its laws but ordinary people find them hard to use. A student w
 
 ## The rule that matters most
 
-**Nothing is shown to the public until an authorized administrator has checked and published it.** That covers every guide, directory entry and route. Administrators create, edit, publish and withdraw legal-information content; legal experts provide consultations, appointments and matter support. If a published guide is edited it leaves the site at once and comes back only when an administrator publishes it again. The database refuses a published row that has no publisher. The platform has no AI. A real person answers every question.
+**Nothing is shown to the public until an authorized administrator has checked and published it.** That covers every guide, directory entry and route. Administrators create, edit, publish and withdraw legal-information content; legal experts provide consultations, appointments and matter support. If a published guide is edited it leaves the site at once and comes back only when an administrator publishes it again. The database refuses a published row that has no publisher. A real person answers every question sent to a legal expert. Ask AI is a small helper, it answers only from published guides, shows the guide it used and says it may be wrong.
 
 ## Stack
 
 - **Backend:** Node.js 20 or newer, Express 4 (ES modules), REST under `/api`
 - **Database:** PostgreSQL 16, plain SQL through `pg`
 - **Frontend:** React, Vite and Tailwind CSS
-- **Tests:** Jest and Supertest for the API, Vitest and Testing Library for the pages, Playwright for the browser
+- **Calls:** a one-to-one WebRTC call between the two browsers. A small Cloudflare Worker (`signaling/`) passes the set-up messages and Cloudflare Realtime supplies a relay when a direct connection is blocked. Nothing is recorded
+- **Tests:** Jest and Supertest for the API, Vitest and Testing Library for the pages, Playwright for the browser, Vitest for the Worker
 
 ## Technical requirements
 
@@ -69,6 +70,7 @@ client/
     components/   parts used by many screens (over 80)
     lib/          the API caller, login state, dates and small helpers
   tests/          component tests and browser tests
+signaling/        the Cloudflare Worker that passes the set-up messages of a call and its tests
 docs1/            API specification, database design, test plan and the technical report
 .github/          the CI workflow that runs the tests on every push
 render.yaml       how the live version is deployed
@@ -116,13 +118,17 @@ These are for local use only. Never use them anywhere real. With no mail setting
 
 | Layer | Tool | Count |
 |---|---|---|
-| API and database | Jest and Supertest against a real database | 810 tests in 45 suites |
-| Pages and components | Vitest and Testing Library | 996 tests in 83 files |
-| Browser at phone width | Playwright with the API replaced by fixed replies | 197 tests in 17 files. Run in Chromium (197 pass), Firefox (197 pass) and WebKit (195 pass, 2 known failures) |
+| API and database | Jest and Supertest against a real database | 83 tests in 10 files |
+| Pages and components | Vitest and Testing Library | 55 tests in 9 files |
+| Browser at phone width | Playwright with the API replaced by fixed replies | 13 tests in 5 files. All pass in Chromium, Firefox and WebKit |
+| Call signaling Worker | Vitest | 79 tests in 3 files |
+
+Measured on 16 November 2026. [`docs1/TEST_PLAN.md`](docs1/TEST_PLAN.md) lists every test.
 
 ```bash
 cd server && npm test
 cd client && npm test && npm run e2e
+cd signaling && npm test
 ```
 
 ## Designs
@@ -177,6 +183,7 @@ Settings for the API on the host:
 - `NODE_ENV`: `production`. The server then refuses to start with no `CORS_ORIGINS` and never prints an email link in its log.
 - `DOCUMENT_KEY`: 64 hex characters that encrypt the documents people attach to a matter. With none, uploads answer 503. Keep a copy somewhere safe. If it is lost, every stored document is lost with it.
 - `GEMINI_API_KEY` and `GEMINI_MODEL`: optional. They switch on Ask AI. With either missing, Ask AI answers that it is not available and the rest of the site is unaffected. Use a model that accepts the request, for example `gemini-3.1-flash-lite`. `ASK_AI_DAILY_LIMIT` caps model calls a day (default 200).
+- `CALL_TICKET_SECRET` and `CALL_SIGNAL_URL`: optional. Together they switch on calls held inside the platform. The secret must be at least 32 characters and the same value must be set on the Cloudflare Worker. The address must start with `wss://`. With either missing, a consultation uses a Daily room if that is set up and otherwise the lawyer's Google Meet link. `CALL_TURN_KEY_ID` and `CALL_TURN_API_TOKEN` are optional and add a Cloudflare relay for networks that block a direct connection.
 - `SEED_ADMIN_PASSWORD`, `SEED_EXPERT_PASSWORD` and `SEED_STUDENT_PASSWORD`: the passwords the seed gives the three demo accounts. Set your own before the first seed so the demo passwords never exist on a live database.
 
 First release checklist:
