@@ -49,6 +49,21 @@ export default function Privacy() {
         <p>You can end sharing at any time. Reminder emails say only the date.</p>
       </Section>
 
+      <Section id="email" title="Email">
+        <p>
+          Verification links, password links, reminders and notices about your consultations and documents are sent through an
+          email service called Brevo. It handles your address only to deliver each message.
+        </p>
+      </Section>
+
+      <Section id="reports" title="Reporting a problem">
+        <p>You can report a wrong fact or a wrong office without an account. You choose how we reply.</p>
+        <p>
+          If you choose a code, we store only a scrambled (hashed) form of it. If you choose email, we keep your address only
+          until we have sent the reply, and then we remove it.
+        </p>
+      </Section>
+
       <Section id="video" title="Video consultations">
         <p>Nothing is recorded.</p>
         <p>
