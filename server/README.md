@@ -134,7 +134,7 @@ tests/
 
 ## Explore the API
 
-**Swagger.** Start the server and open `http://localhost:4000/api/docs`. It lists every route with who may call it, what it takes and what it returns, and each one can be tried from the page. Choose Authorize and paste the token that `POST /auth/login` gives. The raw description is at `/api/openapi.json`. It is written in `src/openapi.js`. The test `tests/integration/openapi.test.js` fails when a route is added or removed and that file is not updated. The page is public and read only. It holds no data.
+**Swagger.** Start the server and open `http://localhost:4000/api/docs`. It lists every route with who may call it, what it takes and what it returns, and each one can be tried from the page. Choose Authorize and paste the token that `POST /auth/login` gives. The description is at `/api/openapi.json`. It is written in `src/openapi.js`. The page is public and read only. It holds no data.
 
 **Postman.** Two collections sit next to this file.
 
@@ -164,12 +164,12 @@ All routes are under `/api`. Every error is `{ "error": "message" }`. Login is a
 
 ## The rules the code enforces
 
-These are the platform's promises. Each one has tests.
+These are the platform's promises. [`../docs1/TEST_PLAN.md`](../docs1/TEST_PLAN.md) shows which of them the current tests check.
 
 1. **Nothing reaches the public until an administrator has checked and published it.** Guides, directory entries and routes go from draft to published. Only an administrator publishes. The database refuses a published row with no publisher.
 2. **Editing a published guide takes it off the site at once.** It comes back only after an administrator publishes it again. A mistaken edit is rejected before anything changes.
-3. **Anonymous means anonymous.** An anonymous question or booking stores no name and no account. It stores a hash of a random token. The person gets the token once. A signed-in person who uses the anonymous route stays anonymous.
-4. **Logging out really logs out.** Each token carries a session number that is checked on every request. Logging out, resetting a password and switching an account off all end the old tokens. A role change works on the next request.
+3. **Anonymous** An anonymous question or booking stores no name and no account. It stores a hash of a random token. The person gets the token once. A signed-in person who uses the anonymous route stays anonymous.
+4. **Logging out** Each token carries a session number that is checked on every request. Logging out, resetting a password and switching an account off all end the old tokens. A role change works on the next request.
 5. **Matters are private.** Somebody else's matter returns 404, the same as one that does not exist. An expert sees a matter only while the owner shares it. The expert never sees who the owner is.
 6. **Reminders are never late.** A reminder goes out 7 days and 1 day before a deadline. If the deadline passes first it is marked missed and not sent. The email gives the date and never the title of the matter. Dates use Kigali time.
 7. **Legal experts join by invitation only.** The invitation is emailed. Registration and the role drop-down both refuse the role.
@@ -183,7 +183,7 @@ npm test
 
 The tests need the `alu_legal_test` database. Each run makes its own private schema in it, applies the migrations and drops the schema at the end. Two runs at once cannot disturb each other.
 
-Rate limits are switched off during the tests and switched on in the few files that test them.
+Rate limits are switched off during the tests.
 
 If `npm test` stops early on a slow machine, run Jest directly:
 
