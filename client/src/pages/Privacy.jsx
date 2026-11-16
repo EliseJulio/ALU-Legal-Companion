@@ -32,6 +32,11 @@ export default function Privacy() {
           ALU Legal Companion is a final-year project at African Leadership University in Rwanda. Elise Julio Hakizimana runs it
           and decides how your information is used.
         </p>
+        <p>
+          To ask about your information, to ask for a copy of it or to withdraw a consent, write to{' '}
+          <a href="mailto:j.hakiziman1@alustudent.com" className={LINK}>j.hakiziman1@alustudent.com</a> or call{' '}
+          <a href="tel:+250785410405" className={LINK}>+250 785 410 405</a>.
+        </p>
       </Section>
 
       <Section id="collect" title="What we collect">
