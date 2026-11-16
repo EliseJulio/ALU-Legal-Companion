@@ -27,6 +27,13 @@ export default function Privacy() {
         This page says what we collect, who can see it and what you can do about it. We keep it short and plain.
       </p>
 
+      <Section id="controller" title="Who is responsible">
+        <p>
+          ALU Legal Companion is a final-year project at African Leadership University in Rwanda. Elise Julio Hakizimana runs it
+          and decides how your information is used.
+        </p>
+      </Section>
+
       <Section id="collect" title="What we collect">
         <p>When you create an account we keep your name and email address. Your password is stored only as a hash, so nobody can read it.</p>
         <p>We also keep what you choose to add: your matters, their dates and your documents, the questions you send and your appointment bookings.</p>
