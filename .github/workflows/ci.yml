@@ -1,6 +1,6 @@
 name: CI
 
-# Runs all three test suites on every push and pull request.
+# Runs all four test suites on every push and pull request.
 # A broken change is caught here and not by someone remembering to run the tests.
 on:
   push:
@@ -108,3 +108,25 @@ jobs:
           name: playwright-report
           path: client/playwright-report/
           retention-days: 7
+
+  # The call Worker decides who may enter a consultation. Its tests need no database and no network.
+  signaling:
+    name: Call Worker — Vitest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: signaling/package-lock.json
+
+      - name: Install dependencies
+        working-directory: signaling
+        run: npm ci
+
+      - name: Run tests
+        working-directory: signaling
+        run: npm test

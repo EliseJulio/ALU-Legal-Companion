@@ -1,0 +1,19 @@
+name: Scheduled jobs
+
+# Calls the API's job endpoint every 10 minutes. The call wakes the hosting service, which sleeps
+# when idle and runs the due deadline reminders and the retention purge.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+# The workflow needs no access to the repository or to GitHub itself.
+permissions: {}
+
+jobs:
+  run-jobs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the job endpoint
+        run: |
+          curl --fail --silent --show-error --max-time 60 -X POST -H "X-Job-Secret: ${{ secrets.JOB_SECRET }}" "${{ secrets.JOB_URL }}"
