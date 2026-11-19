@@ -6,7 +6,8 @@ import Wizard from '@/components/wizard/Wizard';
 import { FieldError } from '@/components/wizard/WizardField';
 import { useWizardErrors } from '@/components/wizard/WizardContext';
 import { CATEGORIES } from '@/lib/directory';
-import { BUTTON_OUTLINE, CARD } from '@/lib/ui';
+import { usePanelFocus } from '@/lib/panelFocus';
+import { BUTTON_DANGER_SOLID, BUTTON_OUTLINE, CARD } from '@/lib/ui';
 
 const H2 = 'font-head text-base font-semibold leading-[1.3] text-ink';
 
@@ -156,7 +157,7 @@ function ShareWizard({ matter, targets, onDone }) {
 // The owner only and only while it is not shared.
 // The wizard holds the share until the owner has read what the lawyer will see.
 export function ShareCard({ matter, onDone }) {
-  const { data: targets } = useApi('/matters/share-targets');
+  const { data: targets, error } = useApi('/matters/share-targets');
   return (
     <section className={CARD} aria-labelledby="share-heading">
       <h2 id="share-heading" className={H2}>Share with one chosen expert</h2>
@@ -165,22 +166,28 @@ export function ShareCard({ matter, onDone }) {
         identify you.
       </p>
       <p className="mt-3 text-xs text-muted-foreground">Sharing is never automatic.</p>
+      {error && <ErrorNotice error={error} className="mt-3" />}
       {targets?.length === 0 && <p className="mt-3 text-sm">No lawyer on the platform is taking shared matters yet.</p>}
       {targets?.length > 0 && <div className="mt-4"><ShareWizard matter={matter} targets={targets} onDone={onDone} /></div>}
     </section>
   );
 }
 
-// Who can open the matter now and the way to end it. Revoking takes effect at once.
+// Who can open the matter now and the way to end it. Revoking takes effect at once, so it asks first.
+// The question opens on Keep access. Keep access returns focus to the revoke button.
 export function AccessCard({ matter, onDone }) {
+  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { firstRef: keepRef, openerRef: revokeRef } = usePanelFocus(asking);
 
   async function revoke() {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
       await apiDelete(`/matters/${matter.id}/share`);
+      setAsking(false);
       onDone();
     } catch (err) {
       setError(err);
@@ -199,9 +206,29 @@ export function AccessCard({ matter, onDone }) {
             <span className="font-semibold">{matter.shared_with_name}</span> can read this record and add
             notes. They cannot see your name or email, change anything or see your reminders.
           </p>
-          <button type="button" aria-disabled={busy || undefined} className={`${BUTTON_OUTLINE} mt-3`} onClick={revoke}>
-            Revoke expert access
-          </button>
+          {asking ? (
+            <div role="group" aria-label="Confirm revoking expert access" className="mt-3 rounded-control border border-border bg-chrome-raised p-3">
+              <p className="text-sm font-semibold text-ink">
+                Take away access for {matter.shared_with_name}? They can no longer open this matter or add notes.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button ref={keepRef} type="button" className={BUTTON_OUTLINE} onClick={() => setAsking(false)}>Keep access</button>
+                <button
+                  type="button"
+                  aria-disabled={busy || undefined}
+                  aria-busy={busy || undefined}
+                  className={BUTTON_DANGER_SOLID}
+                  onClick={revoke}
+                >
+                  {busy ? 'Revoking…' : 'Yes, revoke access'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button ref={revokeRef} type="button" className={`${BUTTON_OUTLINE} mt-3`} onClick={() => setAsking(true)}>
+              Revoke expert access
+            </button>
+          )}
           <p className="mt-3 text-xs text-muted-foreground">When shared, revoking access takes effect immediately.</p>
         </>
       ) : (

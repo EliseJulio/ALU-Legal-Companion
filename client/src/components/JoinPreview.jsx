@@ -17,12 +17,26 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
   const [mic, setMic] = useState(true);
   const video = useRef(null);
   const live = useRef(null);
+  const controls = useRef(null);
+  // False once the page has been left. A permission prompt can still be open then.
+  const mounted = useRef(false);
 
   useEffect(() => {
     if (video.current && video.current.srcObject !== stream) video.current.srcObject = stream;
   }, [stream]);
 
-  useEffect(() => () => live.current?.getTracks().forEach((t) => t.stop()), []);
+  // The preview replaces the Check button, which has gone. Focus goes to the first control.
+  useEffect(() => {
+    if (stream) controls.current?.querySelector('button')?.focus();
+  }, [stream]);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      live.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   async function start() {
     setProblem(null);
@@ -47,6 +61,11 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
         setProblem(err2?.name === 'NotFoundError' ? 'none' : 'blocked');
         return;
       }
+    }
+    // The page was left while the prompt was open. Nothing may keep the camera or microphone on.
+    if (!mounted.current) {
+      got.getTracks().forEach((t) => t.stop());
+      return;
     }
     if (noCamera || audioOnly) got.getVideoTracks().forEach((t) => t.stop());
     got.getAudioTracks().forEach((t) => { t.enabled = !startMuted; });
@@ -102,7 +121,7 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
         <video ref={video} autoPlay muted playsInline aria-label="Your camera preview" className={`h-full w-full -scale-x-100 object-cover ${cam ? '' : 'invisible'}`} />
         {!cam && <p className="absolute inset-0 grid place-items-center p-4 text-center text-sm">Your camera is off. The call will use sound only.</p>}
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div ref={controls} className="mt-3 flex flex-wrap gap-2">
         <ControlButton on={mic} onLabel="Mute microphone" offLabel="Turn on microphone" iconOn="mic" iconOff="mic_off" onClick={toggleMic} />
         {problem !== 'no-camera' && (
           <ControlButton on={cam} onLabel="Turn off camera" offLabel="Turn on camera" iconOn="videocam" iconOff="videocam_off" onClick={toggleCam} />

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import ErrorNotice from '@/components/ErrorNotice';
 import { ScheduleMark } from '@/components/ScheduleItem';
+import ChangeTime from '@/components/ChangeTime';
 import { apiPost } from '@/lib/api';
-import { readableSlot } from '@/lib/bookings';
+import { proposeTime, readableSlot } from '@/lib/bookings';
+import { usePanelFocus } from '@/lib/panelFocus';
+import { kigaliSlotLabel } from '@/lib/slots';
 import JoinCallLink from '@/components/JoinCallLink';
 import { BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_PRIMARY } from '@/lib/ui';
 
@@ -11,13 +14,6 @@ import { BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_PRIMARY } from '@/lib/ui';
 const NEXT = {
   requested: [['accepted', 'Accept this time', true], ['declined', 'Decline', false]],
   accepted: [['completed', 'Mark as completed', true], ['declined', 'Decline', false]],
-};
-
-// What the page says after an action, so a screen reader hears the result.
-const DONE = {
-  accepted: (when) => `Accepted. ${when} is confirmed.`,
-  declined: (when) => `Declined. ${when} has been taken off your requests.`,
-  completed: (when) => `Marked as completed for ${when}.`,
 };
 
 // One consultation on the lawyer's calendar, in the day list and the agenda. The circle and the state
@@ -32,10 +28,20 @@ export default function ExpertConsultRow({ item, onDone }) {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const [message, setMessage] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
   const declineRef = useRef(null);
   const keepRef = useRef(null);
+  const canSuggest = booking.status === 'requested' && !lapsed;
+  // Never mind on the suggestion returns focus to its button.
+  const { openerRef: suggestRef } = usePanelFocus(suggesting);
+
+  // Sends a different time for the request. The request stays open until the person answers.
+  async function suggest(iso) {
+    await proposeTime(booking.id, iso);
+    setSuggesting(false);
+    onDone('proposed', booking.id);
+  }
 
   // The question opens with focus on the safe choice. Closing it returns focus to Decline.
   useEffect(() => {
@@ -51,12 +57,11 @@ export default function ExpertConsultRow({ item, onDone }) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    setMessage('');
     setConfirming(false);
     try {
       await apiPost(`/bookings/${booking.id}/status`, { status });
-      setMessage(DONE[status]?.(when) ?? '');
-      onDone();
+      // The page announces the result and moves focus to this row once it has been reloaded.
+      onDone(status, booking.id);
     } catch (err) {
       // For example "you already have an accepted booking at that time".
       setError(err);
@@ -120,6 +125,12 @@ export default function ExpertConsultRow({ item, onDone }) {
           </p>
         )}
 
+        {booking.proposed_slot && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            You suggested {kigaliSlotLabel(booking.proposed_slot) ?? 'another time'}. Waiting for an answer.
+          </p>
+        )}
+
         {confirming ? (
           <div role="group" aria-label={`Decline the request for ${when}`} className="mt-3 rounded-control border border-border bg-chrome-raised p-3">
             <p className="text-sm font-semibold text-ink">Decline the request for {when}?</p>
@@ -132,15 +143,28 @@ export default function ExpertConsultRow({ item, onDone }) {
               </button>
             </div>
           </div>
+        ) : suggesting ? (
+          <ChangeTime
+            providerId={booking.provider_id}
+            primaryLabel="Send this suggestion"
+            onPick={suggest}
+            onNeverMind={() => setSuggesting(false)}
+            className="mt-3"
+          />
         ) : (
-          actions.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2">{actions.map(actionButton)}</div>
+          (actions.length > 0 || canSuggest) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {actions.map(actionButton)}
+              {canSuggest && (
+                <button ref={suggestRef} type="button" className={BUTTON_OUTLINE} onClick={() => setSuggesting(true)}>
+                  Suggest another time<span className="sr-only"> for {when}</span>
+                </button>
+              )}
+            </div>
           )
         )}
 
-        {/* Always in the page, so a change to it is announced. Empty when there is nothing to say. */}
-        <p role="status" aria-live="polite" className={message ? 'mt-2 text-sm font-semibold text-ink' : ''}>{message}</p>
-        {error && <ErrorNotice error={error} className="mt-2" />}
+        {error &&<ErrorNotice error={error} className="mt-2" />}
       </div>
     </div>
   );
