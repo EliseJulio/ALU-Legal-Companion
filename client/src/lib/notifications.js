@@ -11,13 +11,19 @@ import { typeName } from '@/lib/reports';
 
 // Matters whose history is read for checked documents. More than this is slow for a bell.
 const MAX_MATTERS_CHECKED = 10;
-// How many read items are remembered per person. The oldest are forgotten first.
-const MAX_READ_KEPT = 200;
+// How many read items are remembered per person. Items still in the list are always kept. Of the
+// rest the oldest are forgotten first.
+const MAX_READ_KEPT = 500;
 // The server writes a lawyer's check as "Checked “<item>”: <result>" (matterDocuments.js).
 const CHECKED = /^Checked “/;
 
 const readKey = (userId) => `alc.read.${userId}`;
 const day = (iso) => readableDay(iso) ?? iso;
+
+function upcoming(slot, now) {
+  const when = new Date(slot);
+  return !Number.isNaN(when.getTime()) && when.getTime() > now.getTime();
+}
 
 function truncate(text, length = 90) {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -35,9 +41,16 @@ export function readIds(userId) {
   }
 }
 
-export function saveReadIds(userId, ids) {
+// `current` is the ids of the items the bell shows now. They are kept whatever their age. Only the
+// oldest of the other ids are dropped, so the total stays within MAX_READ_KEPT.
+export function saveReadIds(userId, ids, current = []) {
+  const shown = new Set(current);
+  const stillShown = ids.filter((id) => shown.has(id)).slice(-MAX_READ_KEPT);
+  const others = ids.filter((id) => !shown.has(id));
+  const room = MAX_READ_KEPT - stillShown.length;
+  const kept = [...others.slice(Math.max(0, others.length - room)), ...stillShown];
   try {
-    localStorage.setItem(readKey(userId), JSON.stringify(ids.slice(-MAX_READ_KEPT)));
+    localStorage.setItem(readKey(userId), JSON.stringify(kept));
   } catch {
     // Blocked storage. The items read in this visit stay read until the page is closed.
   }
@@ -79,13 +92,28 @@ export function reminderItems(rows) {
     }));
 }
 
-export function bookingItems(rows) {
+// An accepted appointment is listed only while its time is still to come. One whose time cannot be read
+// is left off too, because nothing says when it ends.
+export function bookingItems(rows, now = new Date()) {
   return rows
-    .filter((b) => b.status === 'accepted')
+    .filter((b) => b.status === 'accepted' && upcoming(b.slot, now))
     .map((b) => ({
       id: `booking-${b.id}`,
       title: 'Appointment accepted',
       text: `${b.provider_name}. Open Appointments for the details.`,
+      to: `/appointments#consult-${b.id}`,
+      at: null,
+    }));
+}
+
+// A request where the lawyer suggested another time. The person answers it on Appointments.
+export function proposalItems(rows) {
+  return rows
+    .filter((b) => b.status === 'requested' && b.proposed_slot)
+    .map((b) => ({
+      id: `proposal-${b.id}`,
+      title: 'The lawyer suggested another time',
+      text: 'Open Appointments to answer.',
       to: `/appointments#consult-${b.id}`,
       at: null,
     }));
@@ -165,7 +193,8 @@ export function sortItems(items) {
 // Every source answers { items, failed }. A failed source is not an error for the others.
 async function checkSource() {
   const matters = await apiGet('/matters');
-  const open = matters.filter((m) => m.status === 'open').slice(0, MAX_MATTERS_CHECKED);
+  const all = matters.filter((m) => m.status === 'open');
+  const open = all.slice(0, MAX_MATTERS_CHECKED);
   const results = await Promise.all(open.map((m) => apiGet(`/matters/${m.id}`).then(
     (detail) => ({ ok: true, detail }),
     () => ({ ok: false }),
@@ -173,6 +202,8 @@ async function checkSource() {
   return {
     items: results.filter((r) => r.ok).flatMap((r) => checkItems(r.detail)),
     failed: results.some((r) => !r.ok),
+    // More open matters than were checked: the bell says it shows part of the list.
+    partial: all.length > open.length,
   };
 }
 
@@ -180,7 +211,7 @@ async function checkSource() {
 function studentSources() {
   return [
     () => apiGet('/matters/reminders').then((rows) => ({ items: reminderItems(rows), failed: false })),
-    () => apiGet('/bookings/mine').then((rows) => ({ items: bookingItems(rows), failed: false })),
+    () => apiGet('/bookings/mine').then((rows) => ({ items: [...bookingItems(rows), ...proposalItems(rows)], failed: false })),
     () => apiGet('/questions/mine').then((rows) => ({ items: questionItems(rows), failed: false })),
     checkSource,
   ];
@@ -221,6 +252,6 @@ export async function loadNotifications(who) {
   if (loaded.length === 0) throw results[0].error;
   return {
     items: sortItems(loaded.flatMap((r) => r.items)),
-    partial: loaded.length < results.length || loaded.some((r) => r.failed),
+    partial: loaded.length < results.length || loaded.some((r) => r.failed || r.partial),
   };
 }

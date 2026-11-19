@@ -36,7 +36,7 @@ export function useNotifications(user) {
   const unread = items.filter((item) => !readSet.has(item.id)).length;
 
   function remember(ids) {
-    saveReadIds(userId, ids);
+    saveReadIds(userId, ids, items.map((item) => item.id));
     setReadState({ userId, ids });
   }
 

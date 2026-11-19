@@ -369,5 +369,16 @@ export function useCall({ reply, audioOnly, startMuted }) {
     dispatch({ type: 'leave' });
   }, [c, closeMedia, polite]);
 
+  // A closed tab sends bye so the room knows the person has gone and must knock again.
+  // A page kept in the back-forward cache (persisted) is not leaving.
+  useEffect(() => {
+    function onPageHide(event) {
+      if (event.persisted) return;
+      leave();
+    }
+    window.addEventListener('pagehide', onPageHide);
+    return () => window.removeEventListener('pagehide', onPageHide);
+  }, [leave]);
+
   return { state, local, remote, mic, cam, notice, canFlip, facing, admit, deny, toggleMic, toggleCam, switchCamera, leave };
 }

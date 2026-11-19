@@ -8,7 +8,13 @@ export function useScrollToHash(ready) {
   const { hash, key } = useLocation();
   useEffect(() => {
     if (!ready || !hash) return undefined;
-    const name = decodeURIComponent(hash.slice(1));
+    let name;
+    try {
+      name = decodeURIComponent(hash.slice(1));
+    } catch {
+      // A malformed hash such as "#%" is not a name on the page. Nothing scrolls.
+      return undefined;
+    }
     const matches = [...document.querySelectorAll('[data-anchor]')].filter((el) => el.dataset.anchor === name);
     const target = matches.find((el) => el.getClientRects().length > 0) ?? matches[0];
     if (!target) return undefined;
