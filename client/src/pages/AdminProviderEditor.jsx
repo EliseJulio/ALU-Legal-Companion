@@ -9,6 +9,7 @@ import Wizard from '@/components/wizard/Wizard';
 import { WizCheck, WizField } from '@/components/wizard/WizardField';
 import { CATEGORIES, PROVIDER_TYPES } from '@/lib/directory';
 import { collect, digits, httpsLink, meetLink, requiredText } from '@/lib/wizard';
+import { plainGuideMessage } from '@/lib/guideErrors';
 
 const LIST = '/admin/providers';
 
@@ -69,7 +70,7 @@ function ProviderForm({ provider, onRefresh }) {
         try {
           await apiPost(`/directory/providers/${row.id}/publish`);
         } catch (err) {
-          const refusal = `Saved as a draft. It is not published yet: ${err.message}`;
+          const refusal = `Saved as a draft. It is not published yet: ${plainGuideMessage(err?.message) || 'the server gave no reason'}`;
           if (provider) {
             setError({ message: refusal });
             onRefresh();

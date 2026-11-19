@@ -26,11 +26,12 @@ function ContactForm({ contact }) {
     if (busy) return;
     setBusy(true);
     setError(null);
+    // A blank order is left out. The server then keeps the saved order, or uses its default on a new contact.
     const body = {
       name: values.name,
       contact: values.contact,
       when_to_use: values.when_to_use,
-      sort_order: Number(values.sort_order),
+      ...(values.sort_order.trim() !== '' && { sort_order: Number(values.sort_order) }),
     };
     try {
       if (contact) await apiPut(`/admin/emergency-contacts/${contact.id}`, body);

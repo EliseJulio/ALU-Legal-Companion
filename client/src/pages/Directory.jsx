@@ -81,7 +81,7 @@ export default function Directory() {
             A booking request is not a confirmed appointment. The provider must accept it first.
           </p>
           <p className="mt-3 text-sm">
-            Other offices are contact-direct listings. Check the details before contacting or visiting.
+            Other offices take no online bookings. Check the details before contacting or visiting.
           </p>
           <Link to="/directory/booking-check" className={`mt-3 ${BUTTON_TEXT}`}>
             Already requested a booking? Check with your code →

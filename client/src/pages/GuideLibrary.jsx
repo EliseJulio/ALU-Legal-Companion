@@ -26,6 +26,12 @@ function chosenFrom(raw) {
 // So more than one topic can be chosen at a time.
 export default function GuideLibrary() {
   const [search, setSearch] = useState('');
+  // The words sent to the server. They follow the box after a quarter of a second without typing.
+  const [asked, setAsked] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setAsked(search.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [search]);
   const [params, setParams] = useSearchParams();
   const chosen = chosenFrom(params.get('domain'));
   // A wide screen has a row of topic buttons. A narrow one has the Filter guides panel.
@@ -39,7 +45,7 @@ export default function GuideLibrary() {
   if (wide && open) setOpen(false);
 
   const query = new URLSearchParams();
-  if (search.trim()) query.set('search', search.trim());
+  if (asked) query.set('search', asked);
   const text = query.toString();
   const { data: guides, error, loading } = useApi(`/guides${text ? `?${text}` : ''}`);
   const shown = guides ? (chosen.length ? guides.filter((g) => chosen.includes(g.domain)) : guides) : null;
@@ -221,7 +227,7 @@ export default function GuideLibrary() {
               <button
                 type="button"
                 // This button leaves the page when it is pressed. Focus goes to the search box.
-                onClick={() => { setSearch(''); choose([]); document.getElementById('guide-search')?.focus(); }}
+                onClick={() => { setSearch(''); setAsked(''); choose([]); document.getElementById('guide-search')?.focus(); }}
                 className={BUTTON_OUTLINE}
               >
                 Show every guide

@@ -35,8 +35,12 @@ export default function ReportSent() {
             <>
               <TokenDisplay token={sent.code} purpose="check your report" onContinue={() => navigate('/report/check')} />
               <div className="mt-4 flex flex-wrap gap-3">
-                <Link to="/report/check" className={BUTTON_OUTLINE}>Check this report</Link>
-                <Link to="/guides" className={BUTTON_OUTLINE}>Back to the guides</Link>
+                <a href="/report/check" target="_blank" rel="noopener noreferrer" className={BUTTON_OUTLINE}>
+                  Check this report{' '}<span className="sr-only">(opens in a new tab)</span>
+                </a>
+                <a href="/guides" target="_blank" rel="noopener noreferrer" className={BUTTON_OUTLINE}>
+                  Back to the guides{' '}<span className="sr-only">(opens in a new tab)</span>
+                </a>
               </div>
             </>
           ) : (

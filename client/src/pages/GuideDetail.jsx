@@ -54,9 +54,10 @@ export default function GuideDetail() {
   if (error?.status === 404) {
     return (
       <div>
-        <h1 className="font-head text-[length:clamp(24px,2.7vw,30px)] leading-[1.15] tracking-[-0.01em] text-ink">This guide is being re-checked</h1>
+        <h1 className="font-head text-[length:clamp(24px,2.7vw,30px)] leading-[1.15] tracking-[-0.01em] text-ink">This guide is not on the site right now.</h1>
         <div className={`mt-6 ${CARD}`}>
-          <p className="font-medium">It will be back once an admin has checked and published it again.</p>
+          <p className="font-medium">It may be being checked again, or the address may be wrong.</p>
+          <p className="mt-1 text-sm text-muted-foreground">It will be back once an admin has checked and published it again.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Whenever a guide is edited it leaves the site until an admin has checked the change.
             That is on purpose. It stops anyone reading law that nobody has verified. Nothing has

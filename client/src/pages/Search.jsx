@@ -72,14 +72,13 @@ export default function Search() {
   const location = useLocation();
   const heading = useRef(null);
   const wordsBox = useRef(null);
-  const libraryBox = useRef(null);
 
-  // The boxes are not remounted by a search, so a person who pressed Enter keeps their place. When
-  // the address changes by another way (the Back button, a link) the boxes are set from it.
+  // The words box is not remounted by a search, so a person who pressed Enter keeps their place. When
+  // the address changes by another way (the Back button, a link) the box is set from it. The library
+  // choice is remounted with its key, so it always starts from the library in the address.
   useEffect(() => {
     if (wordsBox.current && wordsBox.current.value.trim() !== q) wordsBox.current.value = q;
-    if (libraryBox.current) libraryBox.current.value = library;
-  }, [q, library]);
+  }, [q]);
 
   // A search from the menu leaves the person in the menu. The page heading takes focus so the new
   // page is read from its top and the results are not left behind the menu.
@@ -122,7 +121,7 @@ export default function Search() {
         Search the guides, the matters and the directory. Only items an admin has checked and published are listed.
       </p>
 
-      <form onSubmit={submit} role="search" aria-label="Search results" className="mt-8 grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end">
+      <form onSubmit={submit} role="search" aria-label="Search the site" className="mt-8 grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem_auto] md:items-end">
         <div>
           <label htmlFor="search-words" className="block text-sm font-semibold">Search guides, routes and providers</label>
           <div className="mt-2 flex min-h-[3rem] items-center gap-3 rounded-control border border-control bg-surface px-4 focus-within:ring-2 focus-within:ring-focus">
@@ -141,7 +140,7 @@ export default function Search() {
         </div>
         <div>
           <label htmlFor="search-library" className="block text-sm font-semibold">Where to search</label>
-          <Select id="search-library" ref={libraryBox} name="library" defaultValue={library} className={FIELD} wrapperClassName="mt-2 flex w-full">
+          <Select key={library} id="search-library" name="library" defaultValue={library} className={FIELD} wrapperClassName="mt-2 flex w-full">
             {LIBRARIES.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
           </Select>
         </div>

@@ -15,7 +15,6 @@ export default function NotFound() {
         <Link to="/" className={BUTTON_PRIMARY}>Go to the home page</Link>
         <Link to="/directory" className={BUTTON_OUTLINE}>Find where a matter goes first</Link>
         <Link to="/guides" className={BUTTON_OUTLINE}>Read the legal guides</Link>
-        <Link to="/directory" className={BUTTON_OUTLINE}>Look in the directory</Link>
         <Link to="/search" className={BUTTON_OUTLINE}>Search the site</Link>
       </div>
 

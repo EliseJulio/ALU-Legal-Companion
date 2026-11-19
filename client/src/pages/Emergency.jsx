@@ -13,9 +13,6 @@ const NEAREST = [
   { label: 'Find a health facility near me', query: 'hospital or health centre' },
 ];
 
-const TOLL_FREE_NUMBERS = ['112', '3029', '116', '166', '1022'];
-const isTollFree = (contact) => TOLL_FREE_NUMBERS.includes(contact.replace(/\D/g, ''));
-
 // The value on the right of a contact. A number is large and red so it is found at a glance.
 // Other values are words so they keep the text size.
 // A link is the whole value area. It is at least 44 px high with a focus ring and a background step on hover.
@@ -132,11 +129,6 @@ export default function Emergency() {
             <div className="min-w-0">
               <h3 className="font-head text-[15px] leading-[1.3] text-ink">{c.name}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{c.when}</p>
-              {isTollFree(c.contact) && (
-                <p className="mt-1 text-xs text-faint">
-                  Toll-free / Ubuntu (No airtime needed on MTN &amp; Airtel Rwanda)
-                </p>
-              )}
             </div>
             {/* Full width on a phone, so the number sits under its description. Right on a desktop. */}
             <div className="flex w-full justify-start sm:w-auto sm:justify-end">

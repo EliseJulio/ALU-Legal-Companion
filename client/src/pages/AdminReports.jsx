@@ -226,7 +226,7 @@ export default function AdminReports() {
           {data?.reports.length > 0 && (
             <RecordList title="Reports" columns={['Report', 'About', 'Reply by', 'Status']} template={ROW}>
               {data.reports.map((r) => (
-                <RecordRow key={r.id} template={ROW} className={selected === r.id ? 'bg-chrome-raised' : ''}>
+                <RecordRow key={r.id} template={ROW} className={selected === r.id ? 'bg-primary-subtle' : ''}>
                   <Cell>
                     <button
                       type="button"
