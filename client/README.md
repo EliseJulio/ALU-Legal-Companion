@@ -29,7 +29,7 @@ The live website is built with `VITE_API_URL=https://alu-legal-companion.onrende
 | `npm run build` | Makes the files to publish in `dist/` |
 | `npm run preview` | Serves the built files to check them |
 | `npm test` | Runs the component and unit tests |
-| `npm run e2e` | Runs the browser tests at the width of a phone |
+| `npm run e2e` | Runs the browser tests in Chromium at the width of a phone. It starts its own page server on port 5317. `E2E_PORT` changes that port, `E2E_BASE_URL` tests a server that is already running and `E2E_WORKERS` sets the number of browser workers (default 4) |
 | `npm run screenshots` | Takes new screenshots of the pages into `docs1/screenshots`. The folder is not kept in the repository |
 | `npm run lint` | Checks the code with oxlint |
 
@@ -39,13 +39,14 @@ The routes are in `src/App.jsx` and the menu links are in `src/lib/nav.js`.
 
 | Who | Pages |
 |---|---|
-| Anyone | `/` front door, `/directory` (with the guided questions that say where a matter goes first), `/directory/:id`, `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/search`, `/ask`, `/ask-ai`, `/ask/check`, `/check-request`, `/report`, `/report/sent`, `/report/check`, `/emergency` |
+| Anyone | `/` front door, `/directory` (with the guided questions that say where a matter goes first), `/directory/:id`, `/directory/book/:id`, `/directory/booking-check`, `/guides` and `/guides/:id`, `/search`, `/ask`, `/ask-ai`, `/ask/check`, `/check-request`, `/report`, `/report/sent`, `/report/check`, `/emergency`, `/privacy` |
 | Accounts | `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`, `/confirm-email-change`, `/redeem-invite` |
-| Student or staff | `/home`, `/matters`, `/matters/new`, `/matters/:id`, `/calendar`, `/saved`, `/my-activity`, `/settings` |
-| Legal expert | `/expert` overview, `/expert/questions`, `/expert/calendar`, `/expert/matters` |
-| Admin | `/admin` overview, `/admin/calendar`, `/admin/guides`, `/admin/checklists`, `/admin/providers`, `/admin/routes`, `/admin/ladder/new` and `/admin/ladder/:id`, `/admin/reports`, `/admin/users`, `/admin/invites`, `/admin/contacts` (each list has its own `new` and `:id` editor page) |
+| Signed in | `/settings` (open to every role) and `/call/:id`, the consultation room for an accepted booking. It uses the sign-in or the booking's code |
+| Student or staff | `/home`, `/matters`, `/matters/new`, `/matters/:id`, `/calendar`, `/appointments`, `/saved`, `/my-activity` |
+| Legal expert | `/expert` overview, `/expert/questions`, `/expert/calendar`, `/expert/appointments`, `/expert/matters` |
+| Admin | `/admin` overview, `/admin/calendar`, `/admin/appointments`, `/admin/guides`, `/admin/checklists`, `/admin/providers`, `/admin/routes`, `/admin/ladder/new` and `/admin/ladder/:id`, `/admin/reports`, `/admin/users`, `/admin/invites`, `/admin/contacts` (each list has its own `new` and `:id` editor page) |
 
-Old addresses still work and redirect: `/where-to-go` and `/where-to-go/:id` go to the Directory, `/appointments`, `/expert/appointments`, `/expert/bookings` and `/admin/appointments` go to the Calendar of that role.
+Old addresses still work. `/where-to-go` and `/where-to-go/:id` go to the Directory and `/expert/bookings` goes to `/expert/appointments`.
 
 A page that a person's role cannot use explains why. It does not redirect and it never signs anyone out. The server is the real gate. The pages only avoid sending a request that the server would refuse.
 
@@ -80,7 +81,7 @@ The Figma designs the pages follow: https://www.figma.com/design/qQwmLeedehTnVPj
 - **Disclaimer.** "Legal information not legal advice." is in the footer of every page.
 - **Anonymous flows.** A one-time code is shown once and the reader must say they saved it. The code is kept in the page and sent in one request. It is never put in the address bar. The page sends an anonymous request without the login, even for a signed-in person.
 - **Ask AI is optional.** Ask AI answers only from published guides, says when they do not cover a question and points to the Directory or a legal expert. The person must agree before a question is sent to Google. A real legal expert still answers every question sent to one.
-- **One publisher.** An administrator publishes alone. A guide, checklist, route or directory entry is Draft or Published, and editing a published one takes it back to Draft until it is published again. The site shows no "awaiting review" step.
+- **One publisher.** An administrator publishes alone. A guide, checklist, route or directory entry is Draft or Published and editing a published one takes it back to Draft until it is published again. There is no other status between Draft and Published.
 
 ## How the site talks to the server
 
@@ -105,4 +106,4 @@ The browser tests need the browser once: `npx playwright install chromium`.
 ## Notes
 
 - `dist/` is made by the build. It is not kept in git.
-- A static host must send every address to `index.html` so a reload on `/matters/7` works. On Render this is one rewrite rule from `/*` to `/index.html`. Without it a reload or a link from an email, shows "Not Found"..
+- A static host must send every address to `index.html` so a reload on `/matters/7` works. On Render this is one rewrite rule from `/*` to `/index.html`. Without it a reload or a link from an email shows "Not Found".

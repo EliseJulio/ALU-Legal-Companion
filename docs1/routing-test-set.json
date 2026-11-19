@@ -1,0 +1,130 @@
+{
+  "instrument": "Routing accuracy test set (proposal section 3.2.2, Table 8, FR-13)",
+  "how_to_fill": "Each situation is a legal situation named in the needs survey, written exactly as the survey wrote it. For each one the researcher records the body the law requires the person to go to FIRST, spelled as that body's name appears in the directory. A situation that no published route covers has expected_first_body set to null and is counted as a coverage gap, not as a right or wrong answer.",
+  "target": "At least 90 per cent of the situations that a route covers are sent to the right first body, and none is sent to a body with no power over the matter.",
+  "limits": [
+    "The needs survey has 5 respondents. The proposal asks for thirty situations. This set has 12.",
+    "Eleven of the 12 situations are the survey's own option wording, not words a respondent typed. One (id 12) is a respondent's free-text answer.",
+    "No legal expert was available. The expected first bodies were recorded by the researcher from the legal basis each published route cites. They have not been checked by a lawyer.",
+    "The expected body for a situation is the first body of the route the researcher judged to cover it. The route keywords were written by the same researcher."
+  ],
+  "fields": {
+    "id": "a number",
+    "text": "the situation as the survey wrote it",
+    "source": "where it comes from in the survey",
+    "covered": "true when a published route covers the situation, false when none does",
+    "expected_first_body": "the directory name of the body the law requires first, or null when no route covers the situation",
+    "recorded_by": "who recorded the expected body",
+    "note": "why the researcher chose that body, or why none applies"
+  },
+  "situations": [
+    {
+      "id": 1,
+      "text": "A landlord kept my deposit or part of it",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 1",
+      "covered": true,
+      "expected_first_body": "Abunzi committee of your cell",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "A deposit dispute between two people is a breach of contract up to Frw 3,000,000 (Law No. 37/2016, Art. 10)."
+    },
+    {
+      "id": 2,
+      "text": "A landlord raised my rent or told me to leave and it seemed unfair",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 2",
+      "covered": true,
+      "expected_first_body": "Abunzi committee of your cell",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "A lease is an ordinary contract, so a dispute between two people goes to the Abunzi first. If the landlord is a registered business the route sends the person to the Access to Justice Bureau instead."
+    },
+    {
+      "id": 3,
+      "text": "I worked or interned with no written contract",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 3",
+      "covered": true,
+      "expected_first_body": "District labour inspector",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Employment disputes go to the labour inspector first (Law No. 66/2018, Art. 102)."
+    },
+    {
+      "id": 4,
+      "text": "I was paid late, paid less than agreed or not paid at all",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 4",
+      "covered": true,
+      "expected_first_body": "District labour inspector",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Unpaid wages go to the labour inspector first (Law No. 66/2018, Art. 102)."
+    },
+    {
+      "id": 5,
+      "text": "I needed to register a business or get a licence or tax number",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 5",
+      "covered": true,
+      "expected_first_body": "Office of the Registrar General (RDB)",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Business registration is done at the Office of the Registrar General at the Rwanda Development Board."
+    },
+    {
+      "id": 6,
+      "text": "I had trouble with a visa, residence permit or permission to work in Rwanda",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 6",
+      "covered": true,
+      "expected_first_body": "Directorate General of Immigration and Emigration",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Permits and visas are the work of the Directorate General of Immigration and Emigration."
+    },
+    {
+      "id": 7,
+      "text": "I experienced sexual harassment or harassment because of who I am",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 7",
+      "covered": true,
+      "expected_first_body": "Isange One Stop Centre",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Sexual harassment is a form of gender-based violence, and Isange One Stop Centres take it. Harassment for other reasons than sex is only partly covered."
+    },
+    {
+      "id": 8,
+      "text": "I was treated unfairly because of my nationality, gender or disability",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 8",
+      "covered": false,
+      "expected_first_body": null,
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "No published route covers discrimination."
+    },
+    {
+      "id": 9,
+      "text": "I lost money to online fraud or a mobile-money scam",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 9",
+      "covered": true,
+      "expected_first_body": "Rwanda Investigation Bureau (RIB)",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "Fraud is a crime and is reported to the Rwanda Investigation Bureau (Law No. 12/2017)."
+    },
+    {
+      "id": 10,
+      "text": "I had a problem with the police and did not know my rights",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 10",
+      "covered": false,
+      "expected_first_body": null,
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "A complaint about the conduct of the police is not a report of a crime. No published route covers it."
+    },
+    {
+      "id": 11,
+      "text": "I had a family or inheritance matter I needed legal help with",
+      "source": "the question 'Has any of this happened to you in the last two years?', option 11",
+      "covered": false,
+      "expected_first_body": null,
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "No published route covers family or inheritance matters."
+    },
+    {
+      "id": 12,
+      "text": "Registering a business",
+      "source": "response 1, the last question 'what is the one legal question you would most want answered?' (free text)",
+      "covered": true,
+      "expected_first_body": "Office of the Registrar General (RDB)",
+      "recorded_by": "researcher (no legal expert available)",
+      "note": "The only free-text answer in the survey that names a situation."
+    }
+  ]
+}

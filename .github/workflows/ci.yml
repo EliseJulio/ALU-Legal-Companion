@@ -1,12 +1,17 @@
 name: CI
 
-# Runs all four test suites on every push and pull request.
+# Runs four jobs on every push and pull request:
+#   server      Jest and Supertest against a Postgres 16 service
+#   client      Vitest component tests, the production build and oxlint
+#   e2e         Playwright in Chromium, with the API stubbed
+#   signaling   Vitest for the call Worker
 # A broken change is caught here and not by someone remembering to run the tests.
 on:
   push:
   pull_request:
 
 jobs:
+  # The API tests need a real database. The service below is created for this job only.
   server:
     name: Server — Jest + Supertest
     runs-on: ubuntu-latest
@@ -39,6 +44,7 @@ jobs:
         working-directory: server
         run: npm ci
 
+      # Each test run makes its own schema in this database and drops it at the end.
       - name: Run tests
         working-directory: server
         env:
@@ -67,6 +73,7 @@ jobs:
         run: npm test
 
       # Catches unresolved @/ aliases, Tailwind config errors and broken imports.
+      # The build needs no environment variables. VITE_API_URL defaults to the local API.
       - name: Build
         working-directory: client
         run: npm run build

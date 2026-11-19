@@ -1,7 +1,9 @@
 name: Scheduled jobs
 
-# Calls the API's job endpoint every 10 minutes. The call wakes the hosting service, which sleeps
-# when idle and runs the due deadline reminders and the retention purge.
+# Calls POST /api/internal/run-jobs every 10 minutes. The call wakes a free-plan service that sleeps when idle,
+# then runs the due deadline and consultation reminders and the clean-up of old anonymous records.
+# The route answers 404 when the server's JOB_SECRET is unset or shorter than 32 characters, and 401 when the
+# secret sent here does not match. Scheduled runs on GitHub can start a few minutes late.
 on:
   schedule:
     - cron: '*/10 * * * *'
@@ -14,6 +16,15 @@ jobs:
   run-jobs:
     runs-on: ubuntu-latest
     steps:
+      # Repository secrets. JOB_URL is the full address of the route, for example
+      # https://<api host>/api/internal/run-jobs. JOB_SECRET is the same value as JOB_SECRET on the server.
       - name: Call the job endpoint
+        env:
+          JOB_URL: ${{ secrets.JOB_URL }}
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
         run: |
-          curl --fail --silent --show-error --max-time 60 -X POST -H "X-Job-Secret: ${{ secrets.JOB_SECRET }}" "${{ secrets.JOB_URL }}"
+          if [ -z "$JOB_URL" ] || [ -z "$JOB_SECRET" ]; then
+            echo "::error::The JOB_URL and JOB_SECRET repository secrets must both be set. Nothing was called."
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 60 -X POST -H "X-Job-Secret: $JOB_SECRET" "$JOB_URL"

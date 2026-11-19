@@ -2,18 +2,21 @@
 # Values marked "sync: false" are asked for in the Render dashboard. None of them are kept here.
 
 # The database was made by hand in the Render dashboard, so it is not created here.
+# A database on the free plan expires about 30 days after it was made. See the Deployment section of README.md.
 
 services:
-  # The API. Always on, because it checks for due reminders every ten minutes from inside the server.
+  # The API, on the free plan. The service sleeps when idle. The scheduled workflow in .github/workflows/jobs.yml
+  # wakes it by calling the job route every ten minutes, and the in-process timer runs due reminders every ten
+  # minutes while the service is awake. The free plan has no pre-deploy step, so the start command runs the
+  # migrations first. They are safe to run again.
   - type: web
     name: alu-legal-api
     runtime: node
     region: oregon
-    plan: starter
+    plan: free
     rootDir: server
     buildCommand: npm ci
-    startCommand: npm start
-    preDeployCommand: npm run migrate
+    startCommand: npm run migrate && npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -25,19 +28,28 @@ services:
         generateValue: true
       - key: TRUST_PROXY
         value: "1"
-      # The website address, for example https://alu-legal-web.onrender.com
+      # The website address with no slash at the end. Only this address may call the API.
+      # The live website is https://alu-legal-companion-qu8w.onrender.com
       - key: CORS_ORIGINS
         sync: false
-      # The same website address. Email links are built from it.
+      # The same website address. Email links are built from it. Required in production: the server stops without it.
       - key: APP_URL
         sync: false
       # 64 hex characters. Make one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      # Without it uploads answer 503. Encrypted files are kept in the database, so they survive a deploy.
       - key: DOCUMENT_KEY
         sync: false
+      # Outgoing mail. Without it the server logs links and sends nothing.
       - key: SMTP_URL
         sync: false
+      # The sender address, verified with the mail provider. Empty sends from a placeholder address.
       - key: MAIL_FROM
         sync: false
+      # Optional: where replies go, and the name shown before the sender address.
+      - key: MAIL_REPLY_TO
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: ALU Legal Companion
       # Passwords for the accounts that "npm run seed" creates. Use strong ones.
       - key: SEED_ADMIN_PASSWORD
         sync: false
@@ -49,13 +61,14 @@ services:
       - key: JOB_SECRET
         sync: false
       # Most emails a day (Kigali time) that optional mail may use. Keep it below the provider's daily limit.
+      # Reminders and the document, consultation and time-change notices stop at this number.
       - key: DAILY_EMAIL_BUDGET
         value: "180"
-      # Calls inside the platform. With the first two empty the call uses Daily or Meet.
-      # The secret is 32+ characters and matches the one on the Worker.
+      # Calls inside the platform. With CALL_TICKET_SECRET or CALL_SIGNAL_URL empty the call uses Daily or the Meet link.
+      # The secret is 32+ characters and matches the one set on the Worker with wrangler secret put.
       - key: CALL_TICKET_SECRET
         sync: false
-      # The Worker address starting with wss://
+      # The Worker address starting with wss://. Its host name is also listed in the CSP connect-src below.
       - key: CALL_SIGNAL_URL
         sync: false
       # Cloudflare TURN key. Without them the call uses the free STUN address only.
@@ -63,6 +76,27 @@ services:
         sync: false
       - key: CALL_TURN_API_TOKEN
         sync: false
+      # Ask AI. Without GEMINI_API_KEY and GEMINI_MODEL the page says it is not available.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Copy a current free-tier model id from https://ai.google.dev/gemini-api/docs/models
+      - key: GEMINI_MODEL
+        sync: false
+      - key: ASK_AI_DAILY_LIMIT
+        value: "200"
+      # Not listed above, add them in the dashboard only when needed: REMINDERS (set to off only if a cron job
+      # runs npm run reminders instead), and the settings below.
+      # Optional: one shared limit store when more than one API instance runs.
+      # - key: REDIS_URL
+      #   sync: false
+      # Optional: Daily video rooms, used when the platform's own call is not set up.
+      # DAILY_DOMAIN must match the Permissions-Policy address on the website below.
+      # - key: DAILY_API_KEY
+      #   sync: false
+      # - key: DAILY_DOMAIN
+      #   sync: false
+      # - key: VIDEO_ROOMS_PER_DAY
+      #   value: "20"
 
   # The website. Every path goes to index.html so a refresh on /directory still works.
   - type: web
@@ -79,11 +113,13 @@ services:
     # Script: the one inline script in client/index.html (the theme) is allowed by its hash.
     # Recompute the hash if that script changes. The header test fails until it matches.
     # Style: 'self' only. The built HTML has no <style> tag or style="".
-    # connect-src: the API address (VITE_API_URL without /api) and the signaling Worker
-    # (CALL_SIGNAL_URL). Daily stays as the fallback.
+    # connect-src: the API host (VITE_API_URL without /api) and the signaling Worker host (CALL_SIGNAL_URL).
+    # Both host names are typed into the value below, so they must match the live API address and CALL_SIGNAL_URL.
+    # Daily stays as the fallback (*.daily.co).
     # frame-src: the Google map and the Daily call frame.
-    # Permissions-Policy: camera and microphone for this site and the Daily account only.
-    # It takes exact addresses. Replace alulegalcompanion with the DAILY_DOMAIN value.
+    # Permissions-Policy: camera and microphone for this site and the Daily address named below.
+    # Replace alulegalcompanion.daily.co with your own DAILY_DOMAIN address in the Permissions-Policy value if it differs.
+    # The CSP wildcard *.daily.co already covers any Daily subdomain, so only the Permissions-Policy names it.
     headers:
       - path: /*
         name: Content-Security-Policy
@@ -101,6 +137,7 @@ services:
         name: Permissions-Policy
         value: camera=(self "https://alulegalcompanion.daily.co"), microphone=(self "https://alulegalcompanion.daily.co"), geolocation=()
     envVars:
-      # The API address ending in /api, for example https://alu-legal-companion.onrender.com/api (the CSP connect-src above must name the same site)
+      # The API address ending in /api, for example https://alu-legal-companion.onrender.com/api (the CSP connect-src above must name the same site).
+      # Vite writes this value into the site at build time, so a change needs a new build.
       - key: VITE_API_URL
         sync: false
