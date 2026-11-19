@@ -2,29 +2,25 @@
 // tested on their own. A consultation request is a booking, so a student's requests and their
 // accepted times share one list.
 import { secureAddress } from '@/lib/url';
+import { kigaliDay, kigaliTime } from '@/lib/dates';
 
 export const ACCEPTED = 'accepted';
 export const REQUESTED = 'requested';
 export const PAST = 'past';
 export const DECLINED = 'declined';
+export const CANCELLED = 'cancelled';
 export const OTHER = 'other';
 
-const pad = (n) => String(n).padStart(2, '0');
-
-// The reader's own calendar day of a booking slot, as 'YYYY-MM-DD'. A slot is an exact moment sent
-// as UTC. Its day is the day in the reader's zone, the same zone readableSlot prints it in. Null
-// for a slot that cannot be read.
+// The calendar day of a booking slot in Kigali, as 'YYYY-MM-DD'. A slot is an exact moment sent as
+// UTC. Its day is the Kigali day, the same zone readableSlot prints it in. Null for a slot that
+// cannot be read.
 export function localDay(raw) {
-  const when = new Date(raw);
-  if (Number.isNaN(when.getTime())) return null;
-  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}`;
+  return kigaliDay(raw);
 }
 
-// The time of a slot in the reader's zone, as 'HH:MM'. Null for a slot that cannot be read.
+// The time of a slot in Kigali, as 'HH:MM'. Null for a slot that cannot be read.
 export function timeOf(raw) {
-  const when = new Date(raw);
-  if (Number.isNaN(when.getTime())) return null;
-  return `${pad(when.getHours())}:${pad(when.getMinutes())}`;
+  return kigaliTime(raw);
 }
 
 // The state of a booking and the word for it. A requested or declined booking keeps its state.
@@ -34,6 +30,7 @@ export function bookingState(booking, now = new Date()) {
   switch (booking.status) {
     case REQUESTED: return { state: REQUESTED, word: 'Requested' };
     case DECLINED: return { state: DECLINED, word: 'Declined' };
+    case CANCELLED: return { state: CANCELLED, word: 'Cancelled' };
     case 'completed': return { state: PAST, word: 'Past' };
     case ACCEPTED: {
       const when = new Date(booking.slot);

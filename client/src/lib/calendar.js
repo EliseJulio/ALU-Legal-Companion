@@ -128,8 +128,6 @@ export function shortDay(iso) {
 
 // ---- Booking helpers ----
 
-const two = (n) => String(n).padStart(2, '0');
-
 // The seven days of the week that holds `iso`, Monday first and Sunday last. Empty for a date that
 // cannot be read. Sundays belong to the week that is ending, so a Sunday is never the next week's.
 export function weekOf(iso) {
@@ -145,29 +143,15 @@ export function weekOf(iso) {
   });
 }
 
-// The reader's own calendar day for a booking slot as 'YYYY-MM-DD'.
-// A slot is a real moment so it is read with local getters. That is the day on the reader's clock.
-// Null if unreadable.
-export function dayOfSlot(raw) {
-  const when = new Date(raw);
-  if (Number.isNaN(when.getTime())) return null;
-  return isoDate(when.getFullYear(), when.getMonth(), when.getDate());
-}
-
-// The hour and minute of a slot in the reader's zone, such as '10:00'. Null if unreadable.
-export function timeOfSlot(raw) {
-  const when = new Date(raw);
-  if (Number.isNaN(when.getTime())) return null;
-  return `${two(when.getHours())}:${two(when.getMinutes())}`;
-}
-
 // How a booking looks on the calendar. Each state has a word so colour is never the only cue.
 //   accepted   a confirmed time still to come
 //   requested  waiting for the lawyer
 //   past       a time that has gone by or a finished booking
 //   declined   a time that was not taken
+//   cancelled  a time the person or the lawyer took back
 export function chipStateOf(booking, now = new Date()) {
   if (booking.status === 'declined') return 'declined';
+  if (booking.status === 'cancelled') return 'cancelled';
   if (booking.status === 'completed') return 'past';
   const when = new Date(booking.slot);
   if (!Number.isNaN(when.getTime()) && when.getTime() < now.getTime()) return 'past';
@@ -182,4 +166,5 @@ export const STATE_WORDS = {
   requested: 'Requested',
   past: 'Past',
   declined: 'Declined',
+  cancelled: 'Cancelled',
 };

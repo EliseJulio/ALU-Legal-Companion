@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { saveSession, saveUser, readSession, clearSession } from '@/lib/auth';
-import { onSessionExpired, apiGet, apiPost } from '@/lib/api';
+import { onSessionExpired, reloadToken, apiGet, apiPost } from '@/lib/api';
 import { useLiveTick } from '@/lib/live';
 
 const AuthContext = createContext(null);
@@ -46,6 +46,18 @@ export function AuthProvider({ children, syncSession = false }) {
   // A session can also end without anyone choosing it. The token lasts 7 days and the server
   // may refuse it. api.js drops the token and announces it. This is where the screen catches up.
   useEffect(() => onSessionExpired(() => setUser(null)), []);
+
+  // Another tab of the same browser signs in or out through the same storage. This tab takes the
+  // new login (or the lack of one) as well. A clear from another tab has no key, so it counts too.
+  useEffect(() => {
+    function onStorage(event) {
+      if (event.key !== null && event.key !== 'alc.token' && event.key !== 'alc.user') return;
+      reloadToken();
+      setUser(readSession());
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // The saved copy of the user is checked against the server when the app opens and again when the
   // person comes back to the tab and every minute. A failed check changes nothing.
