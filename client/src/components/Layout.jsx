@@ -171,6 +171,7 @@ export default function Layout({ children }) {
         groups={sheetGroups(user)}
         user={user}
         onClose={closeMore}
+        onNavigate={() => setMoreOpen(false)}
         onSignOut={() => { setMoreOpen(false); signOut(); }}
       />
     </>

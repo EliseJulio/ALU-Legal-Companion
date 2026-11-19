@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity } from '@/lib/auth';
+import { signInPath } from '@/lib/url';
 import { BUTTON_PRIMARY, CARD } from '@/lib/ui';
 
 // Guard for the pages of a person's own matters. Only students and staff can have them.
@@ -13,6 +14,7 @@ export default function OwnerOnly({
   forbiddenTitle = 'Matter tracking is for students and staff',
 }) {
   const { user } = useAuth();
+  const here = useLocation();
   if (canOwnActivity(user)) return children;
   return (
     <div className={`mt-6 ${CARD}`}>
@@ -24,7 +26,7 @@ export default function OwnerOnly({
           ? `You are signed in as ${user.name}. Tracked matters belong to the student or staff member who opened them.`
           : 'Your matters are private to you so they need an account. The directory works without one.'}
       </p>
-      <Link to={user ? '/directory' : '/login'} className={`${BUTTON_PRIMARY} mt-3`}>
+      <Link to={user ? '/directory' : signInPath(here)} className={`${BUTTON_PRIMARY} mt-3`}>
         {user ? 'Where do I take this?' : 'Sign in'}
       </Link>
     </div>

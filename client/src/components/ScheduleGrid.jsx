@@ -33,7 +33,7 @@ export default function ScheduleGrid({
               const isToday = iso === todayKey;
               const isSelected = iso === selected;
               const outside = monthOf(iso)?.month !== shown.month || monthOf(iso)?.year !== shown.year;
-              const surface = isSelected ? 'bg-chrome-raised' : outside ? 'bg-canvas' : 'bg-surface';
+              const surface = isSelected ? 'bg-primary-subtle' : outside ? 'bg-canvas' : 'bg-surface';
               return (
                 <td
                   key={iso}

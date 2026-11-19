@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ErrorNotice from '@/components/ErrorNotice';
 import { usePanelFocus } from '@/lib/panelFocus';
 import { BUTTON_DANGER_SOLID, BUTTON_OUTLINE, BUTTON_DESTRUCTIVE } from '@/lib/ui';
@@ -12,6 +12,9 @@ export default function CancelConsultation({ when, onCancel, onDone, className =
   const [error, setError] = useState(null);
   const [done, setDone] = useState(false);
   const { firstRef: keepRef, openerRef: cancelRef } = usePanelFocus(confirming);
+  // The button is gone once the message shows, so the message takes focus.
+  const doneRef = useRef(null);
+  useEffect(() => { if (done) doneRef.current?.focus(); }, [done]);
 
   async function confirm() {
     if (busy) return;
@@ -30,7 +33,7 @@ export default function CancelConsultation({ when, onCancel, onDone, className =
   }
 
   if (done) {
-    return <p role="status" className={`mt-2 text-sm font-semibold text-ink ${className}`}>Cancelled.</p>;
+    return <p ref={doneRef} tabIndex={-1} role="status" className={`mt-2 text-sm font-semibold text-ink outline-none ${className}`}>Cancelled.</p>;
   }
 
   if (!confirming) {

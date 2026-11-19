@@ -91,10 +91,12 @@ describe('Your consultation hours: adding, removing and saving', () => {
     const user = userEvent.setup({ delay: null });
     show({ availability: { ...KEYS, is_default: false, windows: [MONDAY_MORNING, { weekday: 1, start: '14:00', end: '15:00' }, { weekday: 3, start: '13:00', end: '14:00' }] } });
     await user.click(screen.getByRole('button', { name: 'Remove window 1 on Monday' }));
+    expect(screen.getByRole('button', { name: 'Add hours on Monday' })).toHaveFocus();
     expect(screen.getByLabelText('Start on Monday, window 1')).toHaveValue('14:00');
     expect(screen.getByLabelText('Start on Wednesday, window 1')).toHaveValue('13:00');
     expect(screen.queryByLabelText('Start on Monday, window 2')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add hours on Monday' }));
+    expect(screen.getByLabelText('Start on Monday, window 2')).toHaveFocus();
     expect(screen.getByLabelText('Start on Monday, window 2')).toHaveValue('09:00');
     expect(screen.getByLabelText('End on Monday, window 2')).toHaveValue('12:00');
     await user.click(screen.getByRole('button', { name: 'Save consultation hours' }));

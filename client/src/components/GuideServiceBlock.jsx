@@ -71,8 +71,8 @@ export default function GuideServiceBlock({ service }) {
                 <dt className="font-semibold">Fees</dt>
                 <dd>
                   <ul className="space-y-1">
-                    {fees.map((fee) => (
-                      <li key={`${fee.item}-${fee.amount_rwf}`}>
+                    {fees.map((fee, i) => (
+                      <li key={`${i}-${fee.item}-${fee.amount_rwf}`}>
                         {fee.item}: <span className="font-semibold">
                           {fee.amount_rwf === null || fee.amount_rwf === undefined ? 'not published. Ask the office' : frw(fee.amount_rwf)}
                         </span>
@@ -84,14 +84,14 @@ export default function GuideServiceBlock({ service }) {
                 </dd>
               </div>
             )}
-            {processing && (processing.text || processing.days_min !== undefined) && (
+            {processing && (processing.text || processing.days_min != null) && (
               <div>
                 <dt className="font-semibold">How long it takes</dt>
                 <dd>
                   {processing.text}
-                  {!processing.text && processing.days_min !== undefined && (
-                    processing.days_min === processing.days_max || processing.days_max === undefined
-                      ? `${processing.days_min} days`
+                  {!processing.text && processing.days_min != null && (
+                    processing.days_min === processing.days_max || processing.days_max == null
+                      ? `${processing.days_min} ${processing.days_min === 1 ? 'day' : 'days'}`
                       : `${processing.days_min} to ${processing.days_max} days`
                   )}
                 </dd>
@@ -117,10 +117,10 @@ export default function GuideServiceBlock({ service }) {
           </p>
           <ul className="mt-2 space-y-2 text-sm">
             {/* Each checkbox has a 44 px hit area. Its negative margin keeps the small box where it was. */}
-            {documents.map((doc) => {
+            {documents.map((doc, i) => {
               const isChecked = !!checkedDocs[doc.name];
               return (
-                <li key={doc.name} className="flex items-start gap-2.5">
+                <li key={`${i}-${doc.name}`} className="flex items-start gap-2.5">
                   <button
                     type="button"
                     role="checkbox"
@@ -156,8 +156,8 @@ export default function GuideServiceBlock({ service }) {
         <section aria-labelledby="where-heading">
           <h3 id="where-heading" className={H3}>Where to go</h3>
           <ul className="mt-2 space-y-3 text-sm">
-            {offices.map((office) => (
-              <li key={`${office.name}-${office.address}`}>
+            {offices.map((office, i) => (
+              <li key={`${i}-${office.name}-${office.address}`}>
                 <p className="font-semibold">{office.name}</p>
                 <p>{office.address}{office.district ? `, ${office.district}` : ''}</p>
                 {office.hours && <p>Open: {office.hours}</p>}
@@ -177,7 +177,7 @@ export default function GuideServiceBlock({ service }) {
           <h3 id="steps-heading" className={H3}>Do it online, step by step</h3>
           <ol className="mt-2 space-y-4 text-sm">
             {walkthrough.map((step, i) => (
-              <li key={step.instruction} className="flex gap-3">
+              <li key={`${i}-${step.instruction}`} className="flex gap-3">
                 <span className="mt-0.5 h-6 min-w-6 rounded-control bg-primary px-1.5 text-center font-mono text-xs font-medium leading-6 text-primary-foreground">{i + 1}</span>
                 <div>
                   <p>{step.instruction}</p>
@@ -194,7 +194,7 @@ export default function GuideServiceBlock({ service }) {
           <h3 id="confirm-heading" className="font-head text-sm font-bold text-warning-strong">Ask the office to confirm</h3>
           <p className="mt-1 text-sm text-warning-strong">We could not confirm these from an official source. So they are not stated as fact:</p>
           <ul className="mt-1 list-disc pl-5 text-sm text-warning-strong">
-            {unconfirmed.map((item) => <li key={item}>{item}</li>)}
+            {unconfirmed.map((item, i) => <li key={`${i}-${item}`}>{item}</li>)}
           </ul>
         </section>
       )}

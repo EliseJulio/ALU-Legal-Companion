@@ -31,63 +31,8 @@ export function monthOf(iso) {
   return { year, month: month - 1 };
 }
 
-// Where the 1st of a month falls: 0 for Monday up to 6 for Sunday.
-export function leadDays(year, month) {
-  return (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
-}
-
 export function daysInMonth(year, month) {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-}
-
-// The weeks of a month with Monday first. A week is seven cells.
-// A cell is { day, iso } or null for the empty places before the 1st and after the last.
-// A month has 4 or 5 or 6 weeks.
-export function monthGrid(year, month) {
-  const lead = leadDays(year, month);
-  const days = daysInMonth(year, month);
-  const cells = Math.ceil((lead + days) / 7) * 7;
-  const weeks = [];
-  for (let start = 0; start < cells; start += 7) {
-    const week = [];
-    for (let column = 0; column < 7; column += 1) {
-      const day = start + column - lead + 1;
-      week.push(day >= 1 && day <= days ? { day, iso: isoDate(year, month, day) } : null);
-    }
-    weeks.push(week);
-  }
-  return weeks;
-}
-
-// The month before or after `view`. The year wraps. `by` is 1 for the next month and -1 for the last.
-export function shiftMonth(view, by) {
-  const total = view.year * 12 + view.month + by;
-  return { year: Math.floor(total / 12), month: ((total % 12) + 12) % 12 };
-}
-
-// The years a year dropdown offers. From the earliest date's year less one to the latest's plus one.
-// It is never narrower than last year to two years ahead of this one, so a reader can always move
-// forward into next year without a matter first.
-export function yearRange(isoDates, todayYear) {
-  let first = todayYear - 1;
-  let last = todayYear + 2;
-  for (const iso of isoDates) {
-    const at = monthOf(iso);
-    if (!at) continue;
-    first = Math.min(first, at.year - 1);
-    last = Math.max(last, at.year + 1);
-  }
-  const years = [];
-  for (let year = first; year <= last; year += 1) years.push(year);
-  return years;
-}
-
-// The items that fall in one month, in the order they were given. The caller sorts them.
-export function itemsInMonth(items, dateOf, view) {
-  return items.filter((item) => {
-    const at = monthOf(dateOf(item));
-    return at !== null && at.year === view.year && at.month === view.month;
-  });
 }
 
 // The items on each day, keyed by 'YYYY-MM-DD'. Each day keeps the order it was given.

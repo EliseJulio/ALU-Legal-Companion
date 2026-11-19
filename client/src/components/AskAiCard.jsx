@@ -7,7 +7,7 @@ import { BUTTON_PRIMARY, CARD, FORM_FIELD } from '@/lib/ui';
 
 const MAX_QUESTION = 500;
 
-// A card at the top of Legal Guides. Its question is passed to the Ask AI page in the address. It is not sent from here.
+// A card at the top of Legal Guides. Its question is passed to the Ask AI page in the router state, never in the address. It is not sent from here.
 // It shows only when Ask AI is set up. It is never shown to a legal expert.
 export default function AskAiCard() {
   const user = useOptionalUser();
@@ -21,7 +21,7 @@ export default function AskAiCard() {
   function submit(event) {
     event.preventDefault();
     const question = text.trim();
-    navigate(question ? `/ask-ai?q=${encodeURIComponent(question)}` : '/ask-ai');
+    navigate('/ask-ai', question ? { state: { q: question } } : undefined);
   }
 
   return (

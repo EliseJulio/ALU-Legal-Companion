@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 export const LIVE = { every: 30000 };
 
 const CHANGED = 'alc:data-changed';
+// Changes that follow one another within this time are answered with one new request.
+const CHANGE_GAP_MS = 5000;
 
 // Called when a request that changes data has succeeded. The bell then asks again at once.
 export function announceChange() {
@@ -21,17 +23,27 @@ export function useLiveTick(everyMs, { onChange = false } = {}) {
     if (!everyMs) return undefined;
     const bump = () => setTick((n) => n + 1);
     const wake = () => { if (document.visibilityState === 'visible') bump(); };
+    // The first change asks at once. Others within the gap wait and are answered together.
+    let last = 0;
+    let waiting = null;
+    const changed = () => {
+      const left = last + CHANGE_GAP_MS - Date.now();
+      if (left <= 0) { last = Date.now(); bump(); return; }
+      if (waiting) return;
+      waiting = setTimeout(() => { waiting = null; last = Date.now(); bump(); }, left);
+    };
     const timer = setInterval(wake, everyMs);
     document.addEventListener('visibilitychange', wake);
     window.addEventListener('focus', wake);
     window.addEventListener('online', wake);
-    if (onChange) window.addEventListener(CHANGED, bump);
+    if (onChange) window.addEventListener(CHANGED, changed);
     return () => {
       clearInterval(timer);
+      clearTimeout(waiting);
       document.removeEventListener('visibilitychange', wake);
       window.removeEventListener('focus', wake);
       window.removeEventListener('online', wake);
-      window.removeEventListener(CHANGED, bump);
+      window.removeEventListener(CHANGED, changed);
     };
   }, [everyMs, onChange]);
   return tick;

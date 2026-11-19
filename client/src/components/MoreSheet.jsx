@@ -10,8 +10,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabi
 // The More sheet on a phone. It holds every page for this person in the same groups as the menu.
 // It is a dialog so Tab stays inside it while it is open.
 // Escape and a tap on the dimmed page close it. The layout makes the page behind it inert.
-// `onClose` gives focus back to the More button. `onSignOut` is for the sign out button.
-export default function MoreSheet({ open, groups, user, onClose, onSignOut }) {
+// `onClose` gives focus back to the More button. `onNavigate` closes after a page link, with no focus move.
+// `onSignOut` is for the sign out button.
+export default function MoreSheet({ open, groups, user, onClose, onNavigate, onSignOut }) {
   const box = useRef(null);
   const closeButton = useRef(null);
 
@@ -88,8 +89,8 @@ export default function MoreSheet({ open, groups, user, onClose, onSignOut }) {
                     <NavLink
                       to={link.to}
                       end={link.end}
-                      onClick={onClose}
-                      className={({ isActive }) => `flex min-h-[48px] items-center gap-3 rounded-control px-3 text-sm ${RING_ON_CANVAS} ${isActive ? 'bg-chrome-raised font-semibold text-ink' : 'text-ink hover:bg-chrome-raised'}`}
+                      onClick={onNavigate ?? onClose}
+                      className={({ isActive }) => `flex min-h-[48px] items-center gap-3 rounded-control px-3 text-sm ${RING_ON_CANVAS} ${isActive ? 'bg-primary-subtle font-semibold text-primary-text' : 'text-ink hover:bg-chrome-raised'}`}
                     >
                       <Icon name={link.icon} />
                       {link.label}

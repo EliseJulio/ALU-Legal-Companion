@@ -43,6 +43,7 @@ describe('Change the time', () => {
     expect(String(global.fetch.mock.calls[1][0])).toMatch(/\/bookings\/slots\/7$/);
     expect(screen.getByRole('button', { name: '10:00' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: 'Move to this time' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('button', { name: 'Move to this time' })).toHaveAccessibleDescription('Pick a time first.');
   });
 
   it('takes focus when it opens', async () => {

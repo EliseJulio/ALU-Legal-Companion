@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { FORM_FIELD, FORM_TEXTAREA, CHECKBOX, RING } from '@/lib/ui';
 import { ADMIN_BUTTON_OUTLINE } from '@/components/AdminRecords';
 import { FieldError } from '@/components/wizard/WizardField';
@@ -15,13 +16,34 @@ export default function RowEditor({ idBase, legend, hint, itemName, rows, column
     onChange(rows.map((row, i) => (i === index ? { ...row, [key]: value } : row)));
   const addId = `${idBase}-add`;
 
+  // Each row has a key of its own so a removed row does not hand its place to the next one. The keys
+  // are kept in state. A row added by the page gets the next number, and extra keys are cut.
+  const [keyState, setKeyState] = useState({ ids: [], next: 0 });
+  let ids = keyState.ids;
+  if (ids.length !== rows.length) {
+    const list = ids.slice(0, rows.length);
+    let next = keyState.next;
+    while (list.length < rows.length) list.push(next++);
+    ids = list;
+    setKeyState({ ids: list, next });
+  }
+
+  // After an add, focus goes to the first box of the new row. After a remove, to the add button.
+  const focusAfter = useRef(null);
+  useEffect(() => {
+    if (focusAfter.current) {
+      document.getElementById(focusAfter.current)?.focus();
+      focusAfter.current = null;
+    }
+  }, [rows.length]);
+
   return (
     <fieldset className="mt-6">
       <legend className="text-sm font-semibold">{legend}</legend>
       {hint && <p className="mt-1 text-sm text-muted-foreground">{hint}</p>}
 
       {rows.map((row, i) => (
-        <fieldset key={i} className="mt-3 rounded-card border border-border p-4">
+        <fieldset key={ids[i]} className="mt-3 rounded-card border border-border p-4">
           <legend className="px-1 text-sm font-semibold text-primary-text">{itemName} {i + 1}</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {columns.map((col) => (
@@ -72,7 +94,11 @@ export default function RowEditor({ idBase, legend, hint, itemName, rows, column
           <button
             type="button"
             className={`mt-3 ${ADMIN_BUTTON_OUTLINE}`}
-            onClick={() => onChange(rows.filter((_, j) => j !== i))}
+            onClick={() => {
+              setKeyState((k) => ({ ...k, ids: k.ids.filter((_, j) => j !== i) }));
+              focusAfter.current = addId;
+              onChange(rows.filter((_, j) => j !== i));
+            }}
           >
             Remove {itemName.toLowerCase()} {i + 1}
           </button>
@@ -84,7 +110,10 @@ export default function RowEditor({ idBase, legend, hint, itemName, rows, column
         type="button"
         className={`mt-3 ${ADMIN_BUTTON_OUTLINE}`}
         aria-describedby={errors[addId] ? `${addId}-error` : undefined}
-        onClick={() => onChange([...rows, blank()])}
+        onClick={() => {
+          focusAfter.current = `${idBase}-${rows.length}-${columns[0].key}`;
+          onChange([...rows, blank()]);
+        }}
       >
         {addLabel}
       </button>

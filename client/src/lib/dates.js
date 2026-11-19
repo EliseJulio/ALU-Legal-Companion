@@ -15,7 +15,9 @@ export function readableDate(raw) {
   if (typeof raw !== 'string' || raw === '') return null;
   const when = new Date(raw);
   if (Number.isNaN(when.getTime())) return null;
-  return when.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  return when.toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: KIGALI_ZONE,
+  });
 }
 
 // The zone every consultation time is shown in. Kigali has no daylight saving, so it is always UTC+2.

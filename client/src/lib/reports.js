@@ -1,3 +1,5 @@
+import { KIGALI_ZONE } from '@/lib/dates';
+
 // Words and small helpers for reports of a problem. The server stores the short codes.
 
 export const REPORT_TYPES = [
@@ -38,9 +40,6 @@ export function aboutLookupPath(about) {
 const KIND_WORDS = { guide: 'Guide', route: 'Matter', provider: 'Directory', page: 'Page' };
 export const aboutText = (kind, title) => (kind && title ? `${KIND_WORDS[kind]}: ${title}` : '');
 
-// The link a page puts at its foot: /report?about=guide:12
-export const reportLink = (kind, id) => `/report?about=${kind}:${id}`;
-
 // Mirrors the server. Case and spaces and hyphens do not matter and the LC- may be left out.
 // It returns the code in its exact form. When the text cannot be a code it returns the trimmed text and the server then says no.
 export function formatCode(input) {
@@ -55,5 +54,5 @@ export function formatCode(input) {
 export function shortDay(raw) {
   const when = new Date(raw ?? '');
   if (!raw || Number.isNaN(when.getTime())) return '';
-  return when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: KIGALI_ZONE });
 }

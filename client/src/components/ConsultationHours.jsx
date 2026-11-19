@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ErrorNotice from '@/components/ErrorNotice';
 import { apiPut } from '@/lib/api';
 import {
@@ -28,15 +28,27 @@ function HoursEditor({ availability, onSaved }) {
   const [saveError, setSaveError] = useState(null);
   const [message, setMessage] = useState('');
 
+  // The id of the control that takes focus after a window is added or removed, since the pressed one moves or goes.
+  const focusAfter = useRef(null);
+  useEffect(() => {
+    if (focusAfter.current) {
+      document.getElementById(focusAfter.current)?.focus();
+      focusAfter.current = null;
+    }
+  }, [rows]);
+
   const edit = (key, field, value) => {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
     setMessage('');
   };
   const add = (weekday) => {
-    setRows((rs) => [...rs, newWindow(weekday)]);
+    const row = newWindow(weekday);
+    focusAfter.current = `hours-${row.key}-start`;
+    setRows((rs) => [...rs, row]);
     setMessage('');
   };
-  const remove = (key) => {
+  const remove = (key, weekday) => {
+    focusAfter.current = `hours-add-${weekday}`;
     setRows((rs) => rs.filter((r) => r.key !== key));
     setMessage('');
   };
@@ -113,7 +125,7 @@ function HoursEditor({ availability, onSaved }) {
                           {END_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </label>
-                      <button type="button" onClick={() => remove(row.key)} className={REMOVE}>
+                      <button type="button" onClick={() => remove(row.key, weekday)} className={REMOVE}>
                         Remove{' '}<span className="sr-only">window {n} on {name}</span>
                       </button>
                     </li>
@@ -122,6 +134,7 @@ function HoursEditor({ availability, onSaved }) {
               </ul>
               <button
                 type="button"
+                id={`hours-add-${weekday}`}
                 aria-disabled={full || undefined}
                 onClick={() => { if (!full) add(weekday); }}
                 className={`${BUTTON_OUTLINE} mt-2`}

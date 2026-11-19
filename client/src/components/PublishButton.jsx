@@ -4,7 +4,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import { ADMIN_BUTTON_OUTLINE } from '@/components/AdminRecords';
 
 // Publishes a draft directly. There is no separate step. `path` is the record such as "/guides/3".
-export default function SubmitForReview({ path, onDone, className = '' }) {
+export default function PublishButton({ path, onDone, className = '' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 

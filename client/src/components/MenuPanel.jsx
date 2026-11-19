@@ -22,14 +22,13 @@ const NARROW_LINK = `grid h-11 w-11 mx-auto place-items-center rounded-soft ${RI
 const SIDE_CONTROL = `flex min-h-touch w-full items-center gap-3 rounded-control px-3 text-sm text-on-chrome hover:bg-chrome-raised hover:text-chrome-foreground ${RING_ON_CHROME}`;
 const NARROW_CONTROL = `mx-auto grid h-11 w-11 place-items-center rounded-soft text-on-chrome hover:bg-chrome-raised hover:text-chrome-foreground ${RING_ON_CHROME}`;
 
-// The open page is a soft grey row with a bold label and the normal ink icon. Narrowed it is a soft
-// blue tint with a blue icon. aria-current marks the page for a screen reader, so the tint is not the only mark.
+// The open page is a soft blue tint with a bold blue label. Narrowed it is the same tint with a blue icon. aria-current marks the page for a screen reader, so the tint is not the only mark.
 function linkClass(narrow, isActive) {
   if (narrow) {
     return `${NARROW_LINK} ${isActive ? 'bg-primary-subtle text-primary-text' : 'text-on-chrome hover:bg-chrome-raised hover:text-chrome-foreground'}`;
   }
   return `${OPEN_LINK} ${isActive
-    ? 'bg-chrome-raised font-semibold text-chrome-foreground'
+    ? 'bg-primary-subtle font-semibold text-primary-text'
     : 'text-on-chrome hover:bg-chrome-raised hover:text-chrome-foreground'}`;
 }
 

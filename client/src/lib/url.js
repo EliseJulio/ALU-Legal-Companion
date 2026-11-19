@@ -9,7 +9,8 @@ export function scrubTokenFromUrl() {
     const url = new URL(window.location.href);
     if (!url.searchParams.has('token')) return;
     url.searchParams.delete('token');
-    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+    // The router keeps its position in history.state, so it is passed on unchanged.
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
   } catch {
     // No history support. The page still works. Never let cleaning up break the page.
   }

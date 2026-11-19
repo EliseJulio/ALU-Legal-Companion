@@ -154,6 +154,7 @@ export default function GuidedStart({ onSkip = () => {} }) {
             <button
               type="button"
               disabled={picked === null}
+              aria-describedby={picked === null ? 'continue-hint' : undefined}
               onClick={goOn}
               className={picked === null ? BUTTON_DISABLED : BUTTON_PRIMARY}
             >
@@ -162,6 +163,7 @@ export default function GuidedStart({ onSkip = () => {} }) {
             <button type="button" onClick={() => { setPicked(null); setArea(''); }} className={BUTTON_TEXT}>Back</button>
             <button type="button" onClick={() => setNoMatch(true)} className={BUTTON_TEXT}>None of these?</button>
           </div>
+          {picked === null && <p id="continue-hint" className="mt-2 text-sm text-muted-foreground">Choose one matter above to continue.</p>}
         </>
       )}
 

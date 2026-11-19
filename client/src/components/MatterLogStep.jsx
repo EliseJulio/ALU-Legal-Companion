@@ -23,6 +23,10 @@ export default function LogStep({ matterId, onDone, canAttach = false }) {
       setError({ message: 'Write what happened before you add it to the record.' });
       return;
     }
+    if (!date) {
+      setError({ message: 'Choose the date this happened before you add it to the record.' });
+      return;
+    }
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);

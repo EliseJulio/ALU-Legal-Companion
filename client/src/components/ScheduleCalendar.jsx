@@ -36,6 +36,13 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, hours 
   useScrollToHash(Boolean(target));
   const [selected, setSelected] = useState(target?.date ?? todayKey);
   const [view, setView] = useState('month');
+  // A link to another item while the calendar is already open moves to that item's day.
+  const targetDate = target?.date;
+  const [lastLink, setLastLink] = useState({ hash, targetDate });
+  if (lastLink.hash !== hash || lastLink.targetDate !== targetDate) {
+    setLastLink({ hash, targetDate });
+    if (targetDate) setSelected(targetDate);
+  }
   // The grid moves the focus to the day the arrow keys reached. The focus is set after the grid has
   // drawn that day, so the id of the day is kept here until then.
   const focusDay = useRef(null);

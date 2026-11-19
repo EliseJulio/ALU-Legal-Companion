@@ -61,6 +61,7 @@ export default function ChangeTime({ providerId, primaryLabel, onPick, onNeverMi
             type="button"
             aria-disabled={busy || !time || undefined}
             aria-busy={busy || undefined}
+            aria-describedby={!time ? 'change-time-hint' : undefined}
             className={BUTTON_PRIMARY}
             onClick={send}
           >
@@ -69,6 +70,7 @@ export default function ChangeTime({ providerId, primaryLabel, onPick, onNeverMi
         )}
         <button type="button" className={BUTTON_OUTLINE} onClick={onNeverMind}>Never mind</button>
       </div>
+      {days.length > 0 && !time && <p id="change-time-hint" className="mt-2 text-sm text-muted-foreground">Pick a time first.</p>}
       {error && <ErrorNotice error={error} className="mt-3" />}
     </div>
   );

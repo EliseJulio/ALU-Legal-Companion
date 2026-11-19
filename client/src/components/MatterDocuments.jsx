@@ -88,6 +88,16 @@ export default function MatterDocuments({ matter, viewer }) {
   // What was done is said at the top and takes focus so a person far down the page hears it and sees it.
   const noticeRef = useRef(null);
   useEffect(() => { if (notice) noticeRef.current?.focus(); }, [notice]);
+  // The delete question takes focus when it opens. Keep it hands focus back to that file's Remove button.
+  const questionRef = useRef(null);
+  const backToRemove = useRef(null);
+  useEffect(() => {
+    if (removing !== null) questionRef.current?.focus();
+    else if (backToRemove.current !== null) {
+      document.getElementById(`remove-doc-${backToRemove.current}`)?.focus();
+      backToRemove.current = null;
+    }
+  }, [removing]);
 
   const reload = () => { checklist.refetch(); docs.refetch(); };
 
@@ -203,15 +213,18 @@ export default function MatterDocuments({ matter, viewer }) {
       )}
       {owner && (removing === doc.id ? (
         <div role="group" aria-label={`Remove ${doc.label}`} className="mt-2">
-          <p className="text-sm font-semibold">Delete this file for good? Only this file goes. The matter stays.</p>
+          <p ref={questionRef} tabIndex={-1} className="text-sm font-semibold outline-none">Delete this file for good? Only this file goes. The matter stays.</p>
           <div className="mt-2 flex gap-3">
             <button type="button" className={BUTTON_PRIMARY} aria-disabled={busy || undefined}
-              onClick={() => { setRemoving(null); act(() => apiDelete(`${base}/${doc.id}`)); }}>Yes, delete this file</button>
-            <button type="button" className={BUTTON_OUTLINE} onClick={() => setRemoving(null)}>Keep it</button>
+              onClick={async () => {
+                setRemoving(null);
+                if (await act(() => apiDelete(`${base}/${doc.id}`))) setNotice({ text: `Deleted ${doc.label}.` });
+              }}>Yes, delete this file</button>
+            <button type="button" className={BUTTON_OUTLINE} onClick={() => { backToRemove.current = doc.id; setRemoving(null); }}>Keep it</button>
           </div>
         </div>
       ) : (
-        <button type="button" className={`${BUTTON_OUTLINE} mt-2`} aria-label={`Remove ${doc.label}`} onClick={() => setRemoving(doc.id)}>
+        <button type="button" id={`remove-doc-${doc.id}`} className={`${BUTTON_OUTLINE} mt-2`} aria-label={`Remove ${doc.label}`} onClick={() => setRemoving(doc.id)}>
           Remove
         </button>
       ))}

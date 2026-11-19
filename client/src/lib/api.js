@@ -91,8 +91,8 @@ async function request(method, path, body, { anonymous = false, raw = false, for
   // `form` sends a FormData. The browser writes the Content-Type itself, with the boundary.
   if (body !== undefined && !form) headers['Content-Type'] = raw ? body.type : 'application/json';
   // The token in use when the request starts. A 401 below clears only this same token.
-  const sent = token;
-  if (sent && !anonymous) headers.Authorization = `Bearer ${sent}`;
+  const sent = anonymous ? null : token;
+  if (sent) headers.Authorization = `Bearer ${sent}`;
 
   const { signal, timer } = startLimit(limit);
   try {
@@ -137,7 +137,7 @@ async function request(method, path, body, { anonymous = false, raw = false, for
     // would sign an admin out for opening one page.
     // `keepLogin` is for a request where 401 means a wrong password and the login is still good.
     // A login made in another tab while this request was on its way is not the one refused.
-    if (res.status === 401 && !keepLogin && token === sent) {
+    if (res.status === 401 && !keepLogin && sent && token === sent) {
       clearToken();
       announceSessionExpired();
     }

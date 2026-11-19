@@ -43,7 +43,7 @@ describe('Cancel this consultation', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel this consultation' }));
     await user.click(screen.getByRole('button', { name: 'Yes, cancel it' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('Cancelled.')).toBeInTheDocument();
+    expect(await screen.findByText('Cancelled.')).toHaveFocus();
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 

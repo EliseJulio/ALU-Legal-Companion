@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiDelete, apiPost } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -180,6 +180,15 @@ export function AccessCard({ matter, onDone }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const { firstRef: keepRef, openerRef: revokeRef } = usePanelFocus(asking);
+  // After a revoke the button is gone. Focus goes to the line that says no expert has access.
+  const revoked = useRef(false);
+  const noneRef = useRef(null);
+  useEffect(() => {
+    if (!matter.shared_with && revoked.current) {
+      revoked.current = false;
+      noneRef.current?.focus();
+    }
+  }, [matter.shared_with]);
 
   async function revoke() {
     if (busy) return;
@@ -187,6 +196,7 @@ export function AccessCard({ matter, onDone }) {
     setError(null);
     try {
       await apiDelete(`/matters/${matter.id}/share`);
+      revoked.current = true;
       setAsking(false);
       onDone();
     } catch (err) {
@@ -232,7 +242,7 @@ export function AccessCard({ matter, onDone }) {
           <p className="mt-3 text-xs text-muted-foreground">When shared, revoking access takes effect immediately.</p>
         </>
       ) : (
-        <p className="mt-1 text-sm">No expert has been chosen yet.</p>
+        <p ref={noneRef} tabIndex={-1} className="mt-1 text-sm outline-none">No expert has been chosen yet.</p>
       )}
       {error && <ErrorNotice error={error} className="mt-3" />}
     </section>

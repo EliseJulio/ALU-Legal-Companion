@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiGet } from '@/lib/api';
 import { useLiveTick } from '@/lib/live';
 
@@ -8,19 +8,27 @@ import { useLiveTick } from '@/lib/live';
 export function useApi(path, options = {}) {
   // `path` is kept with the answer. When the path changes the old answer is not the answer to
   // the new question. So it is not handed out for even one render.
-  const [state, setState] = useState({ path, data: null, error: null, loading: Boolean(path) });
+  const [state, setState] = useState({ path, data: null, error: null, refreshError: null, loading: Boolean(path) });
+  // Counts the requests as they start. An answer to anything but the latest one is out of date.
+  const latest = useRef(0);
 
   // A background refresh keeps what is on screen. It never shows loading and a failure is ignored.
   const tick = useLiveTick(path ? options.every : 0);
   useEffect(() => {
     if (!tick || !path) return undefined;
     let cancelled = false;
+    const mine = ++latest.current;
     apiGet(path)
       .then((data) => {
-        if (cancelled) return;
-        setState((s) => (s.path === path && JSON.stringify(s.data) !== JSON.stringify(data)
-          ? { path, data, error: null, loading: false }
-          : s));
+        if (cancelled || mine !== latest.current) return;
+        setState((s) => {
+          if (s.path !== path) return s;
+          if (JSON.stringify(s.data) !== JSON.stringify(data)) {
+            return { path, data, error: null, refreshError: null, loading: false };
+          }
+          // Same data, but the answer arrived: an earlier failed reload is over.
+          return s.refreshError ? { ...s, refreshError: null } : s;
+        });
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -38,9 +46,17 @@ export function useApi(path, options = {}) {
     let cancelled = false;
     if (!path) return undefined;
 
+    const mine = ++latest.current;
+    const current = () => !cancelled && mine === latest.current;
     apiGet(path)
-      .then((data) => { if (!cancelled) setState({ path, data, error: null, loading: false }); })
-      .catch((error) => { if (!cancelled) setState({ path, data: null, error, loading: false }); });
+      .then((data) => { if (current()) setState({ path, data, error: null, refreshError: null, loading: false }); })
+      .catch((error) => {
+        if (!current()) return;
+        // A failed reload keeps what is on screen. Only a first load with nothing to show is an error.
+        setState((s) => (s.path === path && s.data !== null
+          ? { ...s, refreshError: error, loading: false }
+          : { path, data: null, error, refreshError: null, loading: false }));
+      });
     return () => { cancelled = true; };
   }, [path, nonce]);
 
@@ -54,7 +70,7 @@ export function useApi(path, options = {}) {
 
   // A new path has no answer yet, even in the render before the effect has run. Refetches retain
   // their prior result while loading in the background so an editor never unmounts mid-save.
-  if (state.path !== path) return { data: null, error: null, loading: Boolean(path), refetch };
-  const { data, error, loading } = state;
-  return { data, error, loading, refetch };
+  if (state.path !== path) return { data: null, error: null, refreshError: null, loading: Boolean(path), refetch };
+  const { data, error, refreshError, loading } = state;
+  return { data, error, refreshError, loading, refetch };
 }

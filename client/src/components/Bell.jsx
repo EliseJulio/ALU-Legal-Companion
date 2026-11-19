@@ -14,6 +14,15 @@ export default function Bell({ user, placement = 'desktop' }) {
   const wrap = useRef(null);
   const button = useRef(null);
   const panel = useRef(null);
+  // Set when Mark all as read is pressed, so focus can leave the button once it becomes disabled.
+  const markedAll = useRef(false);
+
+  useEffect(() => {
+    if (open && notes.unread === 0 && markedAll.current) {
+      markedAll.current = false;
+      panel.current?.focus();
+    }
+  }, [open, notes.unread]);
 
   // Escape closes the panel and gives focus back to the bell. A click outside closes it and leaves
   // focus where the person put it. Opening moves focus into the panel.
@@ -95,7 +104,7 @@ export default function Bell({ user, placement = 'desktop' }) {
             <h2 className="font-head text-base font-semibold">Notifications</h2>
             <button
               type="button"
-              onClick={notes.markAllRead}
+              onClick={() => { markedAll.current = true; notes.markAllRead(); }}
               disabled={notes.unread === 0}
               className={`min-h-touch px-2 text-sm font-semibold text-info hover:bg-chrome-raised disabled:font-normal disabled:text-faint ${RING_ON_CANVAS}`}
             >

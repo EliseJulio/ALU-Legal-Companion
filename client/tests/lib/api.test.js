@@ -101,6 +101,17 @@ describe('when the login stops working', () => {
     expect(getToken()).toBe('tok-new');
   });
 
+  it('keeps the login when an anonymous request is refused with a 401', async () => {
+    setToken('tok-abc');
+    const listener = vi.fn();
+    const stop = onSessionExpired(listener);
+    fetchMock.mockResolvedValue(reply(401, { error: 'Invalid code' }));
+    await apiPost('/questions/check', {}, { anonymous: true }).catch(() => {});
+    expect(getToken()).toBe('tok-abc');
+    expect(listener).not.toHaveBeenCalled();
+    stop();
+  });
+
   it('keeps the token on a 403, because only the role is wrong', async () => {
     setToken('tok-abc');
     fetchMock.mockResolvedValue(reply(403, { error: 'You do not have permission to do that' }));

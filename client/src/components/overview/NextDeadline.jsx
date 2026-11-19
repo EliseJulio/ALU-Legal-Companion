@@ -35,7 +35,7 @@ export default function NextDeadline({ matter, loading, error, reminders, loadin
   const first = route.data?.first_forum?.name;
 
   const big = left === null ? null : left === 0 ? 'Today' : left < 0 ? -left : left;
-  const bigWords = left === null ? '' : left < 0 ? 'days late' : left === 0 ? '' : 'days left';
+  const bigWords = left === null || left === 0 ? '' : `${plural(Math.abs(left), 'day')} ${left < 0 ? 'late' : 'left'}`;
 
   return (
     <Panel id="next-deadline" title="Next deadline" className="lg:col-span-7">
