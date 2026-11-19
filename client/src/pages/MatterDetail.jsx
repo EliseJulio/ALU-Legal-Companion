@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { signInPath } from '@/lib/url';
-import { apiDelete, apiPost, apiPostForm, apiPut } from '@/lib/api';
+import { apiDelete, apiPut } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
 import { LIVE } from '@/lib/live';
 import { useAuth } from '@/lib/AuthContext';
@@ -14,8 +14,10 @@ import StatusPill from '@/components/StatusPill';
 import Disclaimer from '@/components/Disclaimer';
 import MatterDocuments from '@/components/MatterDocuments';
 import { ShareCard, AccessCard } from '@/components/ShareMatter';
-import RecordAttachment, { RecordFileLink } from '@/components/RecordAttachment';
-import { readableDay, todayIso } from '@/lib/dates';
+import { RecordFileLink } from '@/components/RecordAttachment';
+import RecordEntryActions from '@/components/RecordEntryActions';
+import LogStep from '@/components/MatterLogStep';
+import { readableDay } from '@/lib/dates';
 import { useScrollToHash } from '@/lib/useScrollToHash';
 import { matterDeadline } from '@/lib/overview';
 import StatusWord from '@/components/overview/StatusWord';
@@ -26,57 +28,6 @@ import {
 const H2 = 'font-head text-base font-semibold leading-[1.3] text-ink';
 const REMINDER_WORDS = { pending: 'Scheduled', sent: 'Sent', missed: 'Not sent in time', cancelled: 'Cancelled' };
 
-// Add a line to the record. The owner and a legal expert the matter is shared with can both do it.
-function LogStep({ matterId, onDone, canAttach = false }) {
-  const [text, setText] = useState('');
-  const [file, setFile] = useState(null);
-  const [date, setDate] = useState(todayIso());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  async function save(event) {
-    event.preventDefault();
-    if (busy) return; // a second press must not make a second entry with a second file
-    setBusy(true);
-    setError(null);
-    try {
-      if (file) {
-        // A file goes as a form. A note with no file stays plain JSON.
-        const form = new FormData();
-        form.append('description', text.trim());
-        form.append('occurred_on', date);
-        form.append('file', file);
-        await apiPostForm(`/matters/${matterId}/events`, form);
-      } else {
-        await apiPost(`/matters/${matterId}/events`, { description: text.trim(), occurred_on: date });
-      }
-      setText('');
-      setFile(null);
-      onDone();
-    } catch (err) {
-      setError(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={save} className={CARD}>
-      <h2 id="add-heading" className={H2}>Add to your record</h2>
-      <label htmlFor="step-text" className="mt-3 block text-sm font-medium">What happened</label>
-      <p id="step-hint" className="mt-1 text-sm text-muted-foreground">Free text can identify you. Avoid unnecessary sensitive details.</p>
-      <textarea id="step-text" rows={3} value={text} onChange={(e) => setText(e.target.value)} aria-describedby="step-hint" className={FIELD} />
-      <label htmlFor="step-date" className="mt-3 block text-sm font-medium">When</label>
-      <input id="step-date" type="date" max={todayIso()} value={date} onChange={(e) => setDate(e.target.value)} className={DATE_FIELD} />
-      {canAttach && <RecordAttachment file={file} onChange={setFile} disabled={busy} />}
-      {error && <ErrorNotice error={error} className="mt-2" />}
-      <button type="submit" aria-disabled={(busy || !text.trim()) || undefined} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-4`}>
-        Add to the record
-      </button>
-    </form>
-  );
-}
-
 // Change the next step or the deadline. A new deadline replaces the reminders.
 function EditNext({ matter, onDone, onCancel }) {
   const heading = useRef(null);
@@ -86,9 +37,13 @@ function EditNext({ matter, onDone, onCancel }) {
   const [nextDue, setNextDue] = useState(matter.next_due ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // A second press before the first has finished is ignored.
+  const inFlight = useRef(false);
 
   async function save(event) {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -97,6 +52,7 @@ function EditNext({ matter, onDone, onCancel }) {
     } catch (err) {
       setError(err);
       setBusy(false);
+      inFlight.current = false;
     }
   }
 
@@ -293,6 +249,13 @@ export default function MatterDetail() {
                       <RecordFileLink matterId={m.id} event={e} />
                     </p>
                     <p className="mt-1">{e.description}</p>
+                    {owner && (
+                      <RecordEntryActions
+                        matterId={m.id}
+                        event={e}
+                        onDone={(what) => { setNotice(what === 'file' ? 'File removed. The entry is kept.' : 'Entry deleted.'); refetch(); }}
+                      />
+                    )}
                   </li>
                 ))}
               </ol>
@@ -350,7 +313,7 @@ export default function MatterDetail() {
             </section>
 
             <section className={CARD}>
-              <h2 id="delete-heading" className={H2}>Delete this matter?</h2>
+              <h2 id="matter-delete-heading" className={H2}>Delete this matter?</h2>
               <p className="mt-3 text-sm">Permanently removes the record. This is separate from finishing the matter.</p>
               <button
                 ref={deleteButton}

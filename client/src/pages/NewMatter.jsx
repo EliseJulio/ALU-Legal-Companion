@@ -30,7 +30,9 @@ function NewMatterForm() {
   const routeId = params.get('route');
   const navigate = useNavigate();
   // With no route id the path is empty and nothing is requested.
-  const { data: route, error: routeError, loading } = useApi(routeId ? `/directory/routes/${routeId}` : null);
+  const { data: route, error: routeError, loading } = useApi(routeId ? `/directory/routes/${encodeURIComponent(routeId)}` : null);
+  // A route whose steps are not a list shows no example step rather than failing.
+  const routeSteps = Array.isArray(route?.steps) ? route.steps : [];
 
   const [title, setTitle] = useState('');
   const [nextAction, setNextAction] = useState('');
@@ -63,7 +65,14 @@ function NewMatterForm() {
   }
 
   if (routeId && loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (routeId && routeError) return <ErrorNotice error={routeError} />;
+  if (routeId && routeError) {
+    return (
+      <div>
+        <ErrorNotice error={routeError} />
+        <Link to="/matters/new" className={`mt-4 ${BUTTON_OUTLINE}`}>Start a matter without a route</Link>
+      </div>
+    );
+  }
 
   const days = route ? readableDays(route.deadline_days) : null;
   const hasStart = Boolean(route && days);
@@ -128,7 +137,7 @@ function NewMatterForm() {
             type="text"
             value={nextAction}
             onChange={(e) => setNextAction(e.target.value)}
-            placeholder={route ? route.steps[0] : ''}
+            placeholder={route ? (routeSteps[0] ?? '') : ''}
           />
           {hasStart && (
             <div className="mt-4 rounded-card border border-warning-border bg-warning-subtle p-4">
