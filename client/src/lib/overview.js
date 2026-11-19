@@ -1,7 +1,7 @@
 // The arithmetic behind the three overview pages (Home and the lawyer Overview and the admin Overview).
 // Each rule is a plain function with no request in it so it can be tested without a server.
 // Every figure a page shows is worked out here from rows an endpoint already sent.
-import { daysUntil, dueInWords, readableDay, todayIso } from '@/lib/dates';
+import { daysUntil, dueInWords, KIGALI_UTC_OFFSET_MS, kigaliDay, readableDay, todayIso } from '@/lib/dates';
 import { readableSlot } from '@/lib/bookings';
 
 // A deadline this close or closer needs the person now. The matters list uses the same number.
@@ -145,7 +145,7 @@ function shortDay(iso) {
 // `total` is the days from then to the due date. `day` is how many have gone by. It is kept between 0 and `total`.
 // With no due date or a due date before the opened day there is no count. Only the opened day is given.
 export function barSpan(matter, today = new Date()) {
-  const opened = String(matter?.created_at ?? '').slice(0, 10);
+  const opened = kigaliDay(matter?.created_at) ?? '';
   if (!DATE_RE.test(opened)) return null;
   const out = { opened, openedWords: shortDay(opened), day: null, total: null };
   const due = matter?.next_due ?? '';
@@ -227,13 +227,13 @@ export function requesterWords(requester) {
   return /anonymous/i.test(String(requester ?? '')) ? 'Anonymous requester' : 'Signed-in requester';
 }
 
-// Monday 00:00 to the next Monday 00:00 in the reader's own zone.
+// Monday 00:00 to the next Monday 00:00 in Kigali time, as instants. The week is found from the
+// Kigali calendar day, so a browser abroad gets the same week as a reader in Kigali.
 export function weekBounds(now = new Date()) {
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
-  return { start, end };
+  const [y, m, d] = todayIso(now).split('-').map(Number);
+  const dayOfWeek = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  const monday = Date.UTC(y, m - 1, d - ((dayOfWeek + 6) % 7)) - KIGALI_UTC_OFFSET_MS;
+  return { start: new Date(monday), end: new Date(monday + 7 * 86400000) };
 }
 
 const inWeek = (iso, now) => {

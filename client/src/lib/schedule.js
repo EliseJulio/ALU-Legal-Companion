@@ -3,7 +3,7 @@
 // Every date is a 'YYYY-MM-DD' string and every sum is done in UTC so a Kigali deadline never shifts a day.
 // A booking's day is the reader's own day as lib/appointments reads it.
 // Nothing here names anyone the page does not already show.
-import { ACCEPTED, REQUESTED, PAST, DECLINED, bookingState, localDay, timeOf, roomFor } from '@/lib/appointments';
+import { ACCEPTED, REQUESTED, PAST, DECLINED, CANCELLED, bookingState, localDay, timeOf, roomFor } from '@/lib/appointments';
 import {
   LATE, SOON, LATER, MONTH_NAMES, deadlineState, weekOf, monthOf, isoDate, daysInMonth,
   chipStateOf, STATE_WORDS,
@@ -16,6 +16,7 @@ const CONSULT_MARK = {
   [REQUESTED]: 'requested',
   [PAST]: 'past',
   [DECLINED]: 'past',
+  [CANCELLED]: 'past',
   other: 'unknown',
 };
 const DEADLINE_MARK = { [LATE]: 'late', [SOON]: 'soon', [LATER]: 'later' };
@@ -46,19 +47,51 @@ export function consultItem(booking, now = new Date()) {
     title: booking.provider_name || 'Consultation',
     sub: booking.topic ? `About: ${booking.topic}` : 'Consultation',
     status: booking.status,
+    slot: booking.slot,
+    provider_id: booking.provider_id ?? null,
+    proposed_slot: booking.proposed_slot ?? null,
     room: roomFor(booking),
   };
 }
 
 // The circle for each state a consultation can be in on a lawyer's or an admin's calendar.
-const STATE_MARK = { accepted: 'accepted', requested: 'requested', past: 'past', declined: 'past' };
+const STATE_MARK = { accepted: 'accepted', requested: 'requested', past: 'past', declined: 'past', cancelled: 'past' };
 
 // The key under a calendar of consultations only. The lawyer's and the admin's calendars use it.
 export const CONSULT_LEGEND = [
   { mark: 'accepted', words: 'Accepted' },
   { mark: 'requested', words: 'Requested' },
-  { mark: 'past', words: 'Past, declined or completed' },
+  { mark: 'open', words: 'Open for booking' },
+  { mark: 'past', words: 'Past, declined, cancelled or completed' },
 ];
+
+// The key under the admin's calendar. An admin sees no open hours, so that circle is left out.
+export const ADMIN_LEGEND = CONSULT_LEGEND.filter((entry) => entry.mark !== 'open');
+
+// The open hours of a lawyer for the days in view. Each day that falls on a weekday with windows gets one
+// item per window. An open item has no booking, no id and no row action. It is not a consultation.
+// `days` is a list of 'YYYY-MM-DD' and `windows` uses 1 for Monday to 7 for Sunday.
+export function hoursItems(windows = [], days = []) {
+  const items = [];
+  for (const date of days) {
+    const weekday = ((new Date(utcOf(date)).getUTCDay() + 6) % 7) + 1;
+    for (const w of windows) {
+      if (w.weekday !== weekday) continue;
+      items.push({
+        key: `hours-${date}-${w.start}`,
+        kind: 'hours',
+        date,
+        time: w.start,
+        mark: 'open',
+        word: 'Open',
+        title: `Open ${w.start} to ${w.end}`,
+        sub: '',
+        status: 'open',
+      });
+    }
+  }
+  return items;
+}
 
 // A consultation on the lawyer's calendar. The title is the topic. The
 // requester is not put in the item: the row reads it from the booking, exactly as the server sent it.
@@ -134,7 +167,7 @@ export function matterItem(matter, today = new Date()) {
 }
 
 // Timed items come before untimed ones on a day. Then consultations come before deadlines, then A to Z.
-function byWhen(a, b) {
+export function byWhen(a, b) {
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
   if (a.time && b.time) return a.time < b.time ? -1 : a.time > b.time ? 1 : 0;
   if (a.time) return -1;

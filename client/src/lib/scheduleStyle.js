@@ -13,6 +13,8 @@ export const MARK_CLASS = {
   later: 'rounded-full border-2 border-muted-foreground bg-transparent',
   past: 'rounded-full border-2 border-calm bg-calm',
   unknown: 'rounded-full border-2 border-calm bg-transparent',
+  // Open hours are an empty ring in ink, so they read apart from the solid and dashed bookings.
+  open: 'rounded-full border-2 border-ink bg-surface',
 };
 
 // The circle inside a solid chip. Its fill is the words colour of that chip, so it shows on the chip.
@@ -40,6 +42,7 @@ const SHAPE = {
   requested: 'border border-primary-subtle bg-primary-subtle text-primary-text',
   accepted: 'border border-calm bg-calm text-ink',
   past: 'border border-chrome-raised bg-chrome-raised text-muted-foreground',
+  open: 'border border-control bg-surface text-ink',
 };
 
 // The fill of a chip, by its mark. Every chip carries its state in words as well.
