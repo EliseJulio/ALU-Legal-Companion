@@ -12,6 +12,9 @@ pg.types.setTypeParser(1082, (value) => value);
 
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  // Fail in 10 seconds instead of waiting for ever when the database cannot be reached.
+  connectionTimeoutMillis: 10_000,
+  idleTimeoutMillis: 30_000,
   ...(testSchema ? { options: `-c search_path=${testSchema}` } : {}),
 });
 

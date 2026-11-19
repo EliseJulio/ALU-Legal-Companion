@@ -28,3 +28,11 @@ export function requireIntParam(name) {
     next();
   };
 }
+
+// A plausible email address: at most 254 characters, one @, a dot in the domain, and no
+// whitespace, commas or control characters. The input is already trimmed and lower-cased.
+// A longer or odder string would only fail later inside the database.
+// eslint-disable-next-line no-control-regex
+const EMAIL_PATTERN = /^[^\s@,\u0000-\u001f\u007f]+@[^\s@,\u0000-\u001f\u007f]+\.[^\s@,\u0000-\u001f\u007f]+$/;
+export const isPlausibleEmail = (email) => typeof email === 'string'
+  && email.length > 0 && email.length <= 254 && EMAIL_PATTERN.test(email);

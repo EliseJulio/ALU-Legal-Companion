@@ -78,6 +78,21 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '100kb' }));
 
+// Postgres cannot store the NUL character in text and would answer 500. Any string with one,
+// at any depth of the body, is refused here.
+const hasNul = (value) => {
+  if (typeof value === 'string') return value.includes('\u0000');
+  if (Array.isArray(value)) return value.some(hasNul);
+  if (value && typeof value === 'object') {
+    return Object.entries(value).some(([key, v]) => key.includes('\u0000') || hasNul(v));
+  }
+  return false;
+};
+app.use((req, res, next) => {
+  if (hasNul(req.body)) return res.status(400).json({ error: 'The request contains a character that is not allowed.' });
+  next();
+});
+
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 // The description of the API. Swagger UI is at /api/docs and the raw file is at /api/openapi.json.
 app.get('/api/openapi.json', (_req, res) => res.json(openapi));
@@ -124,6 +139,14 @@ app.use((err, req, res, _next) => {
   }
   if (err.type === 'entity.parse.failed' || (err instanceof SyntaxError && err.status === 400)) {
     return res.status(400).json({ error: 'Invalid JSON in request body.' });
+  }
+  // Any other request the body parser refused, such as an unsupported encoding or a wrong length.
+  const status = err.status ?? err.statusCode;
+  if (err.expose && status >= 400 && status < 500) {
+    const error = status === 415
+      ? 'That request uses a content type or encoding this server cannot read.'
+      : 'That request could not be read. Check it and try again.';
+    return res.status(status).json({ error });
   }
   res.status(500).json({ error: 'Something went wrong on our side. Please try again.' });
 });

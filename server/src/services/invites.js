@@ -8,10 +8,9 @@ import { q } from '../db.js';
 
 const hashToken = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex');
 
-// Makes an invitation. Older unused invitations for the same address are cancelled so only
-// the newest link works. Returns the row and the raw token.
+// Makes an invitation. Older invitations are left working until supersedeOlderInvites is called,
+// which happens only after the email was sent. Returns the row and the raw token.
 export async function createInvite(email, days, createdBy) {
-  await q('UPDATE invite_tokens SET used_at = now() WHERE email = $1 AND used_at IS NULL', [email]);
   const raw = crypto.randomBytes(24).toString('base64url');
   const [invite] = await q(
     `INSERT INTO invite_tokens (token_hash, email, expires_at, created_by)
@@ -21,21 +20,21 @@ export async function createInvite(email, days, createdBy) {
   return { invite, raw };
 }
 
-// Uses an invitation. Returns its row or null if it is unknown, used or expired.
-export async function consumeInvite(raw) {
-  if (!raw) return null;
-  const [row] = await q(
-    `UPDATE invite_tokens SET used_at = now()
-      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
-      RETURNING id, email`,
-    [hashToken(raw)]);
-  return row || null;
+// Cancels the older unused invitations for the address so only the newest link works.
+export async function supersedeOlderInvites(email, keepId) {
+  await q('UPDATE invite_tokens SET used_at = now() WHERE email = $1 AND used_at IS NULL AND id <> $2', [email, keepId]);
 }
 
-// Gives an invitation back. It is used when the account could not be made after all so the
-// person can try again with the same link.
-export async function releaseInvite(id) {
-  await q('UPDATE invite_tokens SET used_at = NULL WHERE id = $1', [id]);
+// Uses an invitation. Returns its row or null if it is unknown, used or expired.
+// Pass a transaction client to use it inside that transaction. A rollback then gives the
+// invitation back, so nothing else has to undo it.
+export async function consumeInvite(raw, client = null) {
+  if (!raw) return null;
+  const sql = `UPDATE invite_tokens SET used_at = now()
+      WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
+      RETURNING id, email`;
+  const rows = client ? (await client.query(sql, [hashToken(raw)])).rows : await q(sql, [hashToken(raw)]);
+  return rows[0] || null;
 }
 
 // Why an invitation was refused. Only for a caller that already holds the token.

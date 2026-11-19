@@ -78,7 +78,7 @@ describe('purgeExpired: anonymous bookings', () => {
     await anonBooking({ token: 'b-completed', slot: ago(95), status: 'completed' });
     const [edge] = await anonBooking({ token: 'b-edge', slot: ago(90), status: 'completed' });
     const [soon] = await anonBooking({ token: 'b-soon', slot: ahead(48) });
-    expect(await purgeExpired(NOW)).toEqual({ questions: 0, bookings: 2 });
+    expect(await purgeExpired(NOW)).toEqual({ questions: 0, bookings: 2, tokens: 0 });
     expect(await bookingIds()).toEqual([edge.id, soon.id]);
   });
 });
@@ -87,8 +87,35 @@ describe('purgeExpired: signed-in records', () => {
   it('never deletes a signed-in question or booking, however old', async () => {
     const [question] = await signedInQuestion({ answeredAt: ago(400) });
     const [booking] = await signedInBooking({ slot: ago(400) });
-    expect(await purgeExpired(NOW)).toEqual({ questions: 0, bookings: 0 });
+    expect(await purgeExpired(NOW)).toEqual({ questions: 0, bookings: 0, tokens: 0 });
     expect(await questionIds()).toContain(question.id);
     expect(await bookingIds()).toContain(booking.id);
+  });
+});
+
+describe('purgeExpired: one-time link tokens', () => {
+  const authToken = (hash, { expires, used = null }) => q(
+    `INSERT INTO auth_tokens (user_id, token_hash, purpose, expires_at, used_at)
+     VALUES ($1,$2,'reset_password',$3,$4)`, [student.id, hash, expires, used]);
+  const invite = (hash, { expires, used = null }) => q(
+    `INSERT INTO invite_tokens (token_hash, email, expires_at, used_at, created_by)
+     VALUES ($1,'invitee@example.org',$2,$3,$4)`, [hash, expires, used, expert.id]);
+  const hashes = async (table) => (await q(`SELECT token_hash FROM ${table} ORDER BY token_hash`)).map((r) => r.token_hash);
+
+  it('deletes tokens expired or used more than 30 days ago and keeps the rest', async () => {
+    await authToken('a-old-expired', { expires: ago(31) });
+    await authToken('a-old-used', { expires: ahead(24), used: ago(31) });
+    await authToken('a-recent-expired', { expires: ago(5) });
+    await authToken('a-recent-used', { expires: ahead(24), used: ago(5) });
+    await authToken('a-valid', { expires: ahead(24) });
+    await invite('i-old-expired', { expires: ago(31) });
+    await invite('i-old-used', { expires: ahead(24), used: ago(31) });
+    await invite('i-recent-expired', { expires: ago(5) });
+    await invite('i-valid', { expires: ahead(24) });
+    const result = await purgeExpired(NOW);
+    expect(result.tokens).toBe(4);
+    expect(await hashes('auth_tokens')).toEqual(['a-recent-expired', 'a-recent-used', 'a-valid']);
+    expect(await hashes('invite_tokens')).toEqual(['i-recent-expired', 'i-valid']);
+    expect((await q('SELECT id FROM users')).length).toBe(2);
   });
 });

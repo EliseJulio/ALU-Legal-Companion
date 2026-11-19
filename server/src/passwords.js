@@ -13,3 +13,14 @@ export const checkPassword = (password, hash) => bcrypt.compare(password, hash);
 export const MAX_PASSWORD_BYTES = 72;
 export const PASSWORD_TOO_LONG = 'Password must be at most 72 bytes long. Use fewer characters.';
 export const passwordTooLong = (password) => Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES;
+
+// Checks a password when there may be no account. With no hash it checks against a fixed
+// hash of the same cost, so an unknown address takes as long as a wrong password.
+// The result is false whenever there is no hash.
+let dummyHash;
+export async function checkPasswordOrDummy(password, hash) {
+  if (hash) return checkPassword(password, hash);
+  dummyHash ??= hashPassword('not-a-real-password');
+  await checkPassword(password, await dummyHash);
+  return false;
+}

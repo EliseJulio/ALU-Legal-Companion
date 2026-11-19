@@ -12,7 +12,7 @@ import { q, pool } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { scheduleReminders, isDateString, addDays, kigaliToday } from '../services/reminders.js';
-import { removeMatterFiles, removeDocumentFile, documentsEnabled, readDocument, EXTENSION } from '../services/documentStore.js';
+import { documentsEnabled, readDocument, EXTENSION } from '../services/documentStore.js';
 import {
   readEventUpload, limitMultipartUploads, typeOfUpload, addEntryWithFile, addPlainEntry, Refusal,
 } from '../services/eventFiles.js';
@@ -436,7 +436,7 @@ async function ownEntry(matterId, eventId, user) {
   const access = await loadMatter(matterId, user);
   if (!access || access.as !== 'owner') return null;
   const [row] = await q(
-    `SELECT e.id, e.matter_id, f.stored_name
+    `SELECT e.id, e.matter_id, f.id AS file_id
        FROM matter_events e LEFT JOIN matter_event_files f ON f.event_id = e.id
       WHERE e.id = $1 AND e.matter_id = $2 AND e.author_id = $3 AND e.kind = 'entry'`,
     [eventId, access.matter.id, user.id]);
@@ -444,26 +444,23 @@ async function ownEntry(matterId, eventId, user) {
 }
 
 // DELETE /api/matters/:id/events/:eventId: the owner removes one of their own entries with its file.
-// The row goes first. The cascade removes the file row with it. The encrypted file is removed after
-// that. No history line is written, so nothing is left about what the entry said.
+// The cascade removes the file row, and the bytes in it, with the entry. No history line is written, so nothing is left about what the entry said.
 // requireAuth() has no role list on purpose. A lawyer or an admin then gets the same 404 as anyone else.
 router.delete('/:id/events/:eventId', requireAuth(), requireIntParam('id'), requireIntParam('eventId'), async (req, res) => {
   const found = await ownEntry(req.params.id, req.params.eventId, req.user);
   if (!found) return res.status(404).json({ error: 'Entry not found' });
   await q('DELETE FROM matter_events WHERE id = $1 AND matter_id = $2', [found.id, found.matter_id]);
-  if (found.stored_name) await removeDocumentFile(found.stored_name);
   res.status(204).end();
 });
 
 // DELETE /api/matters/:id/events/:eventId/file: the owner removes only the file on their own entry.
-// The text of the entry stays. The file row goes first, then the encrypted file.
+// The text of the entry stays.
 router.delete('/:id/events/:eventId/file', requireAuth(), requireIntParam('id'), requireIntParam('eventId'), async (req, res) => {
   const found = await ownEntry(req.params.id, req.params.eventId, req.user);
-  if (!found || !found.stored_name) return res.status(404).json({ error: 'File not found' });
-  const [gone] = await q(
-    'DELETE FROM matter_event_files WHERE event_id = $1 AND matter_id = $2 RETURNING stored_name',
+  if (!found || !found.file_id) return res.status(404).json({ error: 'File not found' });
+  await q(
+    'DELETE FROM matter_event_files WHERE event_id = $1 AND matter_id = $2 RETURNING id',
     [found.id, found.matter_id]);
-  if (gone) await removeDocumentFile(gone.stored_name);
   res.status(204).end();
 });
 
@@ -471,9 +468,8 @@ router.delete('/:id/events/:eventId/file', requireAuth(), requireIntParam('id'),
 router.delete('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
   if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
-  // The encrypted files go first. Once the matter row is gone the cascade has removed the rows that say
-  // where they are. This is the only place where a matter or its documents are deleted.
-  await removeMatterFiles(access.matter.id);
+  // The files are rows of the matter, so the cascade removes them with it. This is the only place
+  // where a matter or its documents are deleted.
   await q('DELETE FROM matters WHERE id = $1', [access.matter.id]);
   res.status(204).end();
 });

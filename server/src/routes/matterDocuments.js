@@ -17,8 +17,8 @@ import { itemState, isReady } from '../services/checklists.js';
 import { documentChanged, lawyerRespondedOnDocument } from '../services/notify.js';
 import { loadMatter } from './matters.js';
 import {
-  documentsEnabled, detectType, storeDocument, readDocument, removeDocumentFile,
-  countFiles, MAX_BYTES, MAX_PER_MATTER, MAX_PER_PERSON, MIME_TYPES, EXTENSION,
+  documentsEnabled, detectType, storeDocument, readDocument,
+  countFiles, lockPerson, MAX_BYTES, MAX_PER_MATTER, MAX_PER_PERSON, MIME_TYPES, EXTENSION,
 } from '../services/documentStore.js';
 
 // mergeParams because the matter id is in the path this router is mounted on.
@@ -36,7 +36,7 @@ class Refusal extends Error {
 const rawFile = express.raw({ type: MIME_TYPES, limit: MAX_BYTES });
 
 // The columns are listed one by one.
-// stored_name and iv and auth_tag and sha256 are how the server finds and decrypts the file.
+// stored_name and iv and auth_tag and sha256 and content are how the server finds and decrypts the file.
 // None of them is ever sent to a browser.
 const VIEW = 'id, label, mime, size_bytes, uploaded_at, item_key, review_status, review_note, reviewed_at';
 
@@ -148,12 +148,13 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
   // The room check and the swap check and the insert run under a lock on the matter in one transaction.
   // As separate steps a burst of parallel uploads would all see room and all go in.
   // Two parallel replaces of one document would both succeed.
-  // The lock is held only for these few statements. The slow work of encrypting and writing the file is done above.
+  // The lock is held only for these few statements. The slow work of encrypting the file is done above.
+  // The person lock comes first because the cap on files is counted across all of their matters.
   const client = await pool.connect();
   let row;
-  let oldName = null;
   try {
     await client.query('BEGIN');
+    await lockPerson(client, req.user.id);
     await client.query('SELECT pg_advisory_xact_lock($1)', [access.matter.id]);
 
     let inheritedItem = null;
@@ -161,10 +162,9 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
       // The old row goes in the same transaction as the new one arrives. So there is never a moment
       // with neither or with both. If someone replaced it first this one is refused.
       const gone = await client.query(
-        'DELETE FROM matter_documents WHERE id = $1 AND matter_id = $2 RETURNING stored_name, item_key',
+        'DELETE FROM matter_documents WHERE id = $1 AND matter_id = $2 RETURNING item_key',
         [replaced.id, access.matter.id]);
       if (!gone.rows.length) throw new Refusal(409, 'That document was already replaced. Load the page again and try again.');
-      oldName = gone.rows[0].stored_name;
       inheritedItem = gone.rows[0].item_key;
     } else {
       const { inMatter, total } = await countFiles(client, access.matter.id, req.user.id);
@@ -177,14 +177,13 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
     }
 
     ({ rows: [row] } = await client.query(
-      `INSERT INTO matter_documents (matter_id, label, stored_name, mime, size_bytes, sha256, iv, auth_tag, item_key)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${VIEW}`,
-      [access.matter.id, label, stored.storedName, mime, req.body.length, stored.sha256, stored.iv, stored.authTag,
+      `INSERT INTO matter_documents (matter_id, label, stored_name, mime, size_bytes, sha256, iv, auth_tag, content, item_key)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING ${VIEW}`,
+      [access.matter.id, label, stored.storedName, mime, req.body.length, stored.sha256, stored.iv, stored.authTag, stored.content,
        explicitItem ? itemKey : inheritedItem]));
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    await removeDocumentFile(stored.storedName); // never leave an encrypted file that nothing points at
     if (err instanceof Refusal) return res.status(err.status).json({ error: err.message });
     // The unique index. One file for each checklist item. Say what to do and not what the database said.
     if (err?.code === '23505' && /one_per_item/.test(err.constraint ?? '')) {
@@ -195,9 +194,6 @@ router.post('/', requireAuth(...ROLES), requireIntParam('matterId'), documentUpl
     client.release();
   }
 
-  // The old file is removed only after the new row is committed. The new row is a new check, so
-  // a verdict on the old bytes cannot follow the new ones.
-  if (oldName) await removeDocumentFile(oldName);
   documentChanged(access.matter.id); // tells the lawyer the matter is shared with, if any
   res.status(201).json(view(row));
 });
@@ -301,10 +297,9 @@ router.get('/:docId/file', requireAuth(...ROLES), requireIntParam('matterId'), r
 router.delete('/:docId', requireAuth(...ROLES), requireIntParam('matterId'), requireIntParam('docId'), async (req, res) => {
   const access = await loadMatter(req.params.matterId, req.user);
   if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Document not found' });
-  const [row] = await q('DELETE FROM matter_documents WHERE id = $1 AND matter_id = $2 RETURNING stored_name',
+  const [row] = await q('DELETE FROM matter_documents WHERE id = $1 AND matter_id = $2 RETURNING id',
     [req.params.docId, access.matter.id]);
   if (!row) return res.status(404).json({ error: 'Document not found' });
-  await removeDocumentFile(row.stored_name);
   documentChanged(access.matter.id);
   res.status(204).end();
 });

@@ -4,7 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import request from 'supertest';
 import app from '../../src/app.js';
+import { jest } from '@jest/globals';
 import { q } from '../../src/db.js';
+import { whenSettled, resetNotifyThrottle } from '../../src/services/notify.js';
 import { resetDb, makeUser, makeMatter, makeProvider } from '../helpers.js';
 
 const PASSWORD = 'password1234'; // what makeUser gives every test account
@@ -16,6 +18,10 @@ let other;
 let expert;
 beforeAll(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'erase-docs-')); });
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+// Files kept in the database. The folder is only checked to stay empty.
+const storedCount = async () => (await q(
+  'SELECT ((SELECT count(*) FROM matter_documents WHERE content IS NOT NULL) + (SELECT count(*) FROM matter_event_files WHERE content IS NOT NULL))::int AS n'))[0].n;
 beforeEach(async () => {
   process.env.DOCUMENT_KEY = 'ab'.repeat(32);
   process.env.DOCUMENTS_DIR = dir;
@@ -65,7 +71,7 @@ describe('erasing the account', () => {
     expect(await count('SELECT count(*)::int AS n FROM users WHERE id = $1', [student.user.id])).toBe(0);
     expect(await count('SELECT count(*)::int AS n FROM matters WHERE user_id = $1', [student.user.id])).toBe(0);
     expect(await count('SELECT count(*)::int AS n FROM questions WHERE user_id = $1', [student.user.id])).toBe(0);
-    expect(fs.readdirSync(dir)).toHaveLength(1);
+    expect(await storedCount()).toBe(1);
 
     expect(await count('SELECT count(*)::int AS n FROM users WHERE id = $1', [other.user.id])).toBe(1);
     expect(await count('SELECT count(*)::int AS n FROM matters WHERE id = $1', [theirs.id])).toBe(1);
@@ -77,31 +83,82 @@ describe('erasing the account', () => {
     expect((await request(app).get('/api/auth/me').set('Authorization', student.auth)).status).toBe(401);
   });
 
-  it('keeps a booking for the lawyer but with no name, no account and no topic', async () => {
-    const lawyer = await makeProvider({ name: 'Adv. Amani', category: 'lawyer', type: 'pro_bono_lawyer', bookable: true, user_id: expert.user.id }, { verifiedBy: expert.user.id });
-    const [booking] = await q(
-      `INSERT INTO bookings (user_id, provider_id, slot, topic, status)
-       VALUES ($1,$2, now() + interval '2 days', 'my private topic', 'accepted') RETURNING id`,
-      [student.user.id, lawyer.id]);
-    await erase(student, good);
-    const [row] = await q('SELECT user_id, anon_token, topic, status FROM bookings WHERE id = $1', [booking.id]);
-    expect(row).toEqual({ user_id: null, anon_token: null, topic: null, status: 'accepted' });
+  const lawyerProvider = () => makeProvider(
+    { name: 'Adv. Amani', category: 'lawyer', type: 'pro_bono_lawyer', bookable: true, user_id: expert.user.id },
+    { verifiedBy: expert.user.id });
+
+  it('cancels an open booking and keeps every booking with no name, no account and no topic', async () => {
+    const lawyer = await lawyerProvider();
+    const make = async (status, days) => (await q(
+      `INSERT INTO bookings (user_id, provider_id, slot, topic, status, proposed_slot, proposed_at)
+       VALUES ($1,$2, now() + ($3 || ' days')::interval, 'my private topic', $4,
+               CASE WHEN $4 = 'requested' THEN now() + interval '9 days' END,
+               CASE WHEN $4 = 'requested' THEN now() END) RETURNING id`,
+      [student.user.id, lawyer.id, String(days), status]))[0].id;
+    const accepted = await make('accepted', 2);
+    const requested = await make('requested', 3);
+    const completed = await make('completed', 4);
+    await q(
+      `INSERT INTO booking_reminders (booking_id, recipient, kind, send_at)
+       VALUES ($1,'lawyer','day', now() + interval '1 day'), ($1,'lawyer','hour', now() + interval '2 days')`,
+      [accepted]);
+
+    expect((await erase(student, good)).status).toBe(200);
+
+    const rows = await q('SELECT id, user_id, anon_token, topic, status, proposed_slot FROM bookings ORDER BY id');
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(byId[accepted]).toMatchObject({ user_id: null, anon_token: null, topic: null, status: 'cancelled' });
+    expect(byId[requested]).toMatchObject({ user_id: null, topic: null, status: 'cancelled', proposed_slot: null });
+    expect(byId[completed]).toMatchObject({ user_id: null, topic: null, status: 'completed' });
+    expect(await count(`SELECT count(*)::int AS n FROM booking_reminders WHERE booking_id = $1 AND status = 'cancelled'`, [accepted])).toBe(2);
   });
 
-  it('keeps the account and shows no stack trace when a stored file cannot be removed', async () => {
-    const m = await makeMatter(student.user.id);
-    await upload(student, m.id);
-    const [d] = await q('SELECT stored_name FROM matter_documents WHERE matter_id = $1', [m.id]);
-    // A directory under the stored name cannot be removed as a file, so the removal fails.
-    fs.rmSync(path.join(dir, d.stored_name), { force: true });
-    fs.mkdirSync(path.join(dir, d.stored_name));
-    fs.writeFileSync(path.join(dir, d.stored_name, 'x'), 'x');
+  it('tells the lawyer once about an accepted consultation that is erased, and not about a requested one', async () => {
+    resetNotifyThrottle();
+    const mails = [];
+    const spy = jest.spyOn(console, 'log').mockImplementation((text) => { mails.push(String(text)); });
+    try {
+      const lawyer = await lawyerProvider();
+      await q(
+        `INSERT INTO bookings (user_id, provider_id, slot, topic, status)
+         VALUES ($1,$2, now() + interval '2 days', 'my private topic', 'accepted'),
+                ($1,$2, now() + interval '3 days', 'my private topic', 'requested')`,
+        [student.user.id, lawyer.id]);
 
+      expect((await erase(student, good)).status).toBe(200);
+      await whenSettled();
+
+      const toLawyer = mails.filter((m) => m.includes(`To:      ${expert.user.email}`));
+      expect(toLawyer).toHaveLength(1);
+      expect(toLawyer[0]).toContain('cancelled by the person who booked it');
+      expect(toLawyer[0]).not.toContain('my private topic');
+      expect(toLawyer[0]).not.toContain(student.user.name);
+      expect(toLawyer[0]).not.toContain(student.user.email);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not count an erased booking as an anonymous one', async () => {
+    const lawyer = await lawyerProvider();
+    await q(
+      `INSERT INTO bookings (user_id, provider_id, slot, status) VALUES ($1,$2, now() + interval '2 days', 'completed')`,
+      [student.user.id, lawyer.id]);
+    await erase(student, good);
+    const admin = await makeUser('admin', 'admin@alustudent.com');
+    const res = await request(app).get('/api/admin/stats').set('Authorization', admin.auth);
+    expect(res.body.bookings).toMatchObject({ total: 1, anonymous: 0 });
+  });
+
+  it('refuses with 409 and changes nothing when the account is linked to records it published', async () => {
+    const m = await makeMatter(student.user.id);
+    await q("INSERT INTO invite_tokens (token_hash, email, expires_at, created_by) VALUES ($1,$2, now() + interval '1 day', $3)",
+      ['h'.repeat(64), 'x@example.org', student.user.id]);
     const res = await erase(student, good);
-    expect(res.status).toBe(500);
-    expect(Object.keys(res.body)).toEqual(['error']);
-    expect(JSON.stringify(res.body)).not.toMatch(/at .*\.js|stack/i);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('Your account is linked to records you published. Ask an administrator to switch it off instead.');
     expect(await count('SELECT count(*)::int AS n FROM users WHERE id = $1', [student.user.id])).toBe(1);
+    expect(await count('SELECT count(*)::int AS n FROM matters WHERE id = $1', [m.id])).toBe(1);
   });
 });
 

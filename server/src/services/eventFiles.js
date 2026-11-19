@@ -7,7 +7,7 @@ import multer from 'multer';
 import { pool } from '../db.js';
 import { documentUploadLimiter } from '../middleware/rateLimit.js';
 import {
-  detectType, storeDocument, removeDocumentFile, countFiles,
+  detectType, storeDocument, countFiles, lockPerson,
   MAX_EVENT_FILE_BYTES, MAX_PER_MATTER, MAX_PER_PERSON,
 } from './documentStore.js';
 
@@ -19,7 +19,7 @@ export class Refusal extends Error {
 const MAX_NAME = 120;
 const MB = MAX_EVENT_FILE_BYTES / (1024 * 1024);
 
-// The file is kept in memory. It is at most 5 MB and it is encrypted before it touches the disk.
+// The file is kept in memory. It is at most 5 MB and it is encrypted before it is stored.
 const parse = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_EVENT_FILE_BYTES, files: 1, fields: 6, fieldSize: 16 * 1024, parts: 8 },
@@ -77,12 +77,13 @@ export const typeOfUpload = (file) => detectType(file.buffer);
 
 // Writes the entry and its file in one transaction. There is never an entry without the file the
 // person attached and never a file without its entry. The room check and the insert run under the
-// same lock on the matter as a checklist upload, so a burst cannot get past the cap.
+// same locks as a checklist upload (the person, then the matter), so a burst cannot get past the cap.
 export async function addEntryWithFile({ matterId, userId, occurredOn, description, file, mime }) {
   const stored = await storeDocument(file.buffer);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    await lockPerson(client, userId);
     await client.query('SELECT pg_advisory_xact_lock($1)', [matterId]);
     if (await countEntries(client, matterId) >= MAX_ENTRIES) throw new Refusal(400, ENTRY_CAP_MESSAGE);
     const { inMatter, total } = await countFiles(client, matterId, userId);
@@ -98,15 +99,14 @@ export async function addEntryWithFile({ matterId, userId, occurredOn, descripti
       [matterId, userId, occurredOn, description]);
     const name = cleanFileName(file.originalname, mime);
     await client.query(
-      `INSERT INTO matter_event_files (matter_id, event_id, stored_name, original_name, mime, size_bytes, sha256, iv, auth_tag)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [matterId, e.id, stored.storedName, name, mime, file.buffer.length, stored.sha256, stored.iv, stored.authTag]);
+      `INSERT INTO matter_event_files (matter_id, event_id, stored_name, original_name, mime, size_bytes, sha256, iv, auth_tag, content)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [matterId, e.id, stored.storedName, name, mime, file.buffer.length, stored.sha256, stored.iv, stored.authTag, stored.content]);
     await client.query('UPDATE matters SET updated_at = now() WHERE id = $1', [matterId]);
     await client.query('COMMIT');
     return { ...e, file: { name, size_bytes: file.buffer.length, mime } };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
-    await removeDocumentFile(stored.storedName); // never leave an encrypted file that nothing points at
     throw err;
   } finally {
     client.release();

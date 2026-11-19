@@ -2,8 +2,8 @@
 import { Router } from 'express';
 import { q, pool } from '../db.js';
 import { requireAuth, normalizeEmail } from '../middleware/auth.js';
-import { requireIntParam } from '../middleware/validate.js';
-import { createInvite, deleteInvite } from '../services/invites.js';
+import { requireIntParam, isPlausibleEmail } from '../middleware/validate.js';
+import { createInvite, deleteInvite, supersedeOlderInvites } from '../services/invites.js';
 import { sendMail, appUrl } from '../services/mailer.js';
 import { STALE_AFTER_DAYS } from './directory.js';
 import { ANSWER_TARGET_DAYS } from '../config/targets.js';
@@ -16,13 +16,12 @@ const router = Router();
 // The invitation is the only way to become a legal expert. It is emailed to the person.
 // The admin never sees the token so the admin cannot use it to sign in as the expert.
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // POST /api/admin/invites { email, expires_days }
 router.post('/invites', requireAuth('admin'), async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: 'email is required' });
-  if (email.length > 254 || !EMAIL_PATTERN.test(email)) return res.status(400).json({ error: 'That is not a valid email address' });
+  if (!isPlausibleEmail(email)) return res.status(400).json({ error: 'That is not a valid email address' });
 
   const days = req.body?.expires_days === undefined ? 7 : req.body.expires_days;
   if (!Number.isInteger(days) || days < 1 || days > 30) {
@@ -33,8 +32,9 @@ router.post('/invites', requireAuth('admin'), async (req, res) => {
   if (existing) return res.status(400).json({ error: 'An account with this email already exists' });
 
   const { invite, raw } = await createInvite(email, days, req.user.id);
+  let delivery;
   try {
-    const delivery = await sendMail({
+    delivery = await sendMail({
       to: email,
       subject: 'You are invited to ALU Legal Companion as a legal expert',
       text: [
@@ -49,18 +49,21 @@ router.post('/invites', requireAuth('admin'), async (req, res) => {
         'If you did not expect this invitation you can ignore this message.',
       ].join('\n'),
     });
-    res.status(201).json({
-      ...invite,
-      message: delivery.delivered === false
-        ? 'The invitation was created. This server has no mail set up, so the link is printed in the server log.'
-        : `The invitation was sent to ${email}.`,
-    });
   } catch (err) {
-    // An invitation nobody received is not worth keeping. Say so and let the admin try again.
+    // An invitation nobody received is not worth keeping. Older invitations keep working.
     console.error(`Could not send the invitation for ${invite.id}: ${[err?.name, err?.code].filter(Boolean).join(' ')}`);
     await deleteInvite(invite.id);
-    res.status(502).json({ error: 'The invitation email could not be sent. Check the mail settings and try again.' });
+    return res.status(502).json({ error: 'The invitation email could not be sent. Check the mail settings and try again.' });
   }
+
+  // The new link is out, so only now are the older ones cancelled.
+  await supersedeOlderInvites(email, invite.id);
+  res.status(201).json({
+    ...invite,
+    message: delivery.delivered === false
+      ? 'The invitation was created. This server has no mail set up, so the link is printed in the server log.'
+      : `The invitation was sent to ${email}.`,
+  });
 });
 
 // GET /api/admin/invites: the invitations and their state. The token is never in the list.
@@ -270,7 +273,7 @@ router.get('/stats', requireAuth('admin'), async (_req, res) => {
     `SELECT count(*)::int AS n FROM providers
       WHERE status = 'published' AND (last_checked_at IS NULL OR last_checked_at < CURRENT_DATE - ${STALE_AFTER_DAYS})`);
   const [bookings] = await q(
-    `SELECT count(*)::int AS total, count(*) FILTER (WHERE user_id IS NULL)::int AS anonymous FROM bookings`);
+    `SELECT count(*)::int AS total, count(*) FILTER (WHERE anon_token IS NOT NULL)::int AS anonymous FROM bookings`);
   const [questions] = await q(
     `SELECT count(*)::int AS total, count(*) FILTER (WHERE user_id IS NULL)::int AS anonymous,
             count(*) FILTER (WHERE status = 'open')::int AS open FROM questions`);
@@ -320,7 +323,11 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_BOOKINGS = 5000;
 
 // A real calendar day such as 2026-11-05. 2026-02-30 is refused.
-const isDay = (v) => DATE_PATTERN.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+const isDay = (v) => {
+  if (!DATE_PATTERN.test(v)) return false;
+  const day = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(day.getTime()) && day.toISOString().slice(0, 10) === v;
+};
 
 // GET /api/admin/bookings?from=YYYY-MM-DD&to=YYYY-MM-DD
 // The window is by slot in UTC and both days are included. Either end may be left out.

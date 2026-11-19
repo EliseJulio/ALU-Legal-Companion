@@ -1,6 +1,7 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import app from '../../src/app.js';
 import { q } from '../../src/db.js';
 import { getSecret } from '../../src/middleware/auth.js';
@@ -161,5 +162,130 @@ describe('roles', () => {
     expect((await adminOnly(who)).status).toBe(403);
     await q("UPDATE users SET role = 'admin' WHERE id = $1", [who.user.id]);
     expect((await adminOnly(who)).status).toBe(200);
+  });
+});
+
+describe('sign-in takes as long for an unknown address as for a wrong password', () => {
+  it('still checks the password against a hash when there is no account', async () => {
+    const compare = jest.spyOn(bcrypt, 'compare');
+    const res = await login('nobody@alustudent.com', 'whatever-it-is');
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('Incorrect email or password');
+    expect(compare).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('sign-up input', () => {
+  it('answers email_taken and not 500 when two sign-ups for one address arrive together', async () => {
+    const [a, b] = await Promise.all([register(), register()]);
+    expect([a.status, b.status].sort()).toEqual([201, 400]);
+    const refused = a.status === 400 ? a : b;
+    expect(refused.body.code).toBe('email_taken');
+  });
+
+  it.each([
+    ['a very long address', `${'a'.repeat(300)}@alustudent.com`],
+    ['an address with a space', 'a b@alustudent.com'],
+    ['an address with a comma', 'a,b@alustudent.com'],
+    ['an address with a control character', 'a\u0001b@alustudent.com'],
+  ])('refuses %s with 400', async (_label, email) => {
+    expect((await register({ email })).status).toBe(400);
+  });
+
+  it('refuses a NUL character anywhere in a JSON body with 400', async () => {
+    const res = await register({ name: 'Test\u0000Person' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not allowed/i);
+    expect((await q('SELECT 1 FROM users')).length).toBe(0);
+  });
+
+  it('answers a request with an unsupported encoding with 415 and not 500', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await request(app).post('/api/auth/login')
+      .set('Content-Type', 'application/json').set('Content-Encoding', 'br').send('{"a":1}');
+    expect(res.status).toBe(415);
+    expect(Object.keys(res.body)).toEqual(['error']);
+  });
+});
+
+describe('the email limits do not share one budget', () => {
+  it('lets a person reset a password after others asked for a link on the same address', async () => {
+    process.env.RATE_LIMIT_TEST = '1';
+    try {
+      const body = { email: 'victim.limit@alustudent.com' };
+      for (let i = 0; i < 5; i += 1) {
+        expect((await request(app).post('/api/auth/resend-verification').send(body)).status).toBe(200);
+      }
+      expect((await request(app).post('/api/auth/resend-verification').send(body)).status).toBe(429);
+      expect((await request(app).post('/api/auth/forgot-password').send(body)).status).toBe(200);
+    } finally {
+      delete process.env.RATE_LIMIT_TEST;
+    }
+  });
+
+  it('counts change-email per account, so naming an address never blocks anybody else', async () => {
+    process.env.RATE_LIMIT_TEST = '1';
+    try {
+      const a = await makeUser('student', 'cap.a@alustudent.com');
+      const b = await makeUser('student', 'cap.b@alustudent.com');
+      const ask = (who, email) => request(app).post('/api/auth/change-email').set('Authorization', who.auth)
+        .send({ email, current_password: 'password1234' });
+      for (let i = 0; i < 5; i += 1) expect((await ask(a, `new${i}@alustudent.com`)).status).toBe(200);
+      expect((await ask(a, 'new5@alustudent.com')).status).toBe(429);
+      expect((await ask(b, 'new0@alustudent.com')).status).toBe(200);
+      expect((await request(app).post('/api/auth/forgot-password').send({ email: 'new0@alustudent.com' })).status).toBe(200);
+    } finally {
+      delete process.env.RATE_LIMIT_TEST;
+    }
+  });
+
+  it('stops sign-ups that name one address after five tries', async () => {
+    process.env.RATE_LIMIT_TEST = '1';
+    try {
+      for (let i = 0; i < 5; i += 1) expect((await register({ email: 'many@alustudent.com' })).status).not.toBe(429);
+      expect((await register({ email: 'many@alustudent.com' })).status).toBe(429);
+    } finally {
+      delete process.env.RATE_LIMIT_TEST;
+    }
+  });
+});
+
+describe('admin bookings window', () => {
+  it('answers 400 for a day that matches the pattern but is not a date', async () => {
+    const admin = await makeUser('admin');
+    const res = await request(app).get('/api/admin/bookings?from=2026-13-45').set('Authorization', admin.auth);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('invitations stay safe when something fails', () => {
+  const invite = (admin, email) => request(app).post('/api/admin/invites').set('Authorization', admin.auth).send({ email });
+  const redeem = (invite_token) => request(app).post('/api/auth/redeem-invite')
+    .send({ invite_token, name: 'Lawyer', password: 'a-long-password-1' });
+
+  it('keeps the older invitation working when the new email cannot be sent', async () => {
+    const admin = await makeUser('admin');
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await invite(admin, 'lawyer@example.org')).status).toBe(201);
+    const older = linkToken();
+    const saved = process.env.SMTP_URL;
+    process.env.SMTP_URL = 'smtp://127.0.0.1:1';
+    try {
+      expect((await invite(admin, 'lawyer@example.org')).status).toBe(502);
+    } finally {
+      if (saved === undefined) delete process.env.SMTP_URL; else process.env.SMTP_URL = saved;
+    }
+    expect((await redeem(older)).status).toBe(201);
+  });
+
+  it('does not use the invitation up when the account cannot be made', async () => {
+    const admin = await makeUser('admin');
+    expect((await invite(admin, 'lawyer@example.org')).status).toBe(201);
+    const token = linkToken();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const hash = jest.spyOn(bcrypt, 'hash').mockRejectedValueOnce(new Error('boom'));
+    expect((await redeem(token)).status).toBe(500);
+    hash.mockRestore();
+    expect((await redeem(token)).status).toBe(201);
   });
 });

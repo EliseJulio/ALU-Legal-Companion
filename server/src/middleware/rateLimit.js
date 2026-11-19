@@ -75,7 +75,7 @@ export function createLimiter({ windowMs = FIFTEEN_MINUTES, max, message, store,
 }
 
 // POST /matters/:id/documents. It is counted for the signed-in person and the IP is only the fallback.
-// An upload is up to 10 MB held in memory, then encrypted and written to disk. The limit is per
+// An upload is up to 10 MB held in memory, then encrypted and stored in the database. The limit is per
 // account, so a shared campus IP cannot use up the budget of anyone else.
 export const documentUploadLimiter = createLimiter({
   max: 60,
@@ -128,14 +128,34 @@ export const accountPasswordLimiter = createLimiter({
   requestWasSuccessful: (_req, res) => res.statusCode < 400,
 });
 
-// Routes that send an email (resend a verification link or forgot password): strict and per email.
+// Routes that send an email to a typed address: strict and per email.
 // The risk is someone filling one person's inbox. These routes always answer 200 on purpose so successful requests count too.
 // The count uses the email that was typed. It never uses whether an account exists.
 // So a 429 does not reveal anything a 200 would not.
-export const emailLimiter = createLimiter({
+// Each route has its own limiter, so requests on one route never use up the budget of another.
+const EMAIL_MESSAGE = 'Too many emails requested. Please wait 15 minutes and try again.';
+const SLOW_EMAIL_MESSAGE = 'Too many emails requested. Please wait an hour and try again.';
+const perEmail = () => createLimiter({ max: 5, message: EMAIL_MESSAGE, keyGenerator: emailOrIp });
+export const resendLimiter = perEmail();
+export const forgotPasswordLimiter = perEmail();
+
+// Register: counted per typed email, one hour. A person who mistypes once or twice stays well inside it.
+export const registerEmailLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
   max: 5,
-  message: 'Too many emails requested. Please wait 15 minutes and try again.',
+  message: SLOW_EMAIL_MESSAGE,
   keyGenerator: emailOrIp,
+});
+
+// Change email: counted per signed-in account and not per typed address, so one account cannot send
+// mail to many different addresses and nobody can block another person by naming their address.
+// Requests refused with a 4xx do not count because they send nothing.
+export const changeEmailLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: SLOW_EMAIL_MESSAGE,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skipFailedRequests: true,
 });
 
 // POST /api/ask-ai. Each question can cost a model call, so this is kept low per address.

@@ -7,7 +7,7 @@ import { q, pool } from './db.js';
 import { hashPassword } from './passwords.js';
 import { BUILT_IN_CONTACTS } from './routes/contacts.js';
 import { validateService } from './services/guideService.js';
-import { checklistFromGuide, insertPublishedChecklist } from './services/guideChecklists.js';
+import { checklistFromGuide } from './services/guideChecklists.js';
 import { validateChecklist } from './services/checklists.js';
 import { OFFICIAL_CHECKLISTS, linkGuide } from './services/officialChecklists.js';
 import { seedPasswordProblems } from './seedPasswords.js';
@@ -274,8 +274,15 @@ for (const file of ['student-permit-renewal.json', 'vehicle-ownership-transfer.j
   console.log(`✓ guides: "${draft.title}" queued for the admin to publish`);
 }
 
-// Document checklists, published with the administrator account as the publisher. An existing row is never
+// Document checklists, added as drafts for the admin to read and publish. An existing row is never
 // changed, except that a missing guide link is filled in.
+async function insertDraftChecklist(query, c, { guideId } = {}) {
+  await query(
+    `INSERT INTO document_checklists (slug, title, description, items, guide_id, status)
+     SELECT $1,$2,$3,$4,$5,'draft'
+      WHERE NOT EXISTS (SELECT 1 FROM document_checklists WHERE slug = $1)`,
+    [c.slug, c.title, c.description ?? null, JSON.stringify(c.items), guideId ?? null]);
+}
 const RRA_PAGE = 'https://www.rra.gov.rw/en/domestic-tax-services/motor-vehicle-services/motor-vehicle-ownership-transfer';
 const RRA_PDF = 'https://www.rra.gov.rw/fileadmin/user_upload/OWNERSHIP_TRANSFER_REQUIREMENTS.pdf';
 const CHECKLISTS = [
@@ -330,7 +337,7 @@ const guideIdFor = async (file) => {
 };
 
 for (const c of CHECKLISTS) {
-  await insertPublishedChecklist(q, { ...c, items: c.items }, { adminId: admin.id });
+  await insertDraftChecklist(q, { ...c, items: c.items });
 }
 const car = await guideIdFor(CAR_GUIDE_FILE);
 await q('UPDATE document_checklists SET guide_id = $1 WHERE slug = $2 AND guide_id IS NULL',
@@ -338,16 +345,16 @@ await q('UPDATE document_checklists SET guide_id = $1 WHERE slug = $2 AND guide_
 for (const g of GUIDE_CHECKLISTS) {
   const { draft, guideId } = await guideIdFor(g.file);
   const checklist = checklistFromGuide(draft, { slug: g.slug, title: g.title, description: g.description });
-  await insertPublishedChecklist(q, checklist, { guideId, adminId: admin.id });
+  await insertDraftChecklist(q, checklist, { guideId });
 }
 // Two checklists from official pages. Each is linked to its guide when that guide exists.
 for (const { guideTitle, ...c } of OFFICIAL_CHECKLISTS) {
   const checked = validateChecklist(c);
   if (checked.errors) throw new Error(`${c.slug}: ${checked.errors.join('; ')}`);
-  await insertPublishedChecklist(q, checked.value, { adminId: admin.id });
+  await insertDraftChecklist(q, checked.value);
   await linkGuide(q, c.slug, guideTitle);
 }
-console.log(`✓ checklists: ${CHECKLISTS.length + GUIDE_CHECKLISTS.length + OFFICIAL_CHECKLISTS.length} published`);
+console.log(`✓ checklists: ${CHECKLISTS.length + GUIDE_CHECKLISTS.length + OFFICIAL_CHECKLISTS.length} queued as drafts (nothing published)`);
 
 // The crisis contacts. They are the same list the API falls back to when the table is empty.
 for (const [i, c] of BUILT_IN_CONTACTS.entries()) {

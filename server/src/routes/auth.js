@@ -6,15 +6,17 @@ import {
   signToken, isAllowedEmail, normalizeEmail, ALLOWED_DOMAINS, requireAuth, revokeSessions,
 } from '../middleware/auth.js';
 import {
-  loginEmailLimiter, emailLimiter, authIpLimiter, passwordChangeLimiter, accountPasswordLimiter,
+  loginEmailLimiter, resendLimiter, forgotPasswordLimiter, registerEmailLimiter, changeEmailLimiter,
+  authIpLimiter, passwordChangeLimiter, accountPasswordLimiter,
 } from '../middleware/rateLimit.js';
+import { isPlausibleEmail } from '../middleware/validate.js';
 import {
-  hashPassword, checkPassword, passwordTooLong, PASSWORD_TOO_LONG,
+  hashPassword, checkPassword, checkPasswordOrDummy, passwordTooLong, PASSWORD_TOO_LONG,
 } from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail, mailAvailable } from '../services/mailer.js';
-import { removeMatterFiles } from '../services/documentStore.js';
-import { consumeInvite, releaseInvite, inviteStatus } from '../services/invites.js';
+import { consumeInvite, inviteStatus } from '../services/invites.js';
+import { bookingCancelled } from '../services/notify.js';
 
 const router = Router();
 
@@ -44,7 +46,6 @@ const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\
 // A person may move the account to another address. The new one waits in pending_email until its
 // link is used. Students and staff must stay inside the ALU domains, as at sign-up. Legal experts
 // and admins join from outside the university, so they may use any address.
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALU_ONLY_ROLES = ['student', 'staff'];
 
 // The only answer change-email gives for an address that passes the checks. It is the same whether
@@ -93,32 +94,34 @@ async function sendVerificationEmail(user) {
 }
 
 // POST /api/auth/register: students and staff with an ALU address only
-router.post('/register', authIpLimiter, async (req, res) => {
+router.post('/register', authIpLimiter, registerEmailLimiter, async (req, res) => {
   const { email, password, role } = req.body || {};
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   if (!name || !email || !password || !role) return res.status(400).json({ error: 'name, email, password and role are required' });
   if (name.length > 100) return res.status(400).json({ error: 'Your name must be 100 characters or fewer.' });
   if (!['student', 'staff'].includes(role)) return res.status(400).json({ error: 'Role must be student or staff. Legal experts join by invitation only.' });
-  if (!isAllowedEmail(email)) {
+  if (!isPlausibleEmail(normalizeEmail(email)) || !isAllowedEmail(email)) {
     return res.status(400).json({ error: `Sign-up is limited to the ALU community: ${ALLOWED_DOMAINS.map((d) => '@' + d).join(' or ')}` });
   }
   if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
   if (passwordTooLong(password)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
-  const existing = await q('SELECT id FROM users WHERE email = $1', [normalizeEmail(email)]);
-  // One answer for every existing address, verified or not, so the reply reveals nothing new.
-  // The wording points an unverified person to the link and the sign-in page.
-  if (existing.length) {
+  // An address that already has an account gets this 400 answer whether or not it was verified.
+  // So the reply does reveal that the address exists. The wording points an unverified person
+  // to the link and the sign-in page.
+  // ON CONFLICT covers two sign-ups for one address at the same moment.
+  const [user] = await q(
+    `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, name, email, role`,
+    [name, normalizeEmail(email), await hashPassword(password), role],
+  );
+  if (!user) {
     return res.status(400).json({
       code: 'email_taken',
       error: 'An account with this email already exists. If you have not verified it yet, check your email for the link or ask for a new one on the sign-in page.',
     });
   }
-
-  const [user] = await q(
-    'INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id, name, email, role',
-    [name, normalizeEmail(email), await hashPassword(password), role],
-  );
 
   // No token is returned. Registering is not entry. The account stays unverified and login
   // refuses it until the link is used.
@@ -189,7 +192,7 @@ const RESEND_REPLY = 'If that address has an account still waiting to be verifie
 // If it answered differently for an address with an account, anyone could learn which ALU
 // addresses are registered without knowing a password. A link is sent only when the address
 // has an account that is not verified yet. Older links stay valid until they expire.
-router.post('/resend-verification', authIpLimiter, emailLimiter, async (req, res) => {
+router.post('/resend-verification', authIpLimiter, resendLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'email is required' });
 
@@ -215,7 +218,8 @@ router.post('/login', authIpLimiter, loginEmailLimiter, async (req, res) => {
     'SELECT id, name, email, password_hash, role, email_verified_at, deactivated_at, session_version FROM users WHERE email = $1',
     [normalizeEmail(email)],
   );
-  if (!user || !(await checkPassword(String(password), user.password_hash))) {
+  // With no account the password is checked against a dummy hash, so the reply takes as long either way.
+  if (!(await checkPasswordOrDummy(String(password), user?.password_hash)) || !user) {
     return res.status(401).json({ error: 'Incorrect email or password' });
   }
 
@@ -267,9 +271,11 @@ router.post('/logout', requireAuth(), async (req, res) => {
   res.status(204).end();
 });
 
+const LINKED_ACCOUNT_MESSAGE = 'Your account is linked to records you published. Ask an administrator to switch it off instead.';
+
 // DELETE /api/auth/me { password, confirm: true }: a student or staff member erases their own account.
-// Matters go with their files first. Saved guides and sign-in tokens and own questions go too.
-// A booking stays for the lawyer with no person and no topic.
+// Matters go with their files. Saved guides and sign-in tokens and own questions go too.
+// An open booking is cancelled. Any booking that stays has no person and no topic.
 // Lawyers and admins are tied to published records so an admin closes theirs.
 router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), accountPasswordLimiter, async (req, res) => {
   if (!['student', 'staff'].includes(req.user.role)) {
@@ -286,14 +292,6 @@ router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), accountPas
     return res.status(401).json({ error: 'Incorrect password' });
   }
 
-  // The files go first. If one cannot be removed the account stays and a retry finishes the job.
-  try {
-    const matters = await q('SELECT id FROM matters WHERE user_id = $1', [me.id]);
-    for (const m of matters) await removeMatterFiles(m.id);
-  } catch {
-    return res.status(500).json({ error: 'Your files could not be removed, so nothing was erased. Please try again.' });
-  }
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -301,15 +299,37 @@ router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), accountPas
     await client.query('DELETE FROM bookmarks WHERE user_id = $1', [me.id]);
     await client.query('DELETE FROM auth_tokens WHERE user_id = $1', [me.id]);
     await client.query('DELETE FROM questions WHERE user_id = $1', [me.id]);
+    // An open booking is cancelled so no request or appointment stays open for the lawyer.
+    // The earlier status is read in the same statement, so the lawyer is told only about accepted ones.
+    const { rows: cancelled } = await client.query(
+      `WITH open AS (SELECT id, status FROM bookings WHERE user_id = $1 AND status IN ('requested', 'accepted'))
+       UPDATE bookings b SET status = 'cancelled', proposed_slot = NULL, proposed_at = NULL, user_id = NULL, topic = NULL
+         FROM open WHERE b.id = open.id
+       RETURNING b.id, open.status AS previous_status`,
+      [me.id]);
+    if (cancelled.length) {
+      await client.query(
+        `UPDATE booking_reminders SET status = 'cancelled' WHERE booking_id = ANY($1::int[]) AND status = 'pending'`,
+        [cancelled.map((b) => b.id)]);
+    }
     await client.query('UPDATE bookings SET user_id = NULL, topic = NULL WHERE user_id = $1', [me.id]);
     await client.query('DELETE FROM users WHERE id = $1', [me.id]);
     await client.query('COMMIT');
-  } catch {
+    // Sent after the commit. The mail reads only the slot and the lawyer's address.
+    for (const b of cancelled) {
+      if (b.previous_status === 'accepted') bookingCancelled(b.id);
+    }
+  } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    // A published guide or entry, a review or an invitation still points at this account.
+    if (err.code === '23503') {
+      return res.status(409).json({ error: LINKED_ACCOUNT_MESSAGE });
+    }
     return res.status(500).json({ error: 'Your account could not be erased. Nothing was changed. Please try again.' });
   } finally {
     client.release();
   }
+
   res.json({ ok: true });
 });
 
@@ -362,11 +382,11 @@ router.post('/change-password', authIpLimiter, requireAuth(), passwordChangeLimi
 // Nothing changes yet. The new address waits in pending_email and a link goes to it. The account keeps
 // working with the old address until the link is used, so a typo can never lock anyone out.
 // The current password is needed so that a stolen session alone cannot send an account somewhere else.
-router.post('/change-email', authIpLimiter, requireAuth(), accountPasswordLimiter, emailLimiter, async (req, res) => {
+router.post('/change-email', authIpLimiter, requireAuth(), accountPasswordLimiter, changeEmailLimiter, async (req, res) => {
   const { email: typed, current_password: currentPassword } = req.body || {};
   const email = normalizeEmail(typed);
   // The address is checked first so the caller learns the rule without having to get the password right.
-  if (!email || email.length > 254 || !EMAIL_PATTERN.test(email)) {
+  if (!isPlausibleEmail(email)) {
     return res.status(400).json({ error: 'That is not a valid email address.' });
   }
 
@@ -383,8 +403,19 @@ router.post('/change-email', authIpLimiter, requireAuth(), accountPasswordLimite
     });
   }
 
-  // An address that already has an account gets the same answer as a free one. Nothing is stored and
-  // nothing is sent.
+  // The reply goes first. The lookup and the sends run after it, so the time taken to answer never
+  // shows whether the address has an account. A failure is logged and changes nothing.
+  res.json({ message: CHANGE_EMAIL_REPLY });
+  try {
+    await startEmailChange(me, email);
+  } catch (err) {
+    console.error(`Could not start the email change for user ${me.id}: ${errorTag(err)}`);
+  }
+});
+
+// An address that already has an account gets the same answer as a free one. Nothing is stored and
+// nothing is sent.
+async function startEmailChange(me, email) {
   const [taken] = await q('SELECT id FROM users WHERE email = $1', [email]);
   if (!taken) {
     await q('UPDATE users SET pending_email = $1 WHERE id = $2', [email, me.id]);
@@ -429,8 +460,7 @@ router.post('/change-email', authIpLimiter, requireAuth(), accountPasswordLimite
       console.error(`Could not send the confirmation link for user ${me.id}: ${errorTag(err)}`);
     }
   }
-  res.json({ message: CHANGE_EMAIL_REPLY });
-});
+}
 
 // POST /api/auth/confirm-email-change { token }: use the link sent to the new address.
 // The link works on any device because reading it proves the mailbox is the person's.
@@ -523,7 +553,7 @@ const FORGOT_PASSWORD_REPLY = 'If that address has an account, a reset link is o
 // Unlike resend, this works for verified accounts too because they are the ones who forget.
 // It also cancels the older reset links. An old email in a shared mailbox is a way in, so
 // only the newest link may work.
-router.post('/forgot-password', authIpLimiter, emailLimiter, async (req, res) => {
+router.post('/forgot-password', authIpLimiter, forgotPasswordLimiter, async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'email is required' });
 
@@ -607,7 +637,33 @@ router.post('/redeem-invite', authIpLimiter, async (req, res) => {
   }
   if (passwordTooLong(password)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
-  const invite = await consumeInvite(inviteToken);
+  // The password is hashed first. The invitation is used and the account made in one
+  // transaction, so a failure leaves the invitation working.
+  const passwordHash = await hashPassword(password);
+  const client = await pool.connect();
+  let invite;
+  let user;
+  try {
+    await client.query('BEGIN');
+    invite = await consumeInvite(inviteToken, client);
+    if (invite) {
+      // ON CONFLICT covers an account made with this address after the invitation was sent.
+      ({ rows: [user] } = await client.query(
+        `INSERT INTO users (name, email, password_hash, role, email_verified_at)
+         VALUES ($1, $2, $3, 'legal_expert', now())
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id, name, email, role, session_version`,
+        [name, invite.email, passwordHash]));
+    }
+    // With no account made the rollback gives the invitation back.
+    await client.query(user ? 'COMMIT' : 'ROLLBACK');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
   if (!invite) {
     const why = await inviteStatus(inviteToken);
     const message = {
@@ -616,20 +672,12 @@ router.post('/redeem-invite', authIpLimiter, async (req, res) => {
     }[why] || 'That invitation is not valid. Ask the admin for a new one.';
     return res.status(400).json({ error: message });
   }
-
-  // ON CONFLICT covers an account made with this address after the invitation was sent.
-  const [user] = await q(
-    `INSERT INTO users (name, email, password_hash, role, email_verified_at)
-     VALUES ($1, $2, $3, 'legal_expert', now())
-     ON CONFLICT (email) DO NOTHING
-     RETURNING id, name, email, role, session_version`,
-    [name, invite.email, await hashPassword(password)]);
+  // An address that already has an account gets this 400 answer whether or not it was verified.
+  // The transaction rolled back, so the invitation is still usable with another address.
   if (!user) {
-    // No account was made, so the invitation is given back and not wasted.
-    await releaseInvite(invite.id);
     return res.status(400).json({
       code: 'email_taken',
-      error: 'An account with this email already exists. If you have not verified it yet, check your email for the link or ask for a new one on the sign-in page.',
+      error: 'An account with this email already exists. Use a different address for this invitation, or sign in with the existing account.',
     });
   }
 
