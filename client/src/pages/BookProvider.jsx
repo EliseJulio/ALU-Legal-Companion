@@ -6,6 +6,8 @@ import { useApi } from '@/lib/useApi';
 import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity } from '@/lib/auth';
 import TokenDisplay from '@/components/TokenDisplay';
+import SlotPicker from '@/components/SlotPicker';
+import { slotDays } from '@/lib/slots';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
@@ -32,7 +34,10 @@ export default function BookProvider() {
   const { user } = useAuth();
   const here = useLocation();
   const navigate = useNavigate();
+  // The moment chosen (an ISO time) and the date the reader is looking at. The date is kept apart so
+  // the time list can show a day before a time is chosen.
   const [slot, setSlot] = useState('');
+  const [date, setDate] = useState(null);
   const [topic, setTopic] = useState('');
   // Starts as null on purpose. Nothing is pre-selected. A student in a hurry must not send
   // under their own name a request they meant to keep anonymous.
@@ -57,6 +62,10 @@ export default function BookProvider() {
   // The name says whose time is being asked for. If it cannot be loaded the page works without it:
   // the server still checks the entry when the request is sent.
   const { data: provider } = useApi(usableId ? `/directory/providers/${providerId}` : '');
+  // The open times for the next two weeks. The server picks the window, so no dates are sent.
+  const { data: slotPayload, error: slotsError, loading: slotsLoading, refetch: refetchSlots } = useApi(usableId ? `/bookings/slots/${providerId}` : '');
+  const days = slotDays(slotPayload);
+  const noTimes = Boolean(slotPayload) && days.length === 0;
   // Only an anonymous request has a code. The reader promises to save it before it is sent.
   const [acknowledged, setAcknowledged] = useState(false);
   // Which control a blocking message is about, so that control points at it. `errorCount` makes a
@@ -120,6 +129,12 @@ export default function BookProvider() {
       }
       setBookedAsSelf(true);
     } catch (err) {
+      // Times can be taken while the form is open. The open times are loaded again, and the chosen
+      // time is cleared, so the reader sees what is free now.
+      if (err?.message?.startsWith('That time is not available') || err?.message === 'This lawyer has no open times right now.') {
+        setSlot('');
+        refetchSlots();
+      }
       // The form keeps what was typed. A reader must not lose their text on an error.
       fail(err);
     } finally {
@@ -149,7 +164,7 @@ export default function BookProvider() {
         <Breadcrumb trail={[{ label: 'Home', to: '/' }, { label: 'Directory', to: '/directory' }]} current="Request consultation" />
         <h1 className={`mt-6 ${PAGE_TITLE}`}>This office does not take online bookings</h1>
         <div className={`mt-4 ${CARD}`}>
-          <p className="text-sm">{provider.name} is contact-direct. See how to reach them, or choose a lawyer who takes bookings.</p>
+          <p className="text-sm">{provider.name} takes no online bookings. See how to reach them, or choose a lawyer who takes bookings.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <Link to={`/directory/${providerId}`} className={BUTTON_PRIMARY}>See how to contact them</Link>
             <Link to="/directory" className={BUTTON_OUTLINE}>Back to the directory</Link>
@@ -199,6 +214,11 @@ export default function BookProvider() {
             My activity
           </Link>
         </div>
+      ) : noTimes ? (
+        <div className={`mt-4 ${CARD}`}>
+          <p>This lawyer has no open times in the next two weeks.</p>
+          <Link to="/directory" className={`mt-3 ${BUTTON_OUTLINE}`}>Back to the directory</Link>
+        </div>
       ) : (
         <>
           <p className="mt-4 text-muted-foreground">
@@ -226,20 +246,25 @@ export default function BookProvider() {
           {error && <ErrorNotice key={errorCount} id="booking-error" error={error} className="mt-4" />}
 
           <form onSubmit={handleSubmit} className={`mt-4 ${CARD}`}>
-            <label htmlFor="slot" className="block text-sm font-semibold">Date and time</label>
-            <p id="slot-hint" className="mt-1 text-sm text-muted-foreground">
-              When would suit you? The lawyer can accept it or ask for another time.
-            </p>
-            <input
-              id="slot"
-              ref={slotRef}
-              type="datetime-local"
-              value={slot}
-              onChange={(e) => { setSlot(e.target.value); if (errorFor === 'slot') setErrorFor(null); }}
-              aria-describedby={errorFor === 'slot' ? 'slot-hint booking-error' : 'slot-hint'}
-              aria-invalid={errorFor === 'slot' || undefined}
-              className={FIELD}
-            />
+            {slotsLoading && !slotPayload && <p className="mt-4 text-sm text-muted-foreground">Loading the open times…</p>}
+            {slotsError && days.length === 0 && (
+              <div className="mt-4">
+                <ErrorNotice error={slotsError} />
+                <button type="button" onClick={() => refetchSlots()} className={`mt-3 ${BUTTON_OUTLINE}`}>Try again</button>
+              </div>
+            )}
+            {days.length > 0 && (
+              <SlotPicker
+                days={days}
+                date={date}
+                time={slot}
+                onDate={(d) => { setDate(d); setSlot(''); if (errorFor === 'slot') setErrorFor(null); }}
+                onTime={(iso) => { setSlot(iso); if (errorFor === 'slot') setErrorFor(null); }}
+                describedBy={errorFor === 'slot' ? 'booking-error' : undefined}
+                invalid={errorFor === 'slot'}
+                groupRef={slotRef}
+              />
+            )}
 
             <label htmlFor="topic" className="mt-4 block text-sm font-semibold">What is it about? (optional)</label>
             <p id="topic-hint" className="mt-1 text-sm text-muted-foreground">
@@ -340,7 +365,7 @@ export default function BookProvider() {
           </div>
           <div>
             <dt className="text-sm font-semibold text-faint">The lawyer responds</dt>
-            <dd className="mt-0.5">They accept the time or ask for another.</dd>
+            <dd className="mt-0.5">They accept the time or decline it. If they decline, choose another time.</dd>
           </div>
           <div>
             <dt className="text-sm font-semibold text-faint">You check</dt>
