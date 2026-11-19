@@ -78,6 +78,13 @@ export async function signInAs(page, role) {
 // Fixed example data. Every name, address and code here is made up.
 export const DATA = {
   code: '1234-5678-9ABC-DEFG',
+  // Two open times on 1 January 2099. 08:00 UTC is 10:00 in Kigali, 08:30 UTC is 10:30.
+  slots: () => ({
+    provider_id: 1,
+    slot_minutes: 30,
+    timezone: 'Africa/Kigali',
+    days: [{ date: '2099-01-01', slots: ['2099-01-01T08:00:00.000Z', '2099-01-01T08:30:00.000Z'] }],
+  }),
   contacts: [
     { name: 'Police', contact: '112', when: 'Immediate danger' },
     { name: 'Isange One Stop Centre', contact: '3029', when: 'Abuse or harassment' },
@@ -122,6 +129,13 @@ export const DATA = {
     ...overrides,
   }),
 };
+
+// Chooses the date and then the time from the open times on the request page. The date button names its
+// day and the time button names the Kigali clock time.
+export async function pickSlot(page, time = '10:00') {
+  await page.getByRole('button', { name: /1 January/ }).click();
+  await page.getByRole('button', { name: time, exact: true }).click();
+}
 
 // True when the page is wider than the screen, so a phone would scroll sideways.
 export const scrollsSideways = (page) => page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

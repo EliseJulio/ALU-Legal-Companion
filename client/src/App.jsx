@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import Landing from '@/pages/Landing';
 import RequireRole from '@/components/RequireRole';
+import { useAuth } from '@/lib/AuthContext';
 import AppointmentsRedirect from '@/components/AppointmentsRedirect';
 import WhereToGoRedirect from '@/components/WhereToGoRedirect';
 import PageLoading from '@/components/PageLoading';
@@ -84,6 +85,11 @@ function ScrollToTop() {
 // The staff workspaces. Each page sits inside the guard for its role.
 const Expert = ({ children }) => <RequireRole roles={['legal_expert']}>{children}</RequireRole>;
 const Admin = ({ children }) => <RequireRole roles={['admin']}>{children}</RequireRole>;
+// A visitor keeps the page's own sign-in notice. A signed-in account with another role is refused here.
+const Owner = ({ children }) => {
+  const { user } = useAuth();
+  return user ? <RequireRole roles={['student', 'staff']}>{children}</RequireRole> : children;
+};
 
 export default function App() {
   return (
@@ -128,7 +134,7 @@ export default function App() {
         <Route path="/expert/appointments" element={<Expert><ExpertAppointments /></Expert>} />
         <Route path="/expert/bookings" element={<AppointmentsRedirect to="/expert/appointments" />} />
         <Route path="/expert/matters" element={<Expert><ExpertMatters /></Expert>} />
-        <Route path="/my-activity" element={<MyActivity />} />
+        <Route path="/my-activity" element={<Owner><MyActivity /></Owner>} />
         <Route path="/call/:id" element={<JoinCall />} />
         <Route path="/settings" element={<AccountSettings />} />
         <Route path="/ask" element={<AskQuestion />} />
@@ -137,10 +143,10 @@ export default function App() {
         <Route path="/check-request" element={<CheckRequest />} />
         <Route path="/guides" element={<GuideLibrary />} />
         <Route path="/guides/:id" element={<GuideDetail />} />
-        <Route path="/saved" element={<SavedGuides />} />
+        <Route path="/saved" element={<Owner><SavedGuides /></Owner>} />
         <Route path="/home" element={<Home />} />
-        <Route path="/matters" element={<MyMatters />} />
-        <Route path="/matters/new" element={<NewMatter />} />
+        <Route path="/matters" element={<Owner><MyMatters /></Owner>} />
+        <Route path="/matters/new" element={<Owner><NewMatter /></Owner>} />
         <Route path="/matters/:id" element={<MatterDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/appointments" element={<Appointments />} />
