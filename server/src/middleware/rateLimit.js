@@ -18,7 +18,7 @@ const redisClient = process.env.REDIS_URL
 if (redisClient) {
   // A rate limiter must never be the reason a request fails. If Redis is unreachable, log it
   // once per error and let express-rate-limit's own in-memory fallback keep the server usable.
-  redisClient.on('error', (err) => console.error('[rate-limit] Redis error:', err.message));
+  redisClient.on('error', (err) => console.error('[rate-limit] Redis error:', err?.name, err?.code));
 }
 
 const redisStore = (prefix) => (redisClient
@@ -34,15 +34,41 @@ const skipInTests = () => process.env.NODE_ENV === 'test'
   && process.env.JEST_WORKER_ID !== undefined
   && process.env.RATE_LIMIT_TEST !== '1';
 
-export function createLimiter({ windowMs = FIFTEEN_MINUTES, max, message, ...options }) {
+// The limiter logs the error it gets. A store error can carry a host or a key, so the error that
+// reaches it keeps only its name and its code.
+function quietStore(store) {
+  return new Proxy(store, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== 'function') return value;
+      if (prop !== 'increment') return value.bind(target);
+      return async (...args) => {
+        try {
+          return await value.apply(target, args);
+        } catch (err) {
+          const code = err?.code ? ` (${err.code})` : '';
+          const safe = new Error(`The rate limit store could not be reached${code}.`);
+          safe.name = err?.name || 'Error';
+          safe.code = err?.code;
+          throw safe;
+        }
+      };
+    },
+  });
+}
+
+// A failing store lets the request through. A rate limiter must never be the reason a request fails.
+export function createLimiter({ windowMs = FIFTEEN_MINUTES, max, message, store, ...options }) {
   limiterCount += 1;
+  const backing = store ?? redisStore(`rl:${limiterCount}:`);
   return rateLimit({
     windowMs,
     max,
     standardHeaders: true,
     legacyHeaders: false,
     skip: skipInTests,
-    store: redisStore(`rl:${limiterCount}:`),
+    store: backing ? quietStore(backing) : undefined,
+    passOnStoreError: true,
     handler: (_req, res) => res.status(429).json({ error: message }),
     ...options,
   });
@@ -85,6 +111,16 @@ export const loginEmailLimiter = createLimiter({
 // Change password: strict, counted per signed-in account. A stolen sign-in could otherwise guess the
 // current password with no limit. Only failed attempts count, so a person who gets it right never uses it up.
 export const passwordChangeLimiter = createLimiter({
+  max: 10,
+  message: AUTH_MESSAGE,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  skipSuccessfulRequests: true,
+  requestWasSuccessful: (_req, res) => res.statusCode < 400,
+});
+
+// Routes that check the current password of a signed-in account: change email and erase account.
+// The same rule as the change-password limit, shared by both routes so they draw on one budget.
+export const accountPasswordLimiter = createLimiter({
   max: 10,
   message: AUTH_MESSAGE,
   keyGenerator: (req) => `user:${req.user.id}`,

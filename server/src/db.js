@@ -15,6 +15,12 @@ export const pool = new pg.Pool({
   ...(testSchema ? { options: `-c search_path=${testSchema}` } : {}),
 });
 
+// An idle connection can be dropped by the database. Without a listener Node treats the "error"
+// event as fatal and the whole server stops. The pool opens a new connection when one is needed.
+pool.on('error', (err) => {
+  console.error('[db] idle connection error', { name: err.name, code: err.code });
+});
+
 // A small helper so a route can write: const rows = await q('SELECT ...', [x])
 export async function q(text, params = []) {
   const res = await pool.query(text, params);

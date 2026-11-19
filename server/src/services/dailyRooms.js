@@ -3,7 +3,7 @@
 // Each accepted booking gets its own private room. It is made the first time someone joins.
 // The room name is random so it cannot be guessed.
 // Guests knock and the lawyer admits them. Nothing is recorded.
-// A room and its tokens end after four hours.
+// A room ends four hours after its appointment. Its tokens end four hours after they are made.
 //
 // The service is optional. With no DAILY_API_KEY or DAILY_DOMAIN the join route answers with the lawyer's Google Meet link.
 // The server then makes no request to Daily.
@@ -51,9 +51,11 @@ async function callDaily(path, body) {
 
 // Makes a private room and returns its name. Recording is never switched on.
 // Daily records only when a room asks for it. This one does not so the property is left out.
-export async function createRoom() {
+// The room ends four hours after the appointment. A join made days early still gets that long.
+export async function createRoom(slot) {
   const name = crypto.randomBytes(16).toString('hex');
-  const exp = Math.floor(Date.now() / 1000) + FOUR_HOURS_S;
+  const startMs = Math.max(Date.now(), new Date(slot).getTime());
+  const exp = Math.floor(startMs / 1000) + FOUR_HOURS_S;
   await callDaily('/rooms', {
     name,
     privacy: 'private',

@@ -111,3 +111,26 @@ export async function makeProvider(overrides = {}, { verifiedBy } = {}) {
   );
   return p;
 }
+
+// Consultation hours for an entry: every day, 08:00 to 17:00 Kigali time.
+export const WORKING_WEEK = [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({ weekday, start_minute: 480, end_minute: 1020 }));
+
+// Saves consultation windows for an entry, as the lawyer's own save does. The entry is marked as
+// saved, so the standard hours no longer apply to it. Pass [] to close the entry.
+export async function makeAvailability(providerId, windows = WORKING_WEEK) {
+  await q('UPDATE providers SET availability_set_at = now() WHERE id = $1', [providerId]);
+  for (const w of windows) {
+    await q(
+      `INSERT INTO provider_availability (provider_id, weekday, start_minute, end_minute) VALUES ($1,$2,$3,$4)`,
+      [providerId, w.weekday, w.start_minute, w.end_minute],
+    );
+  }
+}
+
+// A time in Kigali, `days` days after today, at hour:minute. Used for a slot that must be open.
+export function kigaliSlot(days = 3, hour = 10, minute = 0) {
+  const today = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const date = new Date(Date.parse(`${today}T00:00:00Z`) + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const pad = (n) => String(n).padStart(2, '0');
+  return new Date(`${date}T${pad(hour)}:${pad(minute)}:00+02:00`).toISOString();
+}
