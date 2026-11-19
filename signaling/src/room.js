@@ -1,9 +1,13 @@
-import { verifyTicket } from './ticket.js';
+import { verifyTicket, ticketSecret } from './ticket.js';
 
 const HELLO_TIMEOUT_MS = 5000;
 const MAX_BYTES = 16 * 1024;
-const RATE_LIMIT = 60;
+// Most sockets one room holds, counting ones that have not said hello.
+const MAX_SOCKETS = 6;
+const RATE_LIMIT = 200;
 const RATE_WINDOW_MS = 10_000;
+// How long an admitted guest may drop and return without a new knock.
+const GRACE_MS = 5 * 60_000;
 const encoder = new TextEncoder();
 
 function sendJson(ws, msg) {
@@ -20,10 +24,18 @@ export class CallRoom {
     this.env = env;
     this.slots = { host: null, guest: null };
     this.admitted = false;
+    // When the admitted guest's socket dropped without a bye, or null.
+    this.guestDroppedAt = null;
+    this.now = () => Date.now();
     this.denied = false;
+    // Reads the stored denial before any socket is handled.
+    this.ready = state.blockConcurrencyWhile(async () => {
+      this.denied = (await state.storage.get('denied')) === true;
+    });
     this.maxExp = 0;
     this.meta = new WeakMap();
     this.pending = new Set();
+    this.sockets = new Set();
   }
 
   // Accepts the upgrade for the room named in the path.
@@ -42,6 +54,11 @@ export class CallRoom {
 
   // Starts tracking a socket that is already accepted.
   attach(ws, roomName) {
+    if (this.sockets.size >= MAX_SOCKETS) {
+      ws.close(4007, 'room full');
+      return;
+    }
+    this.sockets.add(ws);
     const meta = { roomName, role: null, chain: Promise.resolve(), times: [] };
     meta.helloTimer = setTimeout(() => {
       if (!meta.role) ws.close(4001, 'hello timeout');
@@ -116,8 +133,11 @@ export class CallRoom {
         return this.send(this.otherRole(meta.role), { type: 'signal', data: d });
       }
       case 'bye':
-        // A deliberate leave ends the admission. A dropped connection keeps it.
-        if (meta.role && this.slots[meta.role] === ws) this.admitted = false;
+        // A deliberate leave ends the admission at once.
+        if (meta.role && this.slots[meta.role] === ws) {
+          this.admitted = false;
+          this.guestDroppedAt = null;
+        }
         this.leave(ws, meta);
         return ws.close(1000, 'bye');
       default:
@@ -139,7 +159,8 @@ export class CallRoom {
     this.send('host', { type: 'start' });
   }
 
-  deny() {
+  async deny() {
+    await this.state.storage.put('denied', true);
     const guest = this.slots.guest;
     this.slots.guest = null;
     this.admitted = false;
@@ -156,7 +177,7 @@ export class CallRoom {
   }
 
   async hello(ws, meta, msg) {
-    const claims = await verifyTicket(msg.ticket, this.env.CALL_TICKET_SECRET, meta.roomName);
+    const claims = await verifyTicket(msg.ticket, ticketSecret(this.env), meta.roomName);
     if (!claims) {
       sendJson(ws, { type: 'error', code: 'bad_ticket' });
       return ws.close(4001, 'bad ticket');
@@ -166,6 +187,7 @@ export class CallRoom {
       sendJson(ws, { type: 'denied' });
       return ws.close(4003, 'denied');
     }
+    if (claims.role === 'guest') this.settleGuestDrop();
     meta.role = claims.role;
     this.pending.delete(ws);
     if (claims.exp > this.maxExp) {
@@ -184,11 +206,21 @@ export class CallRoom {
     }
   }
 
+  // Ends a guest's drop. Back within the grace keeps the admission. Back later clears it.
+  settleGuestDrop() {
+    const dropped = this.guestDroppedAt;
+    this.guestDroppedAt = null;
+    if (dropped !== null && this.now() - dropped >= GRACE_MS) this.admitted = false;
+  }
+
   onClose(ws) {
+    this.sockets.delete(ws);
     const meta = this.meta.get(ws);
     if (!meta) return;
     clearTimeout(meta.helloTimer);
     this.pending.delete(ws);
+    // A socket that was replaced by a takeover is no longer the guest slot, so it does not start a drop.
+    if (meta.role === 'guest' && this.slots.guest === ws && this.admitted) this.guestDroppedAt = this.now();
     this.leave(ws, meta);
   }
 
@@ -202,6 +234,7 @@ export class CallRoom {
     for (const ws of this.pending) ws.close(4006, 'expired');
     this.pending.clear();
     this.admitted = false;
+    this.guestDroppedAt = null;
     this.denied = false;
     this.maxExp = 0;
     await this.state.storage.deleteAll();

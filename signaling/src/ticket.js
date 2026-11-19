@@ -1,6 +1,13 @@
 const enc = new TextEncoder();
 const ROOM_RE = /^[0-9a-f]{32}$/;
 
+export const MIN_SECRET_LENGTH = 32;
+
+// The ticket secret with surrounding whitespace removed. Empty when unset.
+export function ticketSecret(env) {
+  return String(env?.CALL_TICKET_SECRET ?? '').trim();
+}
+
 function fromB64url(s) {
   if (!/^[A-Za-z0-9_-]*$/.test(s)) throw new Error('bad base64');
   const pad = '='.repeat((4 - (s.length % 4)) % 4);

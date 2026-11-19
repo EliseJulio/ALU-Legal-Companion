@@ -192,24 +192,121 @@ describe('admission', () => {
     }
   });
 
-  it('keeps an admitted guest admitted after a reconnect', async () => {
-    const { room } = newRoom();
+  it('keeps an admitted guest admitted when a dropped link comes back within the grace', async () => {
+    const { room, clock } = timedRoom();
     const host = await join(room, 'host');
-    await join(room, 'guest');
+    const guest = await join(room, 'guest');
     await send(room, host, { type: 'admit' });
+    room.onClose(guest);
+    const hostBefore = host.sent.length;
+    clock.t += 59_999;
     const again = await join(room, 'guest');
-    expect(host.last().type).not.toBe('knock');
+    expect(again.types()).toEqual(['ready', 'admitted']);
+    expect(host.sent.slice(hostBefore).map((m) => m.type)).toEqual(['start']);
     await send(room, again, { type: 'signal', data: { sdp: 'x' } });
     expect(host.last()).toEqual({ type: 'signal', data: { sdp: 'x' } });
   });
 
   it('does not keep admission for a guest who was never admitted', async () => {
-    const { room } = newRoom();
+    const { room, clock } = timedRoom();
     await join(room, 'host');
-    await join(room, 'guest');
+    const guest = await join(room, 'guest');
+    room.onClose(guest);
+    clock.t += 1_000;
     const again = await join(room, 'guest');
     await send(room, again, { type: 'signal', data: { sdp: 'x' } });
     expect(again.last()).toEqual({ type: 'error', code: 'not_admitted' });
+  });
+});
+
+// A clock the test moves by hand, so the 60 second grace needs no waiting.
+function timedRoom() {
+  const { room } = newRoom();
+  const clock = { t: 1_000_000 };
+  room.now = () => clock.t;
+  return { room, clock };
+}
+
+describe('a guest who leaves must knock again', () => {
+  async function admittedGuest() {
+    const { room, clock } = timedRoom();
+    const host = await join(room, 'host');
+    const guest = await join(room, 'guest');
+    await send(room, host, { type: 'admit' });
+    return { room, clock, host, guest };
+  }
+
+  it('is admitted at once when it says hello again 4 minutes 59.999 seconds after a drop', async () => {
+    const { room, clock, host, guest } = await admittedGuest();
+    room.onClose(guest);
+    clock.t += 299_999;
+    const hostBefore = host.sent.length;
+    const again = await join(room, 'guest');
+    expect(again.types()).toEqual(['ready', 'admitted']);
+    expect(again.sent[0].admitted).toBe(true);
+    expect(host.sent.slice(hostBefore).map((m) => m.type)).toEqual(['start']);
+  });
+
+  it('knocks the host and does not admit a guest who says hello 5 minutes after a drop', async () => {
+    const { room, clock, host, guest } = await admittedGuest();
+    room.onClose(guest);
+    clock.t += 300_000;
+    const again = await join(room, 'guest');
+    expect(again.sent[0]).toEqual({ type: 'ready', role: 'guest', audio: false, peer: true, admitted: false });
+    expect(host.last()).toEqual({ type: 'knock' });
+    await send(room, again, { type: 'signal', data: { sdp: 'x' } });
+    expect(again.last()).toEqual({ type: 'error', code: 'not_admitted' });
+  });
+
+  it('knocks a guest who said bye and comes back within a minute', async () => {
+    const { room, clock, host, guest } = await admittedGuest();
+    await send(room, guest, { type: 'bye' });
+    clock.t += 1_000;
+    const again = await join(room, 'guest');
+    expect(again.sent[0].admitted).toBe(false);
+    expect(host.last()).toEqual({ type: 'knock' });
+  });
+
+  it('starts the 5 minutes again for each new drop', async () => {
+    const { room, clock, host, guest } = await admittedGuest();
+    room.onClose(guest);
+    clock.t += 200_000;
+    const back = await join(room, 'guest');
+    room.onClose(back);
+    clock.t += 250_000;
+    const third = await join(room, 'guest');
+    expect(third.types()).toEqual(['ready', 'admitted']);
+    expect(host.last()).toEqual({ type: 'start' });
+  });
+
+  it('keeps admission for a takeover made long after a drop that was already settled', async () => {
+    const { room, clock, host, guest } = await admittedGuest();
+    room.onClose(guest);
+    clock.t += 30_000;
+    await join(room, 'guest');
+    clock.t += 10 * 60_000;
+    const hostBefore = host.sent.length;
+    const again = await join(room, 'guest');
+    expect(again.types()).toEqual(['ready', 'admitted']);
+    expect(host.sent.slice(hostBefore).map((m) => m.type)).toEqual(['start']);
+  });
+
+  it('keeps admission for a takeover, however long the old socket was open', async () => {
+    const { room, clock, host } = await admittedGuest();
+    clock.t += 10 * 60_000;
+    const hostBefore = host.sent.length;
+    const again = await join(room, 'guest');
+    expect(again.types()).toEqual(['ready', 'admitted']);
+    expect(host.sent.slice(hostBefore).map((m) => m.type)).toEqual(['start']);
+  });
+
+  it('does not start the grace when a replaced socket closes after the takeover', async () => {
+    const { room, clock, guest } = await admittedGuest();
+    await join(room, 'guest');
+    room.onClose(guest);
+    clock.t += 120_000;
+    const third = await join(room, 'guest');
+    expect(third.types()).toEqual(['ready', 'admitted']);
   });
 });
 
@@ -284,6 +381,15 @@ describe('leaving and basics', () => {
 });
 
 describe('limits', () => {
+  it('closes a seventh socket at once with 4007, counting sockets that have not said hello', () => {
+    const { room } = newRoom();
+    for (let i = 0; i < 6; i += 1) room.attach(new FakeSocket(), ROOM);
+    const seventh = new FakeSocket();
+    room.attach(seventh, ROOM);
+    expect(seventh.closed).toBe(4007);
+    expect(seventh.reason).toBe('room full');
+  });
+
   it('closes 4004 for a message over 16 KB', async () => {
     const { room } = newRoom();
     const host = await join(room, 'host');
@@ -309,13 +415,12 @@ describe('limits', () => {
     expect(host.closed).toBe(4004);
   });
 
-  it('allows 60 messages in 10 seconds and stops the 61st with 4005', async () => {
+  it('allows 200 messages in 10 seconds and stops the 201st with 4005', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const { room } = newRoom();
     const host = await join(room, 'host');
-    for (let i = 0; i < 58; i += 1) await send(room, host, { type: 'ping' });
-    expect(host.closed).toBeNull();
-    await send(room, host, { type: 'ping' });
+    // The hello is the first of the 200.
+    for (let i = 0; i < 199; i += 1) await send(room, host, { type: 'ping' });
     expect(host.closed).toBeNull();
     await send(room, host, { type: 'ping' });
     expect(host.last()).toEqual({ type: 'error', code: 'rate' });
@@ -390,6 +495,18 @@ describe('deny sticks', () => {
     await send(room, again, { type: 'signal', data: { sdp: 'x' } });
     expect(host.types()).not.toContain('signal');
     expect(guest.closed).toBe(4003);
+  });
+
+  it('keeps the denial when the object is recreated on the same storage', async () => {
+    const { room, state } = newRoom();
+    const host = await join(room, 'host');
+    await join(room, 'guest');
+    await send(room, host, { type: 'deny' });
+    const recreated = new CallRoom(state, env);
+    await recreated.ready;
+    const again = await join(recreated, 'guest');
+    expect(again.sent).toEqual([{ type: 'denied' }]);
+    expect(again.closed).toBe(4003);
   });
 
   it('refuses a never admitted guest after a deny and does not knock', async () => {
