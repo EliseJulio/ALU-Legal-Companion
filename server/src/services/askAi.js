@@ -15,7 +15,7 @@ const TIMEOUT_MS = 15000;
 const DEFAULT_DAILY_LIMIT = 200;
 const NOT_COVERED_NOTE = 'The guides do not cover this';
 
-export const NOT_ANSWERED = 'I can only answer from published guides and none matches. Browse the guides or ask a legal expert.';
+const NOT_ANSWERED = 'I can only answer from published guides and none matches. Browse the guides or ask a legal expert.';
 
 const SYSTEM_INSTRUCTION = [
   'You answer questions about law in Rwanda for students and staff of the African Leadership University.',
@@ -148,10 +148,10 @@ async function callGemini(cfg, userText) {
   // Some models refuse the thinking setting with a 400. The call is repeated once without it.
   if (res.status === 400) res = await send(false);
   if (!res.ok) {
-    // Google's reason is logged (never the key or the question) so a failure can be diagnosed.
-    let reason = '';
-    try { reason = String((await res.json())?.error?.message ?? '').slice(0, 200); } catch { /* no body */ }
-    console.error(`[ask-ai] model answered ${res.status}: ${reason}`);
+    // Only the status and Google's short error code are logged. The reply text is never kept.
+    let code = '';
+    try { code = String((await res.json())?.error?.status ?? '').replace(/[^A-Z_]/g, '').slice(0, 40); } catch { /* no body */ }
+    console.error(`[ask-ai] model answered ${res.status} ${code}`.trim());
     const kind = res.status === 429 ? 'quota' : res.status >= 500 ? 'busy' : 'unavailable';
     throw new AskAiUnavailable(`model answered ${res.status}`, kind);
   }
@@ -173,7 +173,7 @@ const LAW_NUMBER = /\b(\d+\/\d{4})\b/g;
 
 // True when every number and article or law reference in the answer also appears in the excerpts.
 // Separators are removed before comparing so 3,000,000 and 3 000 000 are the same figure.
-export function answerIsGrounded(answer, excerpts) {
+function answerIsGrounded(answer, excerpts) {
   const source = excerpts.join('\n');
   const collect = (pattern, text, pick) => new Set([...text.matchAll(pattern)].map((m) => pick(m)));
   const digits = (m) => m[0].replace(/[ ,.]/g, '');

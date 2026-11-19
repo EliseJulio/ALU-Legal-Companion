@@ -166,6 +166,9 @@ router.get('/expert', requireAuth('legal_expert'), async (req, res) => {
       ORDER BY b.slot ASC`, [req.user.id]));
 });
 
+// Reminders are a convenience. A failure to make them must not undo the change that caused it.
+const logReminderError = (err) => console.error('[booking-reminders] could not update', { error: err.code || err.name });
+
 // A booking only moves forward. A finished or declined booking cannot be changed again.
 const NEXT_STATUS = { requested: ['accepted', 'declined'], accepted: ['completed', 'declined'] };
 
@@ -183,7 +186,7 @@ async function cancelBooking(res, current) {
      RETURNING ${BOOKING_COLUMNS.replaceAll('b.', '')}`,
     [current.id, current.status]);
   if (!booking) return res.status(409).json({ error: 'That booking was just changed. Reload and try again.' });
-  await cancelBookingReminders(booking.id);
+  await cancelBookingReminders(booking.id).catch(logReminderError);
   if (current.status === 'accepted') bookingCancelled(booking.id);
   res.json(booking);
 }
@@ -205,9 +208,6 @@ router.post('/:id/cancel', requireAuth('student', 'staff'), requireIntParam('id'
   if (!current) return res.status(404).json({ error: 'Booking not found (or not yours)' });
   return cancelBooking(res, current);
 });
-
-// Reminders are a convenience. A failure to make them must not undo the change that caused it.
-const logReminderError = (err) => console.error('[booking-reminders] could not update', { error: err.code || err.name });
 
 // POST /api/bookings/:id/status: the expert accepts, declines or completes their own bookings
 router.post('/:id/status', requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
@@ -273,13 +273,17 @@ function meetLinkOf(value) {
 // Makes the room for a booking or reuses it.
 // The booking row is locked while the room is made so two people joining at once share one room.
 // The count for the day and the new room are checked under one lock too.
-// So two bookings cannot both take the last place in the day. Returns { name } or { reason }.
+// So two bookings cannot both take the last place in the day. Returns { name }, { reason } or { gone } when the booking no longer exists.
 async function claimRoom(bookingId) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows: [booking] } = await client.query(
       'SELECT room_name, slot FROM bookings WHERE id = $1 FOR UPDATE', [bookingId]);
+    if (!booking) {
+      await client.query('ROLLBACK');
+      return { gone: true };
+    }
     if (booking.room_name) {
       await client.query('COMMIT');
       return { name: booking.room_name };
@@ -363,6 +367,7 @@ router.post('/:id/join', joinLimiter, optionalAuth, requireIntParam('id'), async
   }
 
   const room = dailyAvailable() ? await claimRoom(row.id) : { reason: 'daily_unavailable' };
+  if (room.gone) return res.status(404).json(NOT_FOUND);
   if (room.name) {
     try {
       const token = await createToken(room.name, { owner: expert, audioOnly });

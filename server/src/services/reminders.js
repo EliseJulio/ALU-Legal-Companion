@@ -52,6 +52,7 @@ export async function scheduleReminders(matterId, nextDue, today = kigaliToday()
   return rows;
 }
 
+// index.js refuses to start in production without APP_URL, so the fallback is for development only.
 const appUrl = () => (process.env.APP_URL || 'http://localhost:5173').replace(/\/+$/, '');
 
 // The email gives the date and never the matter title. A title like "harassment by my

@@ -3,7 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import request from 'supertest';
 import app from '../../src/app.js';
-import { q } from '../../src/db.js';
+import { jest } from '@jest/globals';
+import { q, pool } from '../../src/db.js';
 import { scheduleReminders, kigaliToday, addDays } from '../../src/services/reminders.js';
 import { resetDb, makeUser, makeMatter, makeProvider } from '../helpers.js';
 
@@ -64,12 +65,35 @@ describe('POST /api/internal/run-jobs', () => {
     expect(res.body).toEqual({
       reminders: { sent: 1, failed: 0, cancelled: 0, missed: 0 },
       booking_reminders: { sent: 0, failed: 0, missed: 0, cancelled: 0, skipped: false },
-      retention: { questions: 0, bookings: 0 },
+      retention: { questions: 0, bookings: 0, tokens: 0 },
+      errors: 0,
     });
     expect(JSON.stringify(res.body)).not.toMatch(/@|Eviction/);
     const [row] = await q(`SELECT status FROM reminders WHERE matter_id = $1 AND send_on = $2`,
       [matter.id, kigaliToday()]);
     expect(row.status).toBe('sent');
+  });
+});
+
+describe('a job that fails', () => {
+  it('does not stop the other jobs, and the route still answers 200 with counts and an errors count', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const realQuery = pool.query.bind(pool);
+    jest.spyOn(pool, 'query').mockImplementation(async (text, params) => {
+      if (/UPDATE reminders SET status = 'missed'/.test(text)) throw new Error('db down');
+      return realQuery(text, params);
+    });
+    try {
+      const res = await request(app).post(URL).set('X-Job-Secret', SECRET);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        booking_reminders: { sent: 0, failed: 0, missed: 0, cancelled: 0, skipped: false },
+        retention: { questions: 0, bookings: 0, tokens: 0 },
+        errors: 1,
+      });
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 });
 

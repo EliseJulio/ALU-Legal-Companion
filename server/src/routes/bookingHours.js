@@ -18,10 +18,10 @@ const slotsLimiter = createLimiter({
   message: 'Too many requests for free times. Please wait a few minutes and try again.',
 });
 
-// The directory entry linked to a lawyer's account, or null when there is none.
-async function linkedEntryId(userId) {
-  const [row] = await q('SELECT id FROM providers WHERE user_id = $1 ORDER BY id LIMIT 1', [userId]);
-  return row ? row.id : null;
+// Every directory entry linked to a lawyer's account, lowest id first. The list is empty when none is linked.
+async function linkedEntryIds(userId) {
+  const rows = await q('SELECT id FROM providers WHERE user_id = $1 ORDER BY id', [userId]);
+  return rows.map((r) => r.id);
 }
 
 function hoursReply(windows, isDefault) {
@@ -30,30 +30,33 @@ function hoursReply(windows, isDefault) {
 
 // GET /api/bookings/availability: the lawyer's own hours
 router.get('/availability', requireAuth('legal_expert'), async (req, res) => {
-  const id = await linkedEntryId(req.user.id);
+  const [id] = await linkedEntryIds(req.user.id);
   if (!id) return res.json(hoursReply([], false));
   const { windows, isDefault } = await hoursOf(id);
   res.json(hoursReply(windows, isDefault));
 });
 
-// PUT /api/bookings/availability: replaces every window in one transaction
+// PUT /api/bookings/availability: replaces every window of every linked entry in one transaction
 router.put('/availability', requireAuth('legal_expert'), async (req, res) => {
   const checked = validateWindows(req.body?.windows);
   if (checked.error) return res.status(400).json({ error: checked.error });
-  const id = await linkedEntryId(req.user.id);
-  if (!id) return res.status(404).json({ error: 'No directory entry is linked to your account.' });
+  const ids = await linkedEntryIds(req.user.id);
+  if (!ids.length) return res.status(404).json({ error: 'No directory entry is linked to your account.' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // One save at a time for each entry. Without this, two saves delete and write the same rows at once.
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext('provider_availability'), $1)`, [id]);
-    await client.query('DELETE FROM provider_availability WHERE provider_id = $1', [id]);
-    for (const w of checked.windows) {
-      await client.query(
-        'INSERT INTO provider_availability (provider_id, weekday, start_minute, end_minute) VALUES ($1,$2,$3,$4)',
-        [id, w.weekday, w.start_minute, w.end_minute]);
+    for (const id of ids) {
+      // One save at a time for each entry. Without this, two saves delete and write the same rows at once.
+      // Entries are locked in id order so two saves for one account cannot wait on each other.
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext('provider_availability'), $1)`, [id]);
+      await client.query('DELETE FROM provider_availability WHERE provider_id = $1', [id]);
+      for (const w of checked.windows) {
+        await client.query(
+          'INSERT INTO provider_availability (provider_id, weekday, start_minute, end_minute) VALUES ($1,$2,$3,$4)',
+          [id, w.weekday, w.start_minute, w.end_minute]);
+      }
+      await client.query('UPDATE providers SET availability_set_at = now() WHERE id = $1', [id]);
     }
-    await client.query('UPDATE providers SET availability_set_at = now() WHERE id = $1', [id]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

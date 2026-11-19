@@ -77,7 +77,7 @@ async function answer(res, current, action) {
   try {
     // The write only goes ahead if the suggestion is still the time that was checked above.
     const [booking] = await q(
-      `UPDATE bookings SET slot = $2, proposed_slot = NULL, proposed_at = NULL, status = 'accepted'
+      `UPDATE bookings SET slot = $2, proposed_slot = NULL, proposed_at = NULL, status = 'accepted', room_name = NULL
         WHERE id = $1 AND status = 'requested' AND proposed_slot = $2 RETURNING ${RETURNING}`,
       [current.id, slot]);
     if (!booking) return res.status(409).json({ error: 'That suggestion was just changed. Reload and look again.' });
@@ -113,7 +113,7 @@ async function saveMove(current, slot) {
       }
     }
     const { rows: [booking] } = await client.query(
-      `UPDATE bookings SET slot = $1, status = 'requested', proposed_slot = NULL, proposed_at = NULL
+      `UPDATE bookings SET slot = $1, status = 'requested', proposed_slot = NULL, proposed_at = NULL, room_name = NULL
         WHERE id = $2 AND status = $3 RETURNING ${RETURNING}`,
       [slot, current.id, current.status]);
     await client.query('COMMIT');

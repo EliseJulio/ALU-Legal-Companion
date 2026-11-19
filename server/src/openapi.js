@@ -408,7 +408,7 @@ const schemas = {
     status: oneOf(['received', 'in_progress', 'resolved']), reply_channel: oneOf(['code', 'email']),
     admin_reply: text('', { nullable: true }), read_at: moment(''), resolved_at: moment('', { nullable: true }), updated_at: moment(''),
     has_email: flag('True while the address of the sender is still held.'),
-    delivery: oneOf(['sent', 'failed'], 'Only when an email report was resolved. "failed" keeps the address so the admin can save again.'),
+    delivery: oneOf(['sent'], 'Only when a resolved email report had an address. "sent" means the email was handed to the mail service. A failed send is logged and not retried.'),
   }),
 
   AdminUser: obj({
@@ -489,11 +489,12 @@ const OPS = [
   // ---- Server
   op('get', '/health', 'Server', 'Check that the server is running', { reply: [200, 'It is running.', obj({ status: text('Always "ok".') })] }),
   op('post', '/internal/run-jobs', 'Server', 'Run the scheduled jobs', {
-    desc: 'Called by a scheduled workflow every 10 minutes. It needs the header X-Job-Secret, which must equal the server setting JOB_SECRET (compared in constant time). It runs the due deadline reminders, the due consultation reminders and the retention purge, and returns counts only. A missing or wrong secret is 401. When JOB_SECRET is shorter than 32 characters the route is off and answers 404 like an unknown path.',
+    desc: 'Called by a scheduled workflow every 10 minutes. It needs the header X-Job-Secret, which must equal the server setting JOB_SECRET (compared in constant time). It runs the due deadline reminders, the due consultation reminders and the retention purge, and returns counts only. A job that fails is left out of the result and counted in errors. A missing or wrong secret is 401, checked before the limit is counted. When JOB_SECRET is missing or shorter than 32 characters the route is off and answers 404 like an unknown path.',
     reply: [200, 'Counts only.', obj({
       reminders: obj({ sent: whole(''), failed: whole(''), cancelled: whole(''), missed: whole(''), skipped: flag('True when another pass was already running. Nothing was done.') }),
       booking_reminders: obj({ sent: whole(''), failed: whole(''), missed: whole(''), cancelled: whole(''), skipped: flag('True when another pass was already running.') }),
-      retention: obj({ questions: whole('Anonymous questions deleted.'), bookings: whole('Anonymous bookings deleted.') }),
+      retention: obj({ questions: whole('Anonymous questions deleted.'), bookings: whole('Anonymous bookings deleted.'), tokens: whole('Used or expired link tokens deleted.') }),
+      errors: whole('Jobs that failed. Each one is left out of the counts above.'),
     })], errors: [401, 404], limited: true,
   }),
 
@@ -504,7 +505,7 @@ const OPS = [
     limited: true,
   }),
   op('post', '/auth/register', 'Accounts', 'Create a student or staff account', {
-    desc: 'Only an @alustudent.com or @alueducation.com address. No token comes back. The account cannot sign in until the emailed link is used. Legal experts join by invitation. The name is 1 to 100 characters and a password is at most 72 bytes. An address that already has an account is refused with 400 and code "email_taken". The words are the same for a verified and an unverified account, and say to check the email or ask for a new link on the sign-in page.',
+    desc: 'Only an @alustudent.com or @alueducation.com address. No token comes back. The account cannot sign in until the emailed link is used. Legal experts join by invitation. The name is 1 to 100 characters and a password is at most 72 bytes. An address that already has an account is refused with 400 and code "email_taken". The words are the same for a verified and an unverified account, and say to check the email or ask for a new link on the sign-in page. An address longer than 254 characters, or with a space, a comma or a control character, is refused with 400. At most 5 tries per address in an hour.',
     body: obj({ name: text('The name.'), email: text('An ALU address.'), password: text('At least 8 characters.'), role: oneOf(['student', 'staff'], 'What the person is.') }, ['name', 'email', 'password', 'role']),
     reply: [201, 'The account was made.', obj({ user: ref('User'), message: text('Says what happened to the email.') })], errors: [400], limited: true,
   }),
@@ -521,7 +522,7 @@ const OPS = [
   op('post', '/auth/login', 'Accounts', 'Sign in', {
     body: obj({ email: text('The address.'), password: text('The password.') }, ['email', 'password']),
     reply: [200, 'Signed in.', ref('Session')], errors: [400, 401, 403], limited: true,
-    desc: '401 for a wrong address or password. 403 when the address is not verified yet (code "not_verified") or the account is switched off (code "deactivated").',
+    desc: '401 for a wrong address or password, and the same time is taken for both. 403 when the address is not verified yet (code "not_verified") or the account is switched off (code "deactivated").',
   }),
   op('get', '/auth/me', 'Accounts', 'Read my own account', { roles: ANYONE_SIGNED_IN, reply: [200, 'My account.', ref('Me')] }),
   op('put', '/auth/me', 'Accounts', 'Change my name', {
@@ -529,8 +530,8 @@ const OPS = [
     roles: ANYONE_SIGNED_IN, body: obj({ name: text('1 to 100 characters.') }, ['name']), reply: [200, 'Saved. A fresh token comes with it.', ref('Session')], errors: [400],
   }),
   op('delete', '/auth/me', 'Accounts', 'Erase my account', {
-    desc: 'Students and staff only. Deletes the account, its matters with their stored files, saved guides, sign-in tokens and questions. A booking stays for the provider with no link to the person and no topic. Lawyers and admins get 403 and ask an admin. 401 for a wrong password.',
-    roles: OWNERS, limited: true, errors: [400, 401, 403, 500],
+    desc: 'Students and staff only. Deletes the account, its matters with their stored files, saved guides, sign-in tokens and questions. An open booking is cancelled with its pending reminders, and an accepted one emails the lawyer the time only. Every booking of the person stays for the provider with no link to the person and no topic. Lawyers and admins get 403 and ask an admin. 401 for a wrong password. 409 when the account is linked to records it published, such as a former admin: nothing is erased and an admin switches the account off instead. A failed erase answers 500 and changes nothing.',
+    roles: OWNERS, limited: true, errors: [400, 401, 403, 409, 500],
     body: obj({ password: text('The password now.'), confirm: flag('Must be true.') }, ['password', 'confirm']),
     reply: [200, 'Erased. The old token stops working.', obj({ ok: flag('Always true.') })],
   }),
@@ -544,7 +545,7 @@ const OPS = [
     reply: [200, 'Changed.', ref('Session')],
   }),
   op('post', '/auth/change-email', 'Accounts', 'Ask to change my email address', {
-    desc: 'Needs the current password. Nothing changes yet. The new address waits until the link sent to it is used, so a typo cannot lock anyone out. Students and staff must use an ALU address. The answer is the same for every address that passes the checks, so it never shows which addresses have an account.',
+    desc: 'Needs the current password. Nothing changes yet. The new address waits until the link sent to it is used, so a typo cannot lock anyone out. Students and staff must use an ALU address. The answer is the same for every address that passes the checks, so it never shows which addresses have an account. The answer goes before the address is stored and the mails are sent. An address longer than 254 characters, or with a space, a comma or a control character, gets 400. At most 5 requests per account in an hour. A request refused with a 4xx does not count.',
     roles: ANYONE_SIGNED_IN, limited: true, errors: [400],
     body: obj({ email: text('The new address.'), current_password: text('The password now.') }, ['email', 'current_password']),
     reply: [200, 'The same message for every address.', ref('Message')],
@@ -564,7 +565,7 @@ const OPS = [
     reply: [200, 'Changed and signed in.', ref('Session')], errors: [400], limited: true,
   }),
   op('post', '/auth/redeem-invite', 'Accounts', 'Use an invitation to become a legal expert', {
-    desc: 'The only way to get the legal_expert role.',
+    desc: 'The only way to get the legal_expert role. The invitation and the account are made in one step, so a failure leaves the invitation usable. An address that already has an account gets 400 with code "email_taken".',
     body: obj({ invite_token: text('The token from the invitation.'), name: text('1 to 100 characters.'), password: text('At least 8 characters.') }, ['invite_token', 'name', 'password']),
     reply: [201, 'The account was made and signed in.', ref('Session')], errors: [400], limited: true,
   }),
@@ -589,18 +590,18 @@ const OPS = [
     roles: ['admin'], body: ref('ProviderInput'), reply: [201, 'The new draft.', ref('ProviderStaff')], errors: [400],
   }),
   op('put', '/directory/providers/{id}', 'Directory', 'Change an entry', {
-    desc: 'A field left out keeps its value. A field sent as null is cleared. Changing a checked fact on a published entry sends it back to draft. Changing the linked expert account ends every matter shared with the entry.',
+    desc: 'A field left out keeps its value. A field sent as null is cleared. Changing a checked fact on a published entry sends it back to draft. Changing the linked expert account ends every matter shared with the entry. A text field sent as a number or a list gets 400.',
     roles: ['admin'], body: ref('ProviderInput'), reply: [200, 'The entry after the change.', ref('ProviderStaff')], errors: [400, 404],
   }),
   op('post', '/directory/providers/{id}/publish', 'Directory', 'Publish an entry', {
-    desc: 'Refused with 400 when any text a reader sees still holds a note for the editor. 409 when the entry changed after it was checked: reload and try again.',
+    desc: 'Refused with 400 when any text a reader sees still holds a note for the editor. It also sets the last-checked date to today (Kigali time). 409 when the entry changed after it was checked: reload and try again.',
     roles: ['admin'], reply: [200, 'Published.', obj({ id: whole(''), status: text('"published".') })], errors: [400, 409],
   }),
 
   // ---- Where to go
   op('get', '/directory/routes', 'Where to go', 'Find which body a kind of matter goes to first', {
     query: [
-      { name: 'q', schema: text(''), description: 'Words about what happened. The best match comes first.' },
+      { name: 'q', schema: text(''), description: 'Words about what happened. A route matches when any word is in its title or keywords. The best match comes first.' },
       { name: 'area', schema: oneOf(DOMAINS), description: 'Keep one area of law.' },
     ],
     reply: [200, 'Published routes whose first body is also published.', arrayOf('RouteSummary')],
@@ -639,7 +640,8 @@ const OPS = [
     body: ref('LadderInput'), reply: [200, 'The step after the change.', ref('LadderStaff')], errors: [400, 404],
   }),
   op('post', '/directory/ladder/{id}/publish', 'Where to go', 'Publish a ladder step', {
-    roles: ['admin'], reply: [200, 'Published.', obj({ id: whole(''), status: text('"published".') })], errors: [400],
+    desc: 'Refused with 400 when a note for the editor is left in its text. 409 when the step changed after it was checked: reload and try again.',
+    roles: ['admin'], reply: [200, 'Published.', obj({ id: whole(''), status: text('"published".') })], errors: [400, 409],
   }),
   op('delete', '/directory/ladder/{id}', 'Where to go', 'Remove a ladder step', {
     roles: ['admin'], reply: [200, 'Removed.', obj({ id: whole('') })], errors: [404],
@@ -688,7 +690,7 @@ const OPS = [
     roles: ['admin'], body: ref('GuideInput'), reply: [201, 'The new draft.', ref('GuideStaff')], errors: [400],
   }),
   op('put', '/guides/{id}', 'Guides', 'Change a guide', {
-    desc: 'Any edit sends the guide back to draft. A field left out keeps its value.',
+    desc: 'Any edit sends the guide back to draft. A field left out keeps its value. Sending null clears source_url, summary or service.',
     roles: ['admin'], body: ref('GuideInput'), reply: [200, 'The guide after the change.', ref('GuideStaff')], errors: [400, 404],
   }),
   op('post', '/guides/{id}/publish', 'Guides', 'Publish a guide', {
@@ -701,7 +703,9 @@ const OPS = [
   }),
 
   // ---- Saved guides
-  op('get', '/bookmarks', 'Saved guides', 'List my saved guides', { roles: OWNERS, reply: [200, 'Newest first.', arrayOf('Saved')] }),
+  op('get', '/bookmarks', 'Saved guides', 'List my saved guides', {
+    desc: 'A save stays when its guide goes back to draft or is withdrawn. The status says which.', roles: OWNERS, reply: [200, 'Newest first.', arrayOf('Saved')],
+  }),
   op('post', '/guides/{id}/bookmark', 'Saved guides', 'Save a guide', {
     desc: 'Only a published guide can be saved. Saving twice is not an error.', roles: OWNERS,
     reply: [201, 'Saved.', obj({ guide_id: whole(''), bookmarked: flag('Always true.') })], errors: [404],
@@ -742,26 +746,26 @@ const OPS = [
     reply: [200, 'The open times.', ref('OpenSlots')], errors: [400, 404], limited: true,
   }),
   op('get', '/bookings/availability', 'Consultations', 'Read my consultation hours', {
-    desc: 'The lawyer\'s own weekly hours. Until a lawyer saves hours the standard hours apply (is_default is true).',
+    desc: 'The lawyer\'s own weekly hours, from the first directory entry linked to the account. Until a lawyer saves hours the standard hours apply (is_default is true). With no entry linked there are no windows.',
     roles: ['legal_expert'], reply: [200, 'The hours.', ref('ConsultationHours')],
   }),
   op('put', '/bookings/availability', 'Consultations', 'Save my consultation hours', {
-    desc: 'Replaces every window in one step. An empty list closes bookings on purpose. At most 14 windows, on the half hour, start before end, none overlapping on one day. Changing hours never takes the directory entry off the site.',
+    desc: 'Replaces every window of every directory entry linked to the account, in one step. An empty list closes bookings on purpose. At most 14 windows, on the half hour, start before end, none overlapping on one day. Changing hours never takes the directory entry off the site.',
     roles: ['legal_expert'], body: obj({ windows: arrayOf('ConsultationWindow') }, ['windows']),
     reply: [200, 'The hours as saved.', ref('ConsultationHours')], errors: [400, 404],
   }),
   op('post', '/bookings/{id}/cancel', 'Consultations', 'Cancel my own consultation', {
     desc: 'A request or an accepted consultation of the signed-in student or staff member. It frees the time and cancels its reminders. A consultation that is declined, completed or already cancelled cannot be cancelled. Anyone else gets 404.',
-    roles: OWNERS, reply: [200, 'The booking, now cancelled.', ref('Booking')], errors: [400, 404],
+    roles: OWNERS, reply: [200, 'The booking, now cancelled.', ref('Booking')], errors: [400, 404, 409],
   }),
   op('post', '/bookings/anon/cancel', 'Consultations', 'Cancel an anonymous consultation with its code', {
     desc: 'The code goes in the body and never in the address.', body: obj({ anon_token: text('The code shown once when the request was made.') }, ['anon_token']),
-    reply: [200, 'The booking, now cancelled.', ref('Booking')], errors: [400, 404], limited: true,
+    reply: [200, 'The booking, now cancelled.', ref('Booking')], errors: [400, 404, 409], limited: true,
   }),
   op('post', '/bookings/{id}/propose', 'Consultations', 'Suggest another time for a waiting request', {
     desc: 'The lawyer whose entry the request is for. Only a request that is still waiting. The time must be an open time (same rule as a new request) and not the time already asked for. A second suggestion replaces the first. A signed-in person is emailed the time and never the topic.',
     roles: ['legal_expert'], body: obj({ slot: moment('One of the lawyer\'s open times.') }, ['slot']),
-    reply: [200, 'The request with the suggested time.', ref('Booking')], errors: [400, 404],
+    reply: [200, 'The request with the suggested time.', ref('Booking')], errors: [400, 404, 409],
   }),
   op('post', '/bookings/{id}/proposal', 'Consultations', 'Accept or decline the time the lawyer suggested', {
     desc: 'The student or staff member who made the request. Accepting moves the consultation to the suggested time and accepts it, if that time is still open (400 if it is not, 409 if it was just taken). Declining keeps the original request waiting.',
@@ -776,12 +780,12 @@ const OPS = [
   op('post', '/bookings/{id}/reschedule', 'Consultations', 'Move my consultation to another open time', {
     desc: 'The student or staff member who made it, while it is waiting or accepted and has not started. The new time must be open. The consultation goes back to waiting for the lawyer to accept the new time, its old time is free again and its reminders are cancelled. It counts against the same limit as a new request, and an accepted consultation moved back to waiting counts towards the three open requests with one lawyer. The lawyer is emailed the new time, and that email stops at the daily email budget. The request still shows on the lawyer\'s appointments page.',
     roles: OWNERS, body: obj({ slot: moment('The new open time.') }, ['slot']),
-    reply: [200, 'The booking at its new time, waiting.', ref('Booking')], errors: [400, 404, 429],
+    reply: [200, 'The booking at its new time, waiting.', ref('Booking')], errors: [400, 404, 409, 429],
   }),
   op('post', '/bookings/anon/reschedule', 'Consultations', 'Move an anonymous consultation with its code', {
     desc: 'The same rules as the signed-in move. The code goes in the body and never in the address.',
     body: obj({ anon_token: text('The code shown once when the request was made.'), slot: moment('The new open time.') }, ['anon_token', 'slot']),
-    reply: [200, 'The booking at its new time, waiting.', ref('Booking')], errors: [400, 404], limited: true,
+    reply: [200, 'The booking at its new time, waiting.', ref('Booking')], errors: [400, 404, 409], limited: true,
   }),
   op('get', '/bookings/mine', 'Consultations', 'List my consultation requests', {
     desc: 'The video room appears only once the lawyer has accepted.', roles: OWNERS, reply: [200, 'Newest first.', arrayOf('BookingMine')],
@@ -856,7 +860,7 @@ const OPS = [
   // ---- Matters
   op('get', '/matters', 'Matters', 'List my matters', { roles: OWNERS, reply: [200, 'Soonest deadline first, closed matters last.', arrayOf('Matter')] }),
   op('post', '/matters', 'Matters', 'Open a matter', {
-    desc: 'It can start from a route. With a route and deadline_start the server works out the due date from the checked number of days.',
+    desc: 'It can start from a route. With a route and deadline_start the server works out the due date from the checked number of days. A route that is not published is refused with 400.',
     roles: OWNERS, body: ref('MatterInput'),
     reply: [201, 'The matter and its reminders.', { allOf: [ref('Matter'), obj({ reminders: arrayOf('Reminder') })] }], errors: [400],
   }),
@@ -872,7 +876,7 @@ const OPS = [
     roles: OWNERS, reply: [200, 'Soonest deadline first.', arrayOf('MatterProgress')],
   }),
   op('get', '/matters/shared', 'Matters', 'List the matters shared with my directory entry', {
-    desc: 'The owner is not named.', roles: ['legal_expert'], reply: [200, 'Soonest deadline first.', arrayOf('SharedMatter')],
+    desc: 'The owner is not named. documents_waiting counts the documents waiting for the lawyer’s check.', roles: ['legal_expert'], reply: [200, 'Soonest deadline first.', arrayOf('SharedMatter')],
   }),
   op('get', '/matters/{id}', 'Matters', 'Read one matter with its record and reminders', {
     desc: 'The owner, or the legal expert it is shared with. Anyone else gets 404.',
@@ -892,15 +896,15 @@ const OPS = [
   op('get', '/matters/{id}/events/{eventId}/file', 'Matters', 'Download the file on a line of the record', {
     desc: 'The owner, or the legal expert the matter is shared with at this moment. Anyone else, an admin too, gets 404.',
     roles: ANYONE_SIGNED_IN,
-    reply: [200, 'The file as it was attached.', null, ['application/pdf', 'image/png', 'image/jpeg']], errors: [404],
+    reply: [200, 'The file as it was attached.', null, ['application/pdf', 'image/png', 'image/jpeg']], errors: [404, 500],
   }),
   op('delete', '/matters/{id}/events/{eventId}', 'Matters', 'Delete a line of the record with its file', {
     desc: 'The owner only, and only a line the owner wrote. Lines the system wrote (shares, checks, comments) and a lawyer’s notes are never deleted this way and answer 404, as does anyone who is not the owner. The line and its stored file go together. No line about the deletion is kept.',
-    roles: OWNERS, reply: [204, 'Deleted.'], errors: [404],
+    roles: ANYONE_SIGNED_IN, reply: [204, 'Deleted.'], errors: [404],
   }),
   op('delete', '/matters/{id}/events/{eventId}/file', 'Matters', 'Remove only the file on a line of the record', {
     desc: 'The owner only, on a line the owner wrote. The line and its text stay. 404 when the line has no file, and for everyone else.',
-    roles: OWNERS, reply: [204, 'The file is removed.'], errors: [404],
+    roles: ANYONE_SIGNED_IN, reply: [204, 'The file is removed.'], errors: [404],
   }),
   op('post', '/matters/{id}/share', 'Matters', 'Share a matter with one office', {
     desc: 'The owner only. It replaces any earlier share.', roles: OWNERS, body: obj({ provider_id: whole('A published entry that has a legal expert account.') }, ['provider_id']),
@@ -931,7 +935,7 @@ const OPS = [
     reply: [200, 'The documents with their comments.', arrayOf('DocumentWithComments')], errors: [404],
   }),
   op('post', '/matters/{matterId}/documents', 'Matter documents', 'Attach a document', {
-    desc: 'The owner only. The body is the file itself: a PDF, a PNG or a JPEG, sent as raw bytes. It is stored encrypted. At most 25 documents on a matter and 100 for a person.',
+    desc: 'The owner only. The body is the file itself: a PDF, a PNG or a JPEG, sent as raw bytes, at most 10 MB. It is stored encrypted in the database. At most 25 documents on a matter and 100 for a person. replaces puts the new file in place of an older document, unchecked. item must be an item of the checklist the matter follows. 503 when the server has no document key.',
     roles: ['student', 'staff', 'legal_expert'], limited: true,
     query: [
       { name: 'label', required: true, schema: text('At most 120 characters.'), description: 'What the document is.' },
@@ -954,7 +958,7 @@ const OPS = [
   }),
   op('get', '/matters/{matterId}/documents/{docId}/file', 'Matter documents', 'Download a document', {
     desc: 'The owner, or the legal expert the matter is shared with.', roles: ['student', 'staff', 'legal_expert'],
-    reply: [200, 'The file as it was uploaded.', null, ['application/pdf', 'image/png', 'image/jpeg']], errors: [404],
+    reply: [200, 'The file as it was uploaded.', null, ['application/pdf', 'image/png', 'image/jpeg']], errors: [404, 500],
   }),
   op('delete', '/matters/{matterId}/documents/{docId}', 'Matter documents', 'Delete a document', {
     desc: 'The owner only.', roles: ['student', 'staff', 'legal_expert'], reply: [204, 'Deleted.'], errors: [404],
@@ -962,6 +966,7 @@ const OPS = [
 
   // ---- Administration
   op('post', '/admin/invites', 'Administration', 'Invite a legal expert by email', {
+    desc: 'An address that already has an account is refused with 400.',
     roles: ['admin'], body: obj({ email: text('The address to invite.'), expires_days: whole('1 to 30. Defaults to 7.') }, ['email']),
     reply: [201, 'The invitation was made.', ref('InviteCreated')], errors: [400, 502],
   }),
@@ -970,7 +975,7 @@ const OPS = [
   }),
   op('get', '/admin/users', 'Administration', 'List the accounts', { roles: ['admin'], reply: [200, 'Newest first.', arrayOf('AdminUser')] }),
   op('put', '/admin/users/{id}/role', 'Administration', 'Change the role of an account', {
-    desc: 'The role legal_expert cannot be given here. The role of a legal expert cannot be changed. The last active admin cannot be demoted.',
+    desc: 'The role legal_expert cannot be given here. The role of a legal expert cannot be changed. The last active admin cannot be demoted. Any other role than student, staff or admin is refused with 400.',
     roles: ['admin'], body: obj({ role: oneOf(['student', 'staff', 'admin'], 'The new role.') }, ['role']),
     reply: [200, 'The account.', ref('AdminUser')], errors: [400, 404],
   }),
@@ -996,10 +1001,15 @@ const OPS = [
   }),
   op('get', '/admin/bookings', 'Administration', 'List every consultation, view only', {
     desc: 'The office, the time and the state. Never who asked: no name, account, token or topic. Optional from and to (YYYY-MM-DD, both included) limit it by time, in UTC. Soonest first.',
-    roles: ['admin'], reply: [200, 'The consultations.', arrayOf('AdminBooking')], errors: [400],
+    roles: ['admin'],
+    query: [
+      { name: 'from', schema: { type: 'string', format: 'date' }, description: 'The first day, YYYY-MM-DD.' },
+      { name: 'to', schema: { type: 'string', format: 'date' }, description: 'The last day, YYYY-MM-DD.' },
+    ],
+    reply: [200, 'The consultations.', arrayOf('AdminBooking')], errors: [400],
   }),
   op('get', '/admin/reports', 'Administration', 'List the reports', {
-    desc: 'Unresolved safety concerns come first, then the newest. The code hash is never sent.',
+    desc: 'Unresolved safety concerns come first, then the newest. Each report carries a 160-character excerpt of its message. The code hash is never sent.',
     roles: ['admin'], query: [
       { name: 'status', schema: oneOf(['received', 'in_progress', 'resolved']), description: 'Keep one status.' },
       { name: 'type', schema: oneOf(['info', 'office', 'broken', 'safety', 'idea']), description: 'Keep one type.' },
@@ -1019,7 +1029,7 @@ const OPS = [
     desc: 'Opening a report marks it read.', roles: ['admin'], reply: [200, 'The report.', ref('ReportDetail')], errors: [404],
   }),
   op('put', '/admin/reports/{id}', 'Administration', 'Set the status of a report and reply', {
-    desc: 'Resolving an email report sends one email with the reply and then erases the address. If the send fails the address stays and delivery is "failed".',
+    desc: 'Resolving an email report erases its address in the same save, and then sends one email with the reply. The address is erased even when the send fails, and a failed send is logged and not retried.',
     roles: ['admin'], body: obj({ status: oneOf(['received', 'in_progress', 'resolved']), admin_reply: text('At most 1000 characters.') }, ['status']),
     reply: [200, 'The report after the change.', ref('ReportSaved')], errors: [400, 404],
   }),

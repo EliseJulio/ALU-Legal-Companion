@@ -17,8 +17,13 @@ export async function searchRoutes(text = '', area = '') {
     // Asking for every word to match would find nothing for most descriptions.
     // Small words like "my" and "the" are dropped. "my landlord kept the deposit" searches
     // for landlord, kept and deposit.
+    // A lexeme from a link or a path can hold characters that are tsquery operators, so each one
+    // is cut into plain letter and digit pieces first.
     const tsq = `to_tsquery('english', array_to_string(
-                   ARRAY(SELECT lexeme FROM unnest(to_tsvector('english', $1))), ' | '))`;
+                   ARRAY(SELECT DISTINCT piece
+                           FROM unnest(to_tsvector('english', $1)) AS lx(lexeme),
+                                regexp_split_to_table(lx.lexeme, '[^[:alnum:]]+') AS piece
+                          WHERE piece <> ''), ' | '))`;
     // The last argument 1 divides the rank by the length of the text. Without it a route
     // with a long title would score higher just for being long.
     rank = `ts_rank(r.tsv, ${tsq}, 1)`;

@@ -91,7 +91,7 @@ function routeError(r) {
   return null;
 }
 
-const daysValue = (r) => (r.deadline_days !== null && r.deadline_days !== undefined ? Number(r.deadline_days) : null);
+const daysValue = (r) => (r.deadline_days !== null && r.deadline_days !== undefined && r.deadline_days !== '' ? Number(r.deadline_days) : null);
 
 // ------------------------------------------------------------------------------ public
 
@@ -160,7 +160,7 @@ router.post('/routes', requireAuth('admin'), async (req, res) => {
     legal_basis: clean(b.legal_basis),
     exclusions: clean(b.exclusions) || null,
     steps: stepsFrom(b.steps),
-    deadline_days: b.deadline_days ?? null,
+    deadline_days: b.deadline_days === '' ? null : (b.deadline_days ?? null),
     deadline_runs_from: clean(b.deadline_runs_from) || null,
     deadline_note: clean(b.deadline_note) || null,
     area: areaFrom(b.area),

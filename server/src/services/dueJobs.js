@@ -5,11 +5,25 @@ import { runDueReminders } from './reminders.js';
 import { runDueBookingReminders } from './bookingReminders.js';
 import { purgeExpired } from './retention.js';
 
+// Each job runs on its own, so one that fails does not stop the others. A failed job has no entry in
+// the result and adds one to errors. Only the error name or code is logged.
 export async function runDueJobs() {
-  const reminders = await runDueReminders();
-  const booking_reminders = await runDueBookingReminders();
-  const retention = await purgeExpired();
-  return { reminders, booking_reminders, retention };
+  const result = {};
+  let errors = 0;
+  const jobs = [
+    ['reminders', runDueReminders],
+    ['booking_reminders', runDueBookingReminders],
+    ['retention', purgeExpired],
+  ];
+  for (const [name, job] of jobs) {
+    try {
+      result[name] = await job();
+    } catch (err) {
+      errors += 1;
+      console.error('[jobs] job failed', { job: name, error: err.code || err.name });
+    }
+  }
+  return { ...result, errors };
 }
 
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -20,9 +34,9 @@ export function startJobScheduler({ everyMs = TEN_MINUTES } = {}) {
   const tick = () => {
     runDueJobs()
       .then((r) => {
-        const busy = r.reminders.sent || r.reminders.missed || r.reminders.failed
-          || r.booking_reminders.sent || r.booking_reminders.missed || r.booking_reminders.failed
-          || r.retention.questions || r.retention.bookings;
+        const busy = r.errors || r.reminders?.sent || r.reminders?.missed || r.reminders?.failed
+          || r.booking_reminders?.sent || r.booking_reminders?.missed || r.booking_reminders?.failed
+          || r.retention?.questions || r.retention?.bookings;
         if (busy) console.log('[jobs]', r);
       })
       .catch((err) => console.error('[jobs] pass failed', { error: err.code || err.name }));

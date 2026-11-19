@@ -27,11 +27,6 @@ export async function sendsOn(day = kigaliToday()) {
   return row ? row.count : 0;
 }
 
-// Read only: is there room left for optional mail today? It reserves nothing.
-export async function optionalMailAllowed(day = kigaliToday()) {
-  return (await sendsOn(day)) < dailyBudget();
-}
-
 // Counts one send. Essential mail is counted this way and is never refused.
 export async function countSend(day = kigaliToday()) {
   const [row] = await q(

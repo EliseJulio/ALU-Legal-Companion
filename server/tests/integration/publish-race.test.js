@@ -27,6 +27,14 @@ const KINDS = [
     make: async () => (await makeRoute((await makeProvider({ name: 'Race entry' })).id)).id,
   },
   {
+    name: 'dispute ladder step',
+    table: 'dispute_ladder_steps',
+    path: (id) => `/api/directory/ladder/${id}/publish`,
+    make: async () => (await q(
+      `INSERT INTO dispute_ladder_steps (position, title, tagline, description, law_cited)
+       VALUES (1, 'Race step', 't', 'd', '') RETURNING id`))[0].id,
+  },
+  {
     name: 'directory entry',
     table: 'providers',
     path: (id) => `/api/directory/providers/${id}/publish`,

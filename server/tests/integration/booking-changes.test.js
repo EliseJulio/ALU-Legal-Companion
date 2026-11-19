@@ -3,7 +3,7 @@ import request from 'supertest';
 import app from '../../src/app.js';
 import { q, pool } from '../../src/db.js';
 import { whenSettled } from '../../src/services/notify.js';
-import { runDueBookingReminders } from '../../src/services/bookingReminders.js';
+import { runDueBookingReminders, scheduleBookingReminders } from '../../src/services/bookingReminders.js';
 import { resetDb, makeUser, makeProvider } from '../helpers.js';
 
 // Monday 09:00 in Kigali. Default hours apply: Monday to Friday, 09:00 to 17:00.
@@ -344,4 +344,69 @@ it('refuses an accept when the suggested time changed after it was read, and cha
   expect(await row(asked.body.id)).toMatchObject({ status: 'requested' });
   expect(new Date((await row(asked.body.id)).slot)).toEqual(new Date(TUE_10));
   expect((await row(asked.body.id)).proposed_slot).toEqual(new Date(THU_11));
+});
+
+const roomOf = async (id) => (await q('SELECT room_name FROM bookings WHERE id = $1', [id]))[0].room_name;
+
+it('drops the stored video room when the time changes, by a move or by an accepted suggestion', async () => {
+  const moved = await book(student, TUE_10);
+  await setStatus(expert, moved.body.id, 'accepted');
+  await q(`UPDATE bookings SET room_name = repeat('a',32), room_created_at = now() WHERE id = $1`, [moved.body.id]);
+  expect((await reschedule(student, moved.body.id, THU_10)).status).toBe(200);
+  expect(await roomOf(moved.body.id)).toBeNull();
+
+  const suggested = await book(staff, TUE_1030);
+  await propose(expert, suggested.body.id, THU_10);
+  await q(`UPDATE bookings SET room_name = repeat('b',32), room_created_at = now() WHERE id = $1`, [suggested.body.id]);
+  expect((await answer(staff, suggested.body.id, 'accept')).status).toBe(200);
+  expect(await roomOf(suggested.body.id)).toBeNull();
+});
+
+it('still answers and mails the lawyer when cancelling the reminders fails', async () => {
+  const asked = await book(student, TUE_10);
+  await setStatus(expert, asked.body.id, 'accepted');
+  await settle();
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+  const realQuery = pool.query.bind(pool);
+  const spy = jest.spyOn(pool, 'query').mockImplementation(async (text, params) => {
+    if (/UPDATE booking_reminders SET status = 'cancelled' WHERE booking_id/.test(text)) throw new Error('db down');
+    return realQuery(text, params);
+  });
+  const res = await as(student, 'post', `/api/bookings/${asked.body.id}/cancel`);
+  spy.mockRestore();
+  expect(res.status).toBe(200);
+  expect(res.body.status).toBe('cancelled');
+  await whenSettled();
+  expect(subjectOf('A consultation was cancelled')).toHaveLength(1);
+});
+
+it('does not leave a waiting reminder for the old time when the new time is too near for it', async () => {
+  const asked = await book(student, THU_10);
+  await setStatus(expert, asked.body.id, 'accepted');
+  // The cancel failed earlier. The booking is accepted again at a time much nearer, Monday 11:00 in Kigali.
+  await q(`UPDATE bookings SET slot = $2 WHERE id = $1`, [asked.body.id, '2026-11-23T09:00:00.000Z']);
+  await scheduleBookingReminders(asked.body.id, FIXED);
+  expect(await reminderRows(asked.body.id)).toEqual([
+    ['lawyer', 'day', '2026-11-25T08:00:00.000Z', 'cancelled'],
+    ['lawyer', 'hour', '2026-11-23T08:00:00.000Z', 'pending'],
+    ['owner', 'day', '2026-11-25T08:00:00.000Z', 'cancelled'],
+    ['owner', 'hour', '2026-11-23T08:00:00.000Z', 'pending'],
+  ]);
+});
+
+it('handles an accepted booking whose account was erased in every route, with no error and no mail', async () => {
+  const asked = await book(student, TUE_10);
+  await setStatus(expert, asked.body.id, 'accepted');
+  await q('UPDATE bookings SET user_id = NULL WHERE id = $1', [asked.body.id]);
+  await settle();
+  expect((await as(student, 'post', `/api/bookings/${asked.body.id}/cancel`)).status).toBe(404);
+  expect((await answer(student, asked.body.id, 'accept')).status).toBe(404);
+  expect((await request(app).post(`/api/bookings/${asked.body.id}/join`).send({})).status).toBe(404);
+  expect((await as(expert, 'post', `/api/bookings/${asked.body.id}/join`).send({})).status).toBe(200);
+  expect((await propose(expert, asked.body.id, THU_10)).status).toBe(400);
+  const listed = await as(expert, 'get', '/api/bookings/expert');
+  expect(listed.body[0].requester).toBe('Anonymous requester');
+  expect((await setStatus(expert, asked.body.id, 'declined')).status).toBe(200);
+  await whenSettled();
+  expect(mails.filter((m) => m.includes('To:'))).toEqual([]);
 });

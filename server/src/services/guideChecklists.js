@@ -12,7 +12,7 @@ export const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').
 
 // A document with a condition (required_if) is not needed by everyone, so it is not required.
 // The condition goes into the notes so the reader still sees it.
-export function itemFromDocument(doc) {
+function itemFromDocument(doc) {
   const conditional = Boolean(doc.required_if);
   const notes = [doc.notes, conditional ? `Only if ${doc.required_if}.` : null].filter(Boolean).join(' ');
   const item = { key: slugify(doc.name), name: doc.name, required: !conditional };

@@ -41,6 +41,22 @@ const OPTIONAL_TEXT = [
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : v);
 
+// Text with no content counts as nothing, so null and '' compare equal.
+const plain = (v) => {
+  const t = clean(v);
+  return t === '' ? null : t;
+};
+
+// Refuses a request whose text fields hold something other than text. It runs on what was sent,
+// before anything is cleaned, so a number or a list is not turned into text.
+function shapeError(body) {
+  for (const f of ['name', 'meet_link', ...OPTIONAL_TEXT]) {
+    const v = body[f];
+    if (v !== undefined && v !== null && typeof v !== 'string') return `${f} must be text`;
+  }
+  return null;
+}
+
 // Longest text an admin may enter for each field of an entry.
 const ENTRY_LIMITS = {
   location: 300, contact: 300, languages: 300, address: 300, hours: 300,
@@ -147,6 +163,8 @@ router.get('/providers/:id', requireIntParam('id'), async (req, res) => {
 // POST /api/directory/providers: a new entry always starts as a draft. The admin publishes it once it is checked.
 router.post('/providers', requireAuth('admin'), async (req, res) => {
   const b = req.body || {};
+  const shape = shapeError(b);
+  if (shape) return res.status(400).json({ error: shape });
   const p = {
     name: clean(b.name),
     category: b.category,
@@ -178,6 +196,8 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
   const [existing] = await q('SELECT * FROM providers WHERE id = $1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Provider not found' });
 
+  const shape = shapeError(req.body || {});
+  if (shape) return res.status(400).json({ error: shape });
   const has = (k) => Object.prototype.hasOwnProperty.call(req.body || {}, k);
   const merged = {};
   for (const k of [...PROVIDER_CHECKED_FIELDS, 'user_id', 'bookable', 'meet_link']) {
@@ -191,7 +211,7 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
   const error = await providerError(merged);
   if (error) return res.status(400).json({ error });
 
-  const factChanged = PROVIDER_CHECKED_FIELDS.some((k) => merged[k] !== existing[k]);
+  const factChanged = PROVIDER_CHECKED_FIELDS.some((k) => plain(merged[k]) !== plain(existing[k]));
   const resetSql = factChanged ? `, status = 'draft', verified_by = NULL, verified_at = NULL` : '';
 
   const [row] = await q(

@@ -48,9 +48,12 @@ const QUIET_MS = 5 * 60 * 1000;
 const lastTold = new Map();
 export const resetNotifyThrottle = () => lastTold.clear();
 function quiet(key) {
+  const now = Date.now();
   const last = lastTold.get(key);
-  if (last && Date.now() - last < QUIET_MS) return true;
-  lastTold.set(key, Date.now());
+  if (last && now - last < QUIET_MS) return true;
+  // Entries older than the quiet window no longer matter, so they are dropped to keep the map small.
+  for (const [k, at] of lastTold) if (now - at >= QUIET_MS) lastTold.delete(k);
+  lastTold.set(key, now);
   return false;
 }
 

@@ -158,7 +158,8 @@ router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res)
   if (error) return res.status(400).json({ error });
   // The service block follows the same rule as the other keys. Left out keeps it. Sent as null clears it.
   // It is checked before the update below. That update takes a published guide off the site.
-  const checked = validateService(has('service') ? req.body.service : existing.service);
+  // A block the request did not send is kept as it is stored and is not checked again.
+  const checked = has('service') ? validateService(req.body.service) : { value: existing.service };
   if (checked.errors) return res.status(400).json({ error: `Service details: ${checked.errors.join('; ')}` });
 
   await q(

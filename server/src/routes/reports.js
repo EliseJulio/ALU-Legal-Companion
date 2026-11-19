@@ -4,7 +4,7 @@
 import { Router } from 'express';
 import { q, pool } from '../db.js';
 import { requireAuth, normalizeEmail } from '../middleware/auth.js';
-import { requireIntParam } from '../middleware/validate.js';
+import { requireIntParam, isPlausibleEmail } from '../middleware/validate.js';
 import { createLimiter } from '../middleware/rateLimit.js';
 import { hashAnonToken } from '../services/anonToken.js';
 import { makeReportCode, normalizeReportCode } from '../services/reportCode.js';
@@ -25,7 +25,6 @@ const TYPE_LABELS = {
 };
 const STATUSES = ['received', 'in_progress', 'resolved'];
 const ABOUT_KINDS = ['guide', 'route', 'provider', 'page'];
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Each route has its own limiter so one does not use up the budget of another.
 const submitLimiter = createLimiter({
@@ -71,7 +70,7 @@ function cleanReport(body) {
   if (replyBy === 'email') {
     email = normalizeEmail(body.email);
     if (!email) return { error: 'Enter your email address.' };
-    if (email.length > 254 || !EMAIL_PATTERN.test(email)) return { error: 'That is not a valid email address.' };
+    if (!isPlausibleEmail(email)) return { error: 'That is not a valid email address.' };
   } else if (text(body.email)) {
     return { error: 'Send either an email address or ask for a code, not both.' };
   }
@@ -158,7 +157,7 @@ const EXPORT_COLUMNS = ['id', 'type', 'about_kind', 'about_label', 'status', 're
 
 // One CSV cell. Always quoted. A cell that starts with = + - @ tab or CR gets a leading quote so
 // a spreadsheet never runs it as a formula.
-export function csvCell(value) {
+function csvCell(value) {
   if (value === null || value === undefined) return '""';
   let text = value instanceof Date ? value.toISOString() : String(value);
   if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
@@ -217,8 +216,9 @@ function resolvedMail(report, reply) {
 }
 
 // PUT /api/admin/reports/:id { status, admin_reply }
-// When an email report is resolved, one email goes out. The address is erased only after the
-// send worked. If the send fails the address stays and saving again tries once more.
+// When an email report is resolved, the address is erased in the same transaction as the status
+// change. The one email goes out after the commit, so no database connection or row lock is held
+// while it is sent, and saving again cannot send it twice.
 adminReports.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   const status = req.body?.status;
   if (!STATUSES.includes(status)) return res.status(400).json({ error: 'Choose a status.' });
@@ -226,29 +226,18 @@ adminReports.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req
   if (reply.length > 1000) return res.status(400).json({ error: 'Keep the reply under 1000 characters.' });
 
   const client = await pool.connect();
+  let saved;
+  let mail = null;
   try {
     await client.query('BEGIN');
-    // The row stays locked while the mail is sent so two saves cannot send it twice.
     const { rows: [report] } = await client.query('SELECT * FROM reports WHERE id = $1 FOR UPDATE', [req.params.id]);
     if (!report) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Report not found' });
     }
 
-    let delivery = null;
-    let eraseEmail = false;
-    if (status === 'resolved' && report.contact_email) {
-      try {
-        await sendMail(resolvedMail(report, reply));
-        delivery = 'sent';
-        eraseEmail = true;
-      } catch (err) {
-        console.error('[reports] could not send the resolved mail', { id: report.id, name: err.name });
-        delivery = 'failed';
-      }
-    }
-
-    const { rows: [saved] } = await client.query(
+    const sendResolvedMail = status === 'resolved' && Boolean(report.contact_email);
+    ({ rows: [saved] } = await client.query(
       `UPDATE reports
           SET status = $1::text, admin_reply = $2, updated_at = now(),
               read_at = COALESCE(read_at, now()),
@@ -257,15 +246,23 @@ adminReports.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req
         WHERE id = $4
         RETURNING id, type, status, reply_channel, admin_reply, read_at, resolved_at, updated_at,
                   (contact_email IS NOT NULL) AS has_email`,
-      [status, reply || null, eraseEmail, report.id]);
+      [status, reply || null, sendResolvedMail, report.id]));
     await client.query('COMMIT');
-    res.json(delivery ? { ...saved, delivery } : saved);
+    if (sendResolvedMail) mail = resolvedMail(report, reply);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();
   }
+
+  if (mail) {
+    sendMail(mail).catch((err) => {
+      console.error('[reports] could not send the resolved mail', { id: saved.id, name: err.name });
+    });
+    return res.json({ ...saved, delivery: 'sent' });
+  }
+  res.json(saved);
 });
 
 export default router;

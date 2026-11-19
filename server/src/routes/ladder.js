@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam } from '../middleware/validate.js';
+import { noteIn } from '../services/guideNotes.js';
 import { LADDER_FIELDS, cleanText, ladderError, positionFrom } from '../services/ladder.js';
 
 const router = Router();
@@ -72,13 +73,32 @@ router.put('/ladder/:id', requireAuth('admin'), requireIntParam('id'), async (re
   res.json(row);
 });
 
-// POST /api/directory/ladder/:id/publish: only a draft can be published.
+// POST /api/directory/ladder/:id/publish: only a draft can be published. A note left for the editor
+// keeps the step a draft, and only the version that was checked is published.
 router.post('/ladder/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  const [draft] = await q(
+    `SELECT title, tagline, description, law_cited, updated_at::text AS seen_at
+       FROM dispute_ladder_steps WHERE id = $1 AND status <> 'published'`, [req.params.id]);
+  if (draft) {
+    const note = noteIn([
+      ['Step title', draft.title], ['Tagline', draft.tagline],
+      ['Description', draft.description], ['Law cited', draft.law_cited],
+    ]);
+    if (note) return res.status(400).json({ error: note });
+  }
   const [row] = await q(
     `UPDATE dispute_ladder_steps SET status = 'published', updated_at = now()
-      WHERE id = $1 AND status <> 'published' RETURNING id, status`,
-    [req.params.id]);
-  if (!row) return res.status(400).json({ error: 'That step could not be found or is already published' });
+      WHERE id = $1 AND status <> 'published' AND updated_at = $2::timestamptz RETURNING id, status`,
+    [req.params.id, draft?.seen_at ?? null]);
+  if (!row) {
+    if (draft) {
+      const [current] = await q('SELECT status FROM dispute_ladder_steps WHERE id = $1', [req.params.id]);
+      if (current && current.status !== 'published') {
+        return res.status(409).json({ error: 'That record was just changed. Reload and try again.' });
+      }
+    }
+    return res.status(400).json({ error: 'That step could not be found or is already published' });
+  }
   res.json(row);
 });
 

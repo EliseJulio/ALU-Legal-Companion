@@ -21,7 +21,7 @@ const FIELDS = [
 ];
 
 // Every text a reader sees in the How to do it block of a guide, with the section it sits in.
-export function serviceEntries(service) {
+function serviceEntries(service) {
   if (!service || typeof service !== 'object') return [];
   const out = [];
   const add = (label, value) => { if (typeof value === 'string') out.push([label, value]); };

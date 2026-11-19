@@ -36,7 +36,14 @@ export async function scheduleBookingReminders(bookingId, now = new Date()) {
   for (const recipient of recipients) {
     for (const kind of Object.keys(LEAD_MS)) {
       const sendAt = new Date(slot - LEAD_MS[kind]);
-      if (sendAt <= now) continue;
+      if (sendAt <= now) {
+        // An old waiting row for this reminder was for another time. It must not fire for this one.
+        await q(
+          `UPDATE booking_reminders SET status = 'cancelled'
+            WHERE booking_id = $1 AND recipient = $2 AND kind = $3 AND status = 'pending'`,
+          [bookingId, recipient, kind]);
+        continue;
+      }
       // A row left from an earlier time is armed again. A row already sent for this same time is kept.
       const rows = await q(
         `INSERT INTO booking_reminders (booking_id, recipient, kind, send_at) VALUES ($1,$2,$3,$4)
