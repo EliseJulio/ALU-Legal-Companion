@@ -6426,21 +6426,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/bookings/anon/{{anonToken}}",
+							"raw": "{{baseUrl}}/bookings/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"bookings",
 								"anon",
-								"{{anonToken}}"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"{{anonToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -6470,21 +6484,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/bookings/anon/{{anonTokenLoose}}",
+							"raw": "{{baseUrl}}/bookings/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"bookings",
 								"anon",
-								"{{anonTokenLoose}}"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"{{anonTokenLoose}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -6502,21 +6530,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/bookings/anon/not-a-code",
+							"raw": "{{baseUrl}}/bookings/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"bookings",
 								"anon",
-								"not-a-code"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"not-a-code\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -6534,21 +6576,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/bookings/anon/0000-0000-0000-0000",
+							"raw": "{{baseUrl}}/bookings/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"bookings",
 								"anon",
-								"0000-0000-0000-0000"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"0000-0000-0000-0000\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -7128,21 +7184,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/bookings/anon/{{anonToken}}",
+							"raw": "{{baseUrl}}/bookings/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"bookings",
 								"anon",
-								"{{anonToken}}"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"{{anonToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -10616,21 +10686,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/questions/anon/{{qToken}}",
+							"raw": "{{baseUrl}}/questions/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"questions",
 								"anon",
-								"{{qToken}}"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"{{qToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -10648,21 +10732,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/questions/anon/not-a-code",
+							"raw": "{{baseUrl}}/questions/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"questions",
 								"anon",
-								"not-a-code"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"not-a-code\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},
@@ -11161,21 +11259,35 @@
 						}
 					],
 					"request": {
-						"method": "GET",
-						"header": [],
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
 						"url": {
-							"raw": "{{baseUrl}}/questions/anon/{{qToken}}",
+							"raw": "{{baseUrl}}/questions/anon/status",
 							"host": [
 								"{{baseUrl}}"
 							],
 							"path": [
 								"questions",
 								"anon",
-								"{{qToken}}"
+								"status"
 							]
 						},
 						"auth": {
 							"type": "noauth"
+						},
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"code\": \"{{qToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
 						}
 					}
 				},

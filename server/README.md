@@ -61,7 +61,7 @@ Check it with `curl http://localhost:4000/api/health`.
 
 ## Demo accounts
 
-`npm run seed` is safe to run again. It creates these accounts, already verified:
+`npm run seed` is safe to run again. Unless `NODE_ENV` is `development` or `test`, it needs the three `SEED_*_PASSWORD` values set; for a local demo run use `NODE_ENV=development npm run seed`. It creates these accounts, already verified:
 
 | Role | Email | Password |
 |---|---|---|
@@ -81,7 +81,7 @@ The seed adds directory entries, "Where to go" routes, a sample guide and crisis
 | `npm start` | Starts the server |
 | `npm run migrate` | Applies the migrations that have not run yet |
 | `npm run seed` | Adds the demo data |
-| `npm run reminders` | Runs one pass of the deadline reminders (for a cron job) |
+| `npm run reminders` | Runs one pass of the scheduled jobs: deadline and consultation reminders and the clean-up (for a cron job) |
 | `npm test` | Runs all the tests |
 
 ## Settings
@@ -153,13 +153,13 @@ All routes are under `/api`. Every error is `{ "error": "message" }`. Login is a
 | Where to go | `GET /directory/routes` (search with `?q=`), `/routes/:id`, staff list at `/routes/all`, `POST` and `PUT /routes`, then `/routes/:id/publish` | public to read; administrator writes and publishes |
 | Crisis contacts | `GET /emergency-contacts` | anyone |
 | Search | `GET /search?q=` (add `&library=guides`, `routes` or `providers`) | anyone |
-| Consultations | `POST /bookings`, `POST /bookings/anonymous`, `GET /bookings/mine` `/anon/:token` `/expert`, `POST /bookings/:id/status` | student or staff, anyone, expert |
+| Consultations | `POST /bookings`, `POST /bookings/anonymous`, `GET /bookings/mine` `/expert`, `POST /bookings/anon/status`, `POST /bookings/:id/status` | student or staff, anyone, expert |
 | Matters | `GET` and `POST /matters`, `GET` `PUT` `DELETE /matters/:id`, `POST /matters/:id/events`, `GET /matters/share-targets` `/shared`, `POST` and `DELETE /matters/:id/share`, `POST` and `DELETE /matters/:id/checklist` | student or staff, expert for shared ones |
 | Guides | `GET /guides` (search with `?search=` and `?domain=`), `/guides/:id`, staff list at `/guides/all`, `POST` and `PUT /guides`, then `/guides/:id/publish` or `/guides/:id/withdraw` | public to read; administrator writes, publishes, and withdraws |
 | Saved guides | `GET /bookmarks`, `POST` and `DELETE /guides/:id/bookmark` | student or staff |
 | Checklists | `GET /checklists`, `/checklists/:id`, staff list at `/checklists/all`, `POST` and `PUT /checklists`, then `/checklists/:id/publish` | public to read; administrator writes and publishes |
 | Matter documents | `GET` and `POST /matters/:id/documents`, `GET /documents/checklist`, `GET /documents/:docId/file`, `DELETE /documents/:docId`, `PUT /documents/:docId/review`, `POST /documents/:docId/comments` | the owner; the expert a matter is shared with can read, check and comment |
-| Questions | `POST /questions`, `POST /questions/anonymous`, `GET /questions/mine` `/anon/:token` `/open`, `POST /questions/:id/answer` | student or staff, anyone, expert |
+| Questions | `POST /questions`, `POST /questions/anonymous`, `GET /questions/mine` `/open`, `POST /questions/anon/status`, `POST /questions/:id/answer` | student or staff, anyone, expert |
 | Admin | `/admin/invites`, `/admin/users` (role, deactivate, reactivate), `/admin/emergency-contacts`, `GET /admin/stats` | admin only |
 
 ## The rules the code enforces
