@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
 import ErrorNotice from '@/components/ErrorNotice';
 import AppointmentGroups from '@/components/AppointmentGroups';
-import { ViewOnlyRow } from '@/pages/AdminCalendar';
+import ViewOnlyRow from '@/components/ViewOnlyRow';
 import { useApi } from '@/lib/useApi';
 import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';

@@ -4,9 +4,12 @@ import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import ScheduleCalendar from '@/components/ScheduleCalendar';
 import ExpertConsultRow from '@/components/ExpertConsultRow';
+import ConsultationHours from '@/components/ConsultationHours';
+import { ScheduleRow } from '@/components/ScheduleItem';
 import { useApi } from '@/lib/useApi';
 import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
+import { useConsultMove } from '@/lib/useConsultMove';
 import { CONSULT_LEGEND, expertItems } from '@/lib/schedule';
 import { PAGE_TITLE } from '@/lib/ui';
 
@@ -17,14 +20,20 @@ import { PAGE_TITLE } from '@/lib/ui';
 export default function ExpertCalendar() {
   const { data: bookings, error, loading, refetch } = useApi('/bookings/expert', LIVE);
   const now = useNow();
+  // The weekly hours. Loaded once and not refreshed in the background, so an unsaved edit is never replaced.
+  const hours = useApi('/bookings/availability');
+  const windows = hours.data?.windows ?? [];
 
   const items = useMemo(() => expertItems(bookings ?? [], now), [bookings, now]);
+  const { message, onDone } = useConsultMove(refetch, bookings);
   const requests = (bookings ?? []).filter((b) => b.status === 'requested').length;
   const accepted = (bookings ?? []).filter((b) => b.status === 'accepted').length;
 
   return (
     <div>
       <Breadcrumb trail={[{ label: 'Expert workspace' }]} current="Calendar" />
+      {/* Always on the page, so the result of an action is read out when it arrives. */}
+      <div role="status" className="sr-only">{message}</div>
       <h1 className={`mt-6 ${PAGE_TITLE}`}>Calendar</h1>
       <p className="mt-2 max-w-reading text-muted-foreground">
         Consultations booked with you. A request is not confirmed until you accept it. An anonymous request says so.
@@ -33,6 +42,8 @@ export default function ExpertCalendar() {
 
       {loading && !bookings && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
+
+      <ConsultationHours availability={hours.data} error={hours.error} loading={hours.loading} onSaved={hours.refetch} />
 
       {/* The calendar waits for the list. An empty month while loading would read as no consultations. */}
       {bookings && (
@@ -61,9 +72,12 @@ export default function ExpertCalendar() {
           <div className="mt-6">
             <ScheduleCalendar
               items={items}
+              hours={windows}
               today={now}
               legend={CONSULT_LEGEND}
-              renderRow={(item) => <ExpertConsultRow item={item} onDone={refetch} />}
+              renderRow={(item) => (item.kind === 'hours'
+                ? <ScheduleRow item={item} />
+                : <ExpertConsultRow item={item} onDone={onDone} />)}
             />
           </div>
         </>

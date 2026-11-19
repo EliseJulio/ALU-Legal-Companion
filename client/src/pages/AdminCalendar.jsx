@@ -2,31 +2,12 @@ import { useMemo } from 'react';
 import Breadcrumb from '@/components/Breadcrumb';
 import ErrorNotice from '@/components/ErrorNotice';
 import ScheduleCalendar from '@/components/ScheduleCalendar';
-import { ScheduleMark } from '@/components/ScheduleItem';
+import ViewOnlyRow from '@/components/ViewOnlyRow';
 import { useApi } from '@/lib/useApi';
 import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
-import { CONSULT_LEGEND, adminItems, longDay } from '@/lib/schedule';
+import { ADMIN_LEGEND, adminItems } from '@/lib/schedule';
 import { PAGE_TITLE } from '@/lib/ui';
-
-// One item for the admin. It names the provider and the state and nothing else.
-// There is no action and no requester and no topic on this page. The admin's rows do not carry those fields.
-export function ViewOnlyRow({ item }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="mt-1.5">
-        <ScheduleMark mark={item.mark} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold tabular-nums text-ink">
-          {item.word}{item.time ? ` · ${item.time}` : ''}
-        </p>
-        <p className="mt-0.5 break-words font-semibold text-ink">{item.title}</p>
-        <p className="break-words text-sm text-muted-foreground">{longDay(item.date)}</p>
-      </div>
-    </div>
-  );
-}
 
 // The admin's calendar. It is VIEW ONLY. You cannot accept or decline or join a consultation here.
 // Requesters are never shown.
@@ -54,7 +35,7 @@ export default function AdminCalendar() {
 
       {!loading && !error && data && (
         <div className="mt-6">
-          <ScheduleCalendar items={items} today={now} legend={CONSULT_LEGEND} renderRow={(item) => <ViewOnlyRow item={item} />} />
+          <ScheduleCalendar items={items} today={now} legend={ADMIN_LEGEND} renderRow={(item) => <ViewOnlyRow item={item} />} />
         </div>
       )}
     </div>

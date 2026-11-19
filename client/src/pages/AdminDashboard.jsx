@@ -43,7 +43,7 @@ export default function AdminDashboard() {
   // The entries list is read only for the count of entries checked in the last 30 days.
   const providers = useApi('/directory/providers/all');
   // This week's consultations. The window is a day wider each side because the server counts days in
-  // UTC and the week is the reader's own. The exact week is cut out again in weekScheduled.
+  // UTC and the week starts at Kigali midnight, which is the day before in UTC. The exact week is cut out again in weekScheduled.
   const now = useNow();
   const { start, end } = weekBounds(now);
   const day = (d, by) => new Date(d.getTime() + by * 86400000).toISOString().slice(0, 10);
@@ -128,6 +128,7 @@ export default function AdminDashboard() {
               ['Accepted', data.bookings.by_status.accepted],
               ['Declined', data.bookings.by_status.declined],
               ['Completed', data.bookings.by_status.completed],
+              ['Cancelled', data.bookings.by_status.cancelled],
             ]}
           />
           <Counts
