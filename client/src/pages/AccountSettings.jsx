@@ -236,8 +236,8 @@ function DeleteAccount({ role }) {
 
   if (role !== 'student' && role !== 'staff') {
     return (
-      <section className={SECTION} aria-labelledby="delete-heading">
-        <h2 id="delete-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
+      <section className={SECTION} aria-labelledby="delete-account-heading">
+        <h2 id="delete-account-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Your account is linked to published records. To delete it, ask an admin.
         </p>
@@ -263,8 +263,8 @@ function DeleteAccount({ role }) {
   }
 
   return (
-    <form onSubmit={remove} className={SECTION} aria-labelledby="delete-heading">
-      <h2 id="delete-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
+    <form onSubmit={remove} className={SECTION} aria-labelledby="delete-account-heading">
+      <h2 id="delete-account-heading" className="font-head text-[20px] leading-[1.25] text-ink">Delete my account</h2>
       <p className="mt-1 text-sm">This deletes:</p>
       <ul className="mt-1 list-disc space-y-1 pl-6 text-sm">
         <li>your matters and their documents</li>

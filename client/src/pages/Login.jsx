@@ -35,10 +35,9 @@ export default function Login() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const { marks, edited } = useFieldMarks(error);
-  // The address that a 403 was returned for. A 403 means the account exists and is not
-  // verified yet, so the server has already said the account exists. Only then is a new link
-  // offered. A 401 never shows this. If it did, its presence would tell a stranger that the
-  // account exists.
+  // The address that a not-verified refusal was returned for. The server sends the code
+  // 'not_verified' only after the password is right, so the account is known to exist. Only
+  // then is a new link offered. A 401 and a switched-off account never show this card.
   const [unverified, setUnverified] = useState(null);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(null);
@@ -72,7 +71,7 @@ export default function Login() {
       navigate(safeNext(params.get('next')) ?? homeFor(session.user), { replace: true });
     } catch (err) {
       setError(err);
-      if (err.status === 403) setUnverified(address);
+      if (err.code === 'not_verified') setUnverified(address);
     } finally {
       // The password does not stay in the page after a try. The email is kept for a retry.
       setPassword('');

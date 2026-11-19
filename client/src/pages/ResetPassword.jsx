@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { scrubTokenFromUrl } from '@/lib/url';
@@ -24,9 +24,12 @@ export default function ResetPassword() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const { marks, edited } = useFieldMarks(error);
+  // A second press while the first is still sending is ignored.
+  const inFlight = useRef(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (inFlight.current) return;
     if (password.length < 8) {
       setError(fieldProblem('password', 'Choose a password of at least 8 characters.'));
       focusField('password');
@@ -39,6 +42,8 @@ export default function ResetPassword() {
     }
     setError(null);
     setSending(true);
+    inFlight.current = true;
+    let lostConnection = false;
     try {
       const session = await apiPost('/auth/reset-password', { token, password });
       // The link is spent. A failed try keeps it in the address because it is not spent then.
@@ -47,11 +52,16 @@ export default function ResetPassword() {
       navigate(homeFor(session.user), { replace: true });
     } catch (err) {
       // The server says why a link was refused. The message is shown as it is.
+      // With no connection the typed passwords stay, so the reader can press again.
+      lostConnection = err?.status === 0;
       setError(err);
     } finally {
-      setPassword('');
-      setShown(false);
-      setAgain('');
+      inFlight.current = false;
+      if (!lostConnection) {
+        setPassword('');
+        setShown(false);
+        setAgain('');
+      }
       setSending(false);
     }
   }

@@ -32,7 +32,10 @@ export default function ConfirmEmailChange() {
         setChanged(session.user);
       })
       // The server says why a link was refused: used, expired or not valid. The message is shown as it is.
-      .catch((err) => setError(err));
+      .catch((err) => {
+        scrubTokenFromUrl();
+        setError(err);
+      });
   }, [token, signIn]);
 
   if (!token) {

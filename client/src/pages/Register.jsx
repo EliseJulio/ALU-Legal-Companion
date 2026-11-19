@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet, apiPost } from '@/lib/api';
 import { FORM_ERROR_ID, fieldProblem, focusField, useFieldMarks } from '@/lib/fieldError';
@@ -41,6 +41,8 @@ export default function Register() {
   const [error, setError] = useState(null);
   const { marks, edited } = useFieldMarks(error);
   const [message, setMessage] = useState(null);
+  // A second press while the first is still sending is ignored.
+  const inFlight = useRef(false);
   // 'checking' until the server answers, then 'open' or 'paused'. A failed check becomes 'open'.
   const [mail, setMail] = useState('checking');
 
@@ -54,6 +56,7 @@ export default function Register() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (inFlight.current) return;
     const problem = problemWith(name.trim(), email.trim(), password);
     if (problem) {
       setError(problem);
@@ -62,6 +65,7 @@ export default function Register() {
     }
     setError(null);
     setSending(true);
+    inFlight.current = true;
     try {
       const reply = await apiPost('/auth/register', { name: name.trim(), email: email.trim(), password, role });
       // The server's message says what happened to the email. It is shown as it is.
@@ -69,6 +73,7 @@ export default function Register() {
     } catch (err) {
       setError(err);
     } finally {
+      inFlight.current = false;
       setPassword('');
       setShown(false);
       setSending(false);
@@ -115,6 +120,14 @@ export default function Register() {
   return (
     <AuthLayout {...SHELL}>
       {error && <ErrorNotice error={error} id={FORM_ERROR_ID} className="mb-4" />}
+      {/* Shown only when the server says the address is taken. The sign-in page offers a new link
+          for an account that is not verified yet. Forgot your password? covers the other case. */}
+      {error?.code === 'email_taken' && (
+        <div className="mb-4 flex flex-col items-start">
+          <Link to="/login" className={BUTTON_TEXT}>Go to sign in</Link>
+          <Link to="/forgot-password" className={BUTTON_TEXT}>Forgot your password?</Link>
+        </div>
+      )}
 
       <div className={CARD}>
         <AuthTabs current="create" />

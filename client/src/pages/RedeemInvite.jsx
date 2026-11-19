@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { apiPost } from '@/lib/api';
 import { scrubTokenFromUrl } from '@/lib/url';
@@ -26,9 +26,12 @@ export default function RedeemInvite() {
   const { marks, edited } = useFieldMarks(error);
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  // A second press while the first is still sending is ignored.
+  const inFlight = useRef(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (inFlight.current) return;
     const problem = (() => {
       if (!code.trim()) return fieldProblem('code', 'Paste the invitation code from your email.');
       if (!name.trim()) return fieldProblem('name', 'Enter your name.');
@@ -43,6 +46,7 @@ export default function RedeemInvite() {
     }
     setError(null);
     setSending(true);
+    inFlight.current = true;
     try {
       const session = await apiPost('/auth/redeem-invite', {
         invite_token: code.trim(),
@@ -56,6 +60,7 @@ export default function RedeemInvite() {
       // The server says why an invitation was refused. The message is shown as it is.
       setError(err);
     } finally {
+      inFlight.current = false;
       setPassword('');
       setShown(false);
       setAgain('');
