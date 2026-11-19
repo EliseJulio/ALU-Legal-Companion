@@ -10,6 +10,17 @@ import { validateService } from './services/guideService.js';
 import { checklistFromGuide, insertPublishedChecklist } from './services/guideChecklists.js';
 import { validateChecklist } from './services/checklists.js';
 import { OFFICIAL_CHECKLISTS, linkGuide } from './services/officialChecklists.js';
+import { seedPasswordProblems } from './seedPasswords.js';
+
+// Unless NODE_ENV is development or test, the starter accounts need strong passwords of their own. Stop
+// before any account is written if one is missing, too short or a public default.
+// On a local machine: NODE_ENV=development npm run seed
+const passwordProblems = seedPasswordProblems(process.env);
+if (passwordProblems.length) {
+  console.error('Seed refused to run. No account was created. Set NODE_ENV=development for local demo passwords.');
+  for (const problem of passwordProblems) console.error(`  - ${problem}`);
+  process.exit(1);
+}
 
 // These accounts are created already verified. Login is blocked until an address is verified
 // and there is no inbox behind these addresses.
@@ -34,8 +45,7 @@ const ENTRIES = [
   { name: 'Pro-bono lawyer in Kigali', category: 'lawyer', type: 'pro_bono_lawyer', location: 'Kigali',
     contact: 'via platform', services: 'Employment, tenancy and business matters.',
     languages: 'Kinyarwanda, English', is_free: true, user_id: expert.id,
-    // A placeholder room for development only.
-    bookable: true, meet_link: 'https://meet.google.com/aaa-bbbb-ccc' },
+    bookable: true },
   { name: 'Access to Justice Bureau (MAJ) of your district', category: 'consultant', type: 'maj_office',
     location: 'All thirty districts', contact: 'Walk in at the district office',
     services: 'Free legal advice and representation for people who cannot pay',
