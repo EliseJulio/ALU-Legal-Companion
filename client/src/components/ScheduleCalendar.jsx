@@ -28,7 +28,11 @@ function nextLine(item) {
 // The student page keeps the defaults. A lawyer page and an admin page pass their own.
 // So an admin row never offers an action that is not there.
 // `hours` is the lawyer's weekly windows. They are drawn as Open items on the days in view and are not bookings.
-export default function ScheduleCalendar({ items, today, legend = LEGEND, hours = [], renderRow = (item) => <ScheduleRow item={item} /> }) {
+// `dayExtra(selectedIso, { select, phone })` draws a block for the selected day, above its list on a wide
+// screen and above the agenda on a phone. The lawyer's slots use it. The other calendars do not pass it.
+export default function ScheduleCalendar({
+  items, today, legend = LEGEND, hours = [], renderRow = (item) => <ScheduleRow item={item} />, dayExtra,
+}) {
   const todayKey = todayIso(today);
   // A link can end in #consult-ID. The calendar then opens on the day of that item and shows its row.
   const { hash } = useLocation();
@@ -134,6 +138,7 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, hours 
           {longDay(selected)}
           {selected === todayKey && <span className="ml-2 text-sm font-semibold text-primary-text">Today</span>}
         </h2>
+        {dayExtra?.(selected, { select: setSelected, phone: false })}
         {dayItems.length === 0 ? (
           <div className="mt-2 space-y-1">
             <p className="text-muted-foreground">Nothing on this day.</p>
@@ -151,6 +156,7 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, hours 
       </section>
 
       <section aria-label={`Agenda for ${monthName}`} className="mt-4 md:hidden">
+        {dayExtra && <div className="mb-2">{dayExtra(selected, { select: setSelected, phone: true })}</div>}
         {days.length === 0 ? (
           <div className="space-y-1">
             <p className="text-muted-foreground">Nothing in {monthName}.</p>

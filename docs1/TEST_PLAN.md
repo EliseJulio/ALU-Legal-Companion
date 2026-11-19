@@ -9,11 +9,11 @@ This page lists every automated test in the repository. For each test it gives t
 | Suite | Tool | Files | Tests | Result |
 |---|---|---|---|---|
 | Server | Jest and Supertest, against a real PostgreSQL | 9 | 113 | all 113 passed |
-| Client | Vitest and Testing Library | 14 | 76 | all 76 passed |
+| Client | Vitest and Testing Library | 14 | 80 | all 80 passed |
 | Browser | Playwright, in Chromium | 5 | 13 | all 13 passed |
 | Worker | Vitest | 3 | 97 | all 97 passed |
 
-That is 299 tests in 31 files. No test in the set is skipped. These numbers count only the key set in the repository. Running the same commands on the author's computer also runs the further tests, so it reports more.
+That is 303 tests in 31 files. No test in the set is skipped. These numbers count only the key set in the repository. Running the same commands on the author's computer also runs the further tests, so it reports more.
 
 The booking features were also walked through once with a real server, a real database and a real browser, with no stubbed replies, on a throwaway database. That walk found and fixed a defect in the lawyer's hours card.
 
@@ -279,12 +279,16 @@ cd signaling && npm test     # no network needed
 | Client | `components/ChangeTime.test.jsx` | After a 409 refusal, loads the open times again and clears the chosen time. |
 | Client | `components/ChangeTime.test.jsx` | Takes focus when it opens. |
 | Client | `components/ChangeTime.test.jsx` | Says so when the provider has no open time in the next two weeks. |
-| Client | `components/ConsultationHours.test.jsx` | Has a heading, says in plain words what the hours are for, labels each time and sizes its buttons to touch. |
-| Client | `components/ConsultationHours.test.jsx` | Shows the standard hours and saves them whole when the answer comes after the first draw. |
-| Client | `components/ConsultationHours.test.jsx` | Says they are standard, shows Monday to Friday nine to five and keeps them as the lawyer’s own when saved unchanged. |
-| Client | `components/ConsultationHours.test.jsx` | Says nobody can book until hours are added and saves an empty list as a deliberate closure. |
-| Client | `components/ConsultationHours.test.jsx` | Adds nine-to-twelve on the day asked, removes only the window asked and saves the whole set in day order. |
-| Client | `components/ConsultationHours.test.jsx` | Refuses an overlap without sending anything and keeps the rows when the server refuses a save. |
+| Client | `components/ConsultationHours.test.jsx` | Shows no slots and no Save button while loading, so an empty list cannot be sent. |
+| Client | `components/ConsultationHours.test.jsx` | Says they are the standard hours until the lawyer saves and keeps them when saved unchanged. |
+| Client | `components/ConsultationHours.test.jsx` | Closes an open slot in the draft, counts the change and Discard restores it. |
+| Client | `components/ConsultationHours.test.jsx` | Sends the merged windows when the lawyer opens the slot after the last one. |
+| Client | `components/ConsultationHours.test.jsx` | Keeps the draft and shows the server words when a save is refused. |
+| Client | `components/ConsultationHours.test.jsx` | Refuses more than fourteen windows and sends nothing. |
+| Client | `components/ConsultationHours.test.jsx` | Says nothing is open and saving an empty list still closes bookings on purpose. |
+| Client | `components/ConsultationHours.test.jsx` | Is a button that is not a toggle and it does not change the draft. |
+| Client | `components/ConsultationHours.test.jsx` | Opens 09:00 to 17:00 on the day and closes the whole day. |
+| Client | `components/ConsultationHours.test.jsx` | Shows Previous day and Next day on a phone and moves the selected day. |
 | Client | `lib/cancelBooking.test.js` | Allows only a request or an accepted time still to come and nothing already over, declined or unreadable. |
 | Client | `lib/cancelBooking.test.js` | Posts to the booking with the login. |
 | Client | `lib/cancelBooking.test.js` | Sends the code in the body only, with no login and nothing in the address. |

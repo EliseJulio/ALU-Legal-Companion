@@ -121,7 +121,7 @@ These are for local use only. Never use them anywhere real. With no mail setting
 | Layer | Tool | Count |
 |---|---|---|
 | API and database | Jest and Supertest against a real database | 113 tests in 9 files |
-| Pages and components | Vitest and Testing Library | 76 tests in 14 files |
+| Pages and components | Vitest and Testing Library | 80 tests in 14 files |
 | Browser at phone width | Playwright with the API replaced by fixed replies | 13 tests in 5 files, run in Chromium (the default) |
 | Call signaling Worker | Vitest | 97 tests in 3 files |
 

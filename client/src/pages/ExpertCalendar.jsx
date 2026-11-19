@@ -22,7 +22,6 @@ export default function ExpertCalendar() {
   const now = useNow();
   // The weekly hours. Loaded once and not refreshed in the background, so an unsaved edit is never replaced.
   const hours = useApi('/bookings/availability');
-  const windows = hours.data?.windows ?? [];
 
   const items = useMemo(() => expertItems(bookings ?? [], now), [bookings, now]);
   const { message, onDone } = useConsultMove(refetch, bookings);
@@ -42,8 +41,6 @@ export default function ExpertCalendar() {
 
       {loading && !bookings && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
-
-      <ConsultationHours availability={hours.data} error={hours.error} loading={hours.loading} onSaved={hours.refetch} />
 
       {/* The calendar waits for the list. An empty month while loading would read as no consultations. */}
       {bookings && (
@@ -70,15 +67,28 @@ export default function ExpertCalendar() {
           )}
 
           <div className="mt-6">
-            <ScheduleCalendar
+            {/* The hours are edited on the calendar. The draft drives the Open items and the day's slots. */}
+            <ConsultationHours
+              availability={hours.data}
+              error={hours.error}
+              loading={hours.loading}
+              onSaved={hours.refetch}
               items={items}
-              hours={windows}
-              today={now}
-              legend={CONSULT_LEGEND}
-              renderRow={(item) => (item.kind === 'hours'
-                ? <ScheduleRow item={item} />
-                : <ExpertConsultRow item={item} onDone={onDone} />)}
-            />
+              now={now}
+            >
+              {({ windows, dayExtra }) => (
+                <ScheduleCalendar
+                  items={items}
+                  hours={windows}
+                  today={now}
+                  legend={CONSULT_LEGEND}
+                  dayExtra={dayExtra}
+                  renderRow={(item) => (item.kind === 'hours'
+                    ? <ScheduleRow item={item} />
+                    : <ExpertConsultRow item={item} onDone={onDone} />)}
+                />
+              )}
+            </ConsultationHours>
           </div>
         </>
       )}
