@@ -4,11 +4,11 @@
 # The database was made by hand in the Render dashboard, so it is not created here.
 
 services:
-  # The API. Always on, because it checks for due reminders once an hour from inside the server.
+  # The API. Always on, because it checks for due reminders every ten minutes from inside the server.
   - type: web
     name: alu-legal-api
     runtime: node
-    region: frankfurt
+    region: oregon
     plan: starter
     rootDir: server
     buildCommand: npm ci
@@ -45,6 +45,12 @@ services:
         sync: false
       - key: SEED_STUDENT_PASSWORD
         sync: false
+      # The secret for POST /api/internal/run-jobs. 32+ characters, the same value as the JOB_SECRET GitHub secret.
+      - key: JOB_SECRET
+        sync: false
+      # Most emails a day (Kigali time) that optional mail may use. Keep it below the provider's daily limit.
+      - key: DAILY_EMAIL_BUDGET
+        value: "180"
       # Calls inside the platform. With the first two empty the call uses Daily or Meet.
       # The secret is 32+ characters and matches the one on the Worker.
       - key: CALL_TICKET_SECRET
