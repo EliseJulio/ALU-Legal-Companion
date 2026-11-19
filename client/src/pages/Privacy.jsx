@@ -48,6 +48,7 @@ export default function Privacy() {
       <Section id="anonymous" title="Anonymous questions and bookings">
         <p>An anonymous question or booking stores no name, no email and no account.</p>
         <p>It is tied only to a random code that is shown once. We store the code only in scrambled (hashed) form. If you lose it, it cannot be recovered.</p>
+        <p>We delete an anonymous question 90 days after it is answered, and an anonymous booking 90 days after its appointment time.</p>
       </Section>
 
       <Section id="ask-ai" title="Ask AI">
@@ -89,7 +90,7 @@ export default function Privacy() {
       </Section>
 
       <Section id="where" title="Where your data is held">
-        <p>The server and the database are hosted by Render in Frankfurt, Germany. That is outside Rwanda. This is a known limit.</p>
+        <p>The database is hosted by Render in Oregon, in the United States. That is outside Rwanda. This is a known limit.</p>
         <p>
           Render keeps backups of the database for 30 days. If you delete your account, a copy of your data can stay in a backup
           for up to 30 days before it is removed.
@@ -107,7 +108,7 @@ export default function Privacy() {
           </li>
           <li>Lawyers and admins ask an admin to delete their account, because their accounts are linked to published records.</li>
         </ul>
-        <p>We keep your data until you delete it or your account.</p>
+        <p>We keep your account, your matters and your documents until you delete them or your account. Anonymous questions and bookings are deleted after 90 days, as the section on anonymous questions says.</p>
         <p>
           For anything else, use{' '}
           <Link to="/report" className={LINK}>Report a problem</Link>.
@@ -125,7 +126,7 @@ export default function Privacy() {
           <li>Article 50: personal data is stored in Rwanda unless it is authorised otherwise.</li>
           <li>Article 52: personal data is kept only until the purpose is fulfilled unless the law allows longer.</li>
         </ul>
-        <p>We are not yet in line with Article 50 for hosting, because our server is in Frankfurt.</p>
+        <p>We are not yet in line with Article 50 for hosting, because our database is in the United States.</p>
       </Section>
 
       <Disclaimer className="mt-8" />

@@ -128,19 +128,30 @@ export default function AskAI() {
             {result.answered ? (
               <>
                 <p className="whitespace-pre-line text-ink">{result.answer}</p>
-                <p className="mt-4 text-sm">
-                  <span className="font-semibold">Source: </span>
-                  {result.sources.map((source, index) => (
-                    <span key={source.id}>
-                      {index > 0 && ', '}
-                      <Link to={`/guides/${source.id}`} className={`font-semibold text-info underline underline-offset-4 ${RING_ON_CANVAS}`}>
-                        {source.title}
-                      </Link>
-                    </span>
-                  ))}
-                </p>
+                {result.sources.length > 0 && (
+                  <div className="mt-4 text-sm">
+                    <p id="ask-sources" className="font-semibold">Sources</p>
+                    {/* Each guide opens in a new tab. Nothing is stored, so leaving this page would lose the answer. */}
+                    <ul aria-labelledby="ask-sources" className="mt-1 space-y-1">
+                      {result.sources.map((source) => (
+                        <li key={source.id}>
+                          <a
+                            href={`/guides/${source.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex min-h-touch items-center font-semibold text-info underline underline-offset-4 ${RING_ON_CANVAS}`}
+                          >
+                            {source.title}
+                            <span className="sr-only"> (opens in a new tab)</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1 text-muted-foreground">Each guide opens in a new tab, so your answer stays here.</p>
+                  </div>
+                )}
                 <p className="mt-3 text-sm text-muted-foreground">
-                  AI answers may be wrong. Legal information, not legal advice.
+                  AI answers may be wrong. Legal information not legal advice.
                 </p>
               </>
             ) : (

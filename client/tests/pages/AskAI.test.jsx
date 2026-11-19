@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AskAI from '@/pages/AskAI';
@@ -58,6 +58,24 @@ describe('Ask AI', () => {
     await u.click(screen.getByRole('button', { name: 'Ask' }));
     await settle();
     expect(asks()).toHaveLength(1);
+  });
+
+  it('lists the source guides and opens each one in a new tab, so the answer stays on the page', async () => {
+    stub({ ask: reply(200, { answered: true, answer: 'Short answer.', sources: [{ id: 3, title: 'Getting your deposit back' }, { id: 5, title: 'Ending a lease' }] }) });
+    show('?q=Can my landlord keep my deposit');
+    const u = user();
+    await u.click(await screen.findByRole('checkbox', { name: 'I understand' }));
+    await u.click(screen.getByRole('button', { name: 'Ask' }));
+    const list = await screen.findByRole('list', { name: 'Sources' });
+    const links = within(list).getAllByRole('link');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveAttribute('href', '/guides/3');
+    expect(links[1]).toHaveAttribute('href', '/guides/5');
+    for (const link of links) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveTextContent('(opens in a new tab)');
+    }
   });
 
   it('says plainly that it is not available when the model is not set up', async () => {
