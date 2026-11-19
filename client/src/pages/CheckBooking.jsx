@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiGet } from '@/lib/api';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import StatusPill from '@/components/StatusPill';
 import MeetLink from '@/components/MeetLink';
-import { readableSlot, bookingStatusStep } from '@/lib/bookings';
+import CancelConsultation from '@/components/CancelConsultation';
+import TimeActions from '@/components/ConsultTimeReply';
+import { readableSlot, bookingStatusStep, canCancel, lookUpAnonBooking, cancelAnonBooking, answerProposalAnon, rescheduleBookingAnon } from '@/lib/bookings';
 import { FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Check an anonymous booking with its code. The code is kept in state and goes only into the
-// path of one request. It is never put in the address bar. The code alone opens the booking.
+// body of one request. It is never put in the address bar. The code alone opens the booking.
 // In the address it would stay in history and could be sent on to the next site.
 // The server accepts any case and spaces and hyphens. So the page sends what was typed.
 export default function CheckBooking() {
@@ -17,6 +18,8 @@ export default function CheckBooking() {
   const [booking, setBooking] = useState(null);
   const [error, setError] = useState(null);
   const [looking, setLooking] = useState(false);
+  // Counts the lookups. An answer only counts if no newer lookup or code change came after it.
+  const latest = useRef(0);
 
   async function lookUp(event) {
     event.preventDefault();
@@ -26,15 +29,42 @@ export default function CheckBooking() {
       setError({ message: 'Type the code you were given when you booked.' });
       return;
     }
+    const mine = latest.current + 1;
+    latest.current = mine;
     setError(null);
     setLooking(true);
     try {
-      setBooking(await apiGet(`/bookings/anon/${encodeURIComponent(typed)}`, { anonymous: true }));
+      const found = await lookUpAnonBooking(typed);
+      if (latest.current === mine) setBooking(found);
     } catch (err) {
-      setBooking(null);
-      setError(err);
+      if (latest.current === mine) {
+        setBooking(null);
+        setError(err);
+      }
     } finally {
-      setLooking(false);
+      if (latest.current === mine) setLooking(false);
+    }
+  }
+
+  // A changed code makes any lookup still on its way out of date.
+  function changeCode(value) {
+    setCode(value);
+    setBooking(null);
+    latest.current += 1;
+    setLooking(false);
+  }
+
+  // Loads the booking again after the person answers a suggested time or moves it. The code is
+  // sent in the body of this one request, as the first lookup does.
+  async function reload() {
+    const typed = code.trim();
+    const mine = latest.current + 1;
+    latest.current = mine;
+    try {
+      const found = await lookUpAnonBooking(typed);
+      if (latest.current === mine) setBooking(found);
+    } catch (err) {
+      if (latest.current === mine) setError(err);
     }
   }
 
@@ -56,7 +86,7 @@ export default function CheckBooking() {
           id="booking-code"
           type="text"
           value={code}
-          onChange={(e) => { setCode(e.target.value); setBooking(null); }}
+          onChange={(e) => changeCode(e.target.value)}
           autoComplete="off"
           autoCapitalize="none"
           autoCorrect="off"
@@ -94,6 +124,24 @@ export default function CheckBooking() {
             {booking.topic && (<><dt className="text-muted-foreground">About</dt><dd>{booking.topic}</dd></>)}
           </dl>
           <MeetLink booking={booking} anonCode={code.trim()} className="mt-4" />
+          <TimeActions
+            booking={booking}
+            className="mt-4"
+            answer={(action) => answerProposalAnon(code.trim(), action)}
+            move={(iso) => rescheduleBookingAnon(code.trim(), iso)}
+            onChanged={reload}
+          />
+          {canCancel(booking) && (
+            <CancelConsultation
+              className="mt-4"
+              when={readableSlot(booking.slot) ?? 'this time'}
+              onCancel={async () => {
+                // The code goes in the body of the request, never in the address.
+                const result = await cancelAnonBooking(code.trim());
+                setBooking((b) => (b ? { ...b, status: result?.status ?? 'cancelled' } : b));
+              }}
+            />
+          )}
           {step.next && (
             <Link to="/directory" className={`mt-4 ${BUTTON_OUTLINE}`}>
               {step.next}

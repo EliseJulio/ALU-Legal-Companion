@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiGet } from '@/lib/api';
+import { lookUpAnonQuestion } from '@/lib/questions';
 import ErrorNotice from '@/components/ErrorNotice';
 import Breadcrumb from '@/components/Breadcrumb';
 import StatusPill from '@/components/StatusPill';
 import { RING, FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Read the answer to an anonymous question with its code. The code is kept in state and goes
-// only into the path of one request. It is never put in the address bar. The code alone opens
+// only into the body of one request. It is never put in the address bar. The code alone opens
 // the question. In the address it would stay in history and could be sent on to the next site.
 // The server accepts any case and spaces and hyphens. So the page sends what was typed.
 export default function CheckAnswer() {
@@ -15,6 +15,8 @@ export default function CheckAnswer() {
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState(null);
+  // Counts the lookups. An answer only counts if no newer lookup or code change came after it.
+  const latest = useRef(0);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -25,17 +27,30 @@ export default function CheckAnswer() {
       setError({ message: 'Type the code you were given, then press Check.' });
       return;
     }
+    const mine = latest.current + 1;
+    latest.current = mine;
     setError(null);
     setChecking(true);
     try {
       // Sent without a login. The code is the only key. A login adds nothing here.
-      setResult(await apiGet(`/questions/anon/${encodeURIComponent(typed)}`, { anonymous: true }));
+      const answer = await lookUpAnonQuestion(typed);
+      if (latest.current === mine) setResult(answer);
     } catch (err) {
-      setResult(null);
-      setError(err);
+      if (latest.current === mine) {
+        setResult(null);
+        setError(err);
+      }
     } finally {
-      setChecking(false);
+      if (latest.current === mine) setChecking(false);
     }
+  }
+
+  // A changed code makes any lookup still on its way out of date.
+  function changeCode(value) {
+    setCode(value);
+    setResult(null);
+    latest.current += 1;
+    setChecking(false);
   }
 
   const answered = Boolean(result?.answer);
@@ -61,7 +76,7 @@ export default function CheckAnswer() {
           id="answer-code"
           type="text"
           value={code}
-          onChange={(e) => { setCode(e.target.value); setResult(null); }}
+          onChange={(e) => changeCode(e.target.value)}
           aria-describedby="answer-code-hint"
           autoComplete="off"
           autoCapitalize="none"
