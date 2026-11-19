@@ -6,7 +6,7 @@ export default defineConfig({
     cloudflareTest({
       wrangler: { configPath: './wrangler.toml' },
       miniflare: {
-        bindings: { CALL_TICKET_SECRET: 'test-only-secret-value', ALLOWED_ORIGINS: 'https://example.invalid' },
+        bindings: { CALL_TICKET_SECRET: 'test-only-secret-value-for-signaling-tests', ALLOWED_ORIGINS: 'https://example.invalid' },
       },
     }),
   ],

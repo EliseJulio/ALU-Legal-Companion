@@ -6,7 +6,7 @@ function b64url(bytes) {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-export const SECRET = 'test-only-secret-value';
+export const SECRET = 'test-only-secret-value-for-signaling-tests';
 export const ROOM = 'a'.repeat(32);
 
 export async function makeTicket(claims = {}, { secret = SECRET, header } = {}) {
@@ -39,8 +39,11 @@ export class FakeSocket {
   send(text) {
     this.sent.push(JSON.parse(text));
   }
-  close(code) {
-    if (this.closed === null) this.closed = code ?? 1005;
+  close(code, reason) {
+    if (this.closed === null) {
+      this.closed = code ?? 1005;
+      this.reason = reason ?? null;
+    }
   }
   types() {
     return this.sent.map((m) => m.type);
@@ -50,14 +53,19 @@ export class FakeSocket {
   }
 }
 
+// A state whose storage lives as long as the object, so a new CallRoom built on it sees the old values.
 export function makeState() {
   const calls = { alarms: [], deleted: 0, deleteAll: 0 };
+  const store = new Map();
   return {
     calls,
     storage: {
+      get: async (key) => store.get(key),
+      put: async (key, value) => { store.set(key, value); },
       setAlarm: async (t) => calls.alarms.push(t),
       deleteAlarm: async () => { calls.deleted += 1; },
-      deleteAll: async () => { calls.deleteAll += 1; },
+      deleteAll: async () => { calls.deleteAll += 1; store.clear(); },
     },
+    blockConcurrencyWhile: (fn) => fn(),
   };
 }

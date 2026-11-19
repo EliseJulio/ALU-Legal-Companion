@@ -53,10 +53,18 @@ function callWorker(room, headers) {
 }
 
 describe('worker routing', () => {
-  it('answers /health with ok', async () => {
+  it('answers /health with the JSON status and nothing else', async () => {
     const res = await SELF.fetch(url('/health'));
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe('ok');
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(await res.json()).toEqual({ status: 'ok' });
+  });
+
+  it('answers 405 with an Allow header and an empty body to a POST to /health', async () => {
+    const res = await SELF.fetch(url('/health'), { method: 'POST' });
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD');
+    expect(await res.text()).toBe('');
   });
 
   it('returns 404 for other paths', async () => {
@@ -140,6 +148,41 @@ describe('subprotocol pre-check', () => {
     expect(res.headers.get('Sec-WebSocket-Protocol')).toBe('alu-call.v1');
     res.webSocket.accept();
     res.webSocket.close(1000);
+  });
+});
+
+describe('ticket secret', () => {
+  // An environment whose room stub answers 200, so a request that passes the checks is visible.
+  function envWith(secret) {
+    return {
+      ALLOWED_ORIGINS: ORIGIN,
+      CALL_TICKET_SECRET: secret,
+      CALL_ROOM: {
+        idFromName: () => 'id',
+        get: () => ({ fetch: async () => new Response('routed', { status: 200 }) }),
+      },
+    };
+  }
+
+  function roomRequest(ticket) {
+    return new Request(url(`/room/${ROOM}`), {
+      headers: { Upgrade: 'websocket', Origin: ORIGIN, 'Sec-WebSocket-Protocol': `alu-call.v1, ${ticket}` },
+    });
+  }
+
+  it('trims stray spaces from the secret before checking a ticket', async () => {
+    const ticket = await makeTicket({});
+    const res = await worker.fetch(roomRequest(ticket), envWith(`  ${SECRET}\n`));
+    expect(res.status).toBe(200);
+  });
+
+  it('answers 503 with no detail when the secret is missing or short after trimming', async () => {
+    const ticket = await makeTicket({});
+    for (const weak of [undefined, '', 'x'.repeat(31), `${'x'.repeat(31)}   `]) {
+      const res = await worker.fetch(roomRequest(ticket), envWith(weak));
+      expect(res.status, String(weak)).toBe(503);
+      expect(await res.text()).toBe('service unavailable');
+    }
   });
 });
 
