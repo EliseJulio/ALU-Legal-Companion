@@ -19,7 +19,7 @@ afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
 beforeEach(async () => {
   process.env.DOCUMENT_KEY = 'ab'.repeat(32);
   process.env.DOCUMENTS_DIR = dir;
-  for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f), { force: true });
+  for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f), { recursive: true, force: true });
   await resetDb();
   student = await makeUser('student', 'student@alustudent.com');
   other = await makeUser('student', 'other@alustudent.com');
@@ -102,5 +102,22 @@ describe('erasing the account', () => {
     expect(Object.keys(res.body)).toEqual(['error']);
     expect(JSON.stringify(res.body)).not.toMatch(/at .*\.js|stack/i);
     expect(await count('SELECT count(*)::int AS n FROM users WHERE id = $1', [student.user.id])).toBe(1);
+  });
+});
+
+describe('the limit on checking the password for erasing', () => {
+  it('stops one account after 10 wrong passwords', async () => {
+    process.env.RATE_LIMIT_TEST = '1';
+    try {
+      // Each attempt names a different address so the per-address login limit does not answer first.
+      for (let i = 0; i < 10; i += 1) {
+        expect((await erase(student, { password: 'wrong', confirm: true, email: `try${i}@alustudent.com` })).status).toBe(401);
+      }
+      const blocked = await erase(student, { password: 'wrong', confirm: true, email: 'try10@alustudent.com' });
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.error).toMatch(/too many attempts/i);
+    } finally {
+      delete process.env.RATE_LIMIT_TEST;
+    }
   });
 });

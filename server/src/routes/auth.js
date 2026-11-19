@@ -5,8 +5,12 @@ import { q, pool } from '../db.js';
 import {
   signToken, isAllowedEmail, normalizeEmail, ALLOWED_DOMAINS, requireAuth, revokeSessions,
 } from '../middleware/auth.js';
-import { loginEmailLimiter, emailLimiter, authIpLimiter, passwordChangeLimiter } from '../middleware/rateLimit.js';
-import { hashPassword, checkPassword } from '../passwords.js';
+import {
+  loginEmailLimiter, emailLimiter, authIpLimiter, passwordChangeLimiter, accountPasswordLimiter,
+} from '../middleware/rateLimit.js';
+import {
+  hashPassword, checkPassword, passwordTooLong, PASSWORD_TOO_LONG,
+} from '../passwords.js';
 import { issueToken, consumeToken, tokenStatus } from '../services/authTokens.js';
 import { sendMail, mailAvailable } from '../services/mailer.js';
 import { removeMatterFiles } from '../services/documentStore.js';
@@ -22,6 +26,10 @@ router.get('/mail-status', authIpLimiter, (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ available: mailAvailable() });
 });
+
+// The log line for a failed send. It names the error and its code and never the message, because
+// an SMTP message can carry an address.
+const errorTag = (err) => [err?.name, err?.code].filter(Boolean).join(' ') || 'Error';
 
 // What a sign-in returns. It is small on purpose.
 function publicUser(u) {
@@ -86,16 +94,26 @@ async function sendVerificationEmail(user) {
 
 // POST /api/auth/register: students and staff with an ALU address only
 router.post('/register', authIpLimiter, async (req, res) => {
-  const { name, email, password, role } = req.body || {};
+  const { email, password, role } = req.body || {};
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   if (!name || !email || !password || !role) return res.status(400).json({ error: 'name, email, password and role are required' });
+  if (name.length > 100) return res.status(400).json({ error: 'Your name must be 100 characters or fewer.' });
   if (!['student', 'staff'].includes(role)) return res.status(400).json({ error: 'Role must be student or staff. Legal experts join by invitation only.' });
   if (!isAllowedEmail(email)) {
     return res.status(400).json({ error: `Sign-up is limited to the ALU community: ${ALLOWED_DOMAINS.map((d) => '@' + d).join(' or ')}` });
   }
   if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (passwordTooLong(password)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
   const existing = await q('SELECT id FROM users WHERE email = $1', [normalizeEmail(email)]);
-  if (existing.length) return res.status(400).json({ error: 'An account with this email already exists' });
+  // One answer for every existing address, verified or not, so the reply reveals nothing new.
+  // The wording points an unverified person to the link and the sign-in page.
+  if (existing.length) {
+    return res.status(400).json({
+      code: 'email_taken',
+      error: 'An account with this email already exists. If you have not verified it yet, check your email for the link or ask for a new one on the sign-in page.',
+    });
+  }
 
   const [user] = await q(
     'INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id, name, email, role',
@@ -114,7 +132,7 @@ router.post('/register', authIpLimiter, async (req, res) => {
   try {
     delivery = await sendVerificationEmail(user);
   } catch (err) {
-    console.error(`Could not send the verification email for user ${user.id}: ${err.message}`);
+    console.error(`Could not send the verification email for user ${user.id}: ${errorTag(err)}`);
     delivery = { failed: true };
   }
 
@@ -124,7 +142,9 @@ router.post('/register', authIpLimiter, async (req, res) => {
   });
 });
 
-// POST /api/auth/verify-email: use the link, prove the address and sign the person in.
+// POST /api/auth/verify-email: use the link and mark the address as proved. It never signs
+// anyone in. Whoever clicks the link may not be the person who registered the address, so the
+// reply carries no token and no user. The person signs in with their own password.
 // This route may say why a link was refused. The caller already holds the token, so
 // "already used" or "expired" tells them nothing new and each has a different next step.
 router.post('/verify-email', authIpLimiter, async (req, res) => {
@@ -143,20 +163,22 @@ router.post('/verify-email', authIpLimiter, async (req, res) => {
 
   // COALESCE keeps the first time the address was proved if a second link is used later.
   const [user] = await q(
-    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1 RETURNING id, name, email, role, session_version, deactivated_at',
+    'UPDATE users SET email_verified_at = COALESCE(email_verified_at, now()) WHERE id = $1 RETURNING id, deactivated_at',
     [consumed.user_id],
   );
   if (!user) return res.status(400).json({ error: 'That account no longer exists. Please register again.' });
 
-  // A switched-off account gets no token here, the same as at login. The session check would
-  // reject the token anyway. Refusing to make it keeps both ways in consistent.
+  // A switched-off account is refused here as it is at login.
   if (user.deactivated_at) {
     return res.status(403).json({
       error: 'This account is no longer active. If you think that is a mistake, contact the ALU Legal Companion team.',
     });
   }
 
-  res.json({ token: signToken(user), user: publicUser(user) });
+  res.json({
+    verified: true,
+    message: 'Your email address is verified. Sign in with your email and password.',
+  });
 });
 
 // The only answer resend-verification ever gives. It is a constant so a later edit cannot
@@ -171,20 +193,18 @@ router.post('/resend-verification', authIpLimiter, emailLimiter, async (req, res
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'email is required' });
 
-  const [user] = await q(
-    'SELECT id, name, email FROM users WHERE email = $1 AND email_verified_at IS NULL AND deactivated_at IS NULL',
-    [normalizeEmail(email)],
-  );
-  if (user) {
-    // A send failure must not change the reply. That would show the account exists.
-    try {
-      await sendVerificationEmail(user);
-    } catch (err) {
-      console.error(`Could not resend the verification email for user ${user.id}: ${err.message}`);
-    }
-  }
-
+  // The reply goes first. The lookup and the send run after it, so the time taken to answer
+  // never shows whether the address has an account. A failure is logged and changes nothing.
   res.json({ message: RESEND_REPLY });
+  try {
+    const [user] = await q(
+      'SELECT id, name, email FROM users WHERE email = $1 AND email_verified_at IS NULL AND deactivated_at IS NULL',
+      [normalizeEmail(email)],
+    );
+    if (user) await sendVerificationEmail(user);
+  } catch (err) {
+    console.error(`Could not resend the verification email: ${errorTag(err)}`);
+  }
 });
 
 // POST /api/auth/login
@@ -205,13 +225,16 @@ router.post('/login', authIpLimiter, loginEmailLimiter, async (req, res) => {
   // who already proved they know the password.
   // They are 403 and not 401. The password was right, so this is not a credential failure.
   // The website clears a saved login on 401 and keeps it on 403.
+  // The code lets the sign-in page tell the two apart without reading the text.
   if (!user.email_verified_at) {
     return res.status(403).json({
+      code: 'not_verified',
       error: 'Your email address is not verified yet. Check your inbox for the verification link we sent when you registered. You can ask for a new link from the sign-in page.',
     });
   }
   if (user.deactivated_at) {
     return res.status(403).json({
+      code: 'deactivated',
       error: 'This account is no longer active. If you think that is a mistake, contact the ALU Legal Companion team.',
     });
   }
@@ -248,7 +271,7 @@ router.post('/logout', requireAuth(), async (req, res) => {
 // Matters go with their files first. Saved guides and sign-in tokens and own questions go too.
 // A booking stays for the lawyer with no person and no topic.
 // Lawyers and admins are tied to published records so an admin closes theirs.
-router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), async (req, res) => {
+router.delete('/me', authIpLimiter, loginEmailLimiter, requireAuth(), accountPasswordLimiter, async (req, res) => {
   if (!['student', 'staff'].includes(req.user.role)) {
     return res.status(403).json({
       error: 'Accounts for lawyers and admins are tied to published records. Ask an admin to close yours.',
@@ -316,6 +339,7 @@ router.post('/change-password', authIpLimiter, requireAuth(), passwordChangeLimi
   if (typeof newPassword !== 'string' || newPassword.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
+  if (passwordTooLong(newPassword)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
   const [me] = await q('SELECT id, password_hash FROM users WHERE id = $1', [req.user.id]);
   if (!me || !(await checkPassword(String(currentPassword ?? ''), me.password_hash))) {
@@ -338,7 +362,7 @@ router.post('/change-password', authIpLimiter, requireAuth(), passwordChangeLimi
 // Nothing changes yet. The new address waits in pending_email and a link goes to it. The account keeps
 // working with the old address until the link is used, so a typo can never lock anyone out.
 // The current password is needed so that a stolen session alone cannot send an account somewhere else.
-router.post('/change-email', authIpLimiter, requireAuth(), emailLimiter, async (req, res) => {
+router.post('/change-email', authIpLimiter, requireAuth(), accountPasswordLimiter, emailLimiter, async (req, res) => {
   const { email: typed, current_password: currentPassword } = req.body || {};
   const email = normalizeEmail(typed);
   // The address is checked first so the caller learns the rule without having to get the password right.
@@ -384,7 +408,7 @@ router.post('/change-email', authIpLimiter, requireAuth(), emailLimiter, async (
         ].join('\n'),
       });
     } catch (err) {
-      console.error(`Could not send the change notice for user ${me.id}: ${err.message}`);
+      console.error(`Could not send the change notice for user ${me.id}: ${errorTag(err)}`);
     }
     try {
       await sendMail({
@@ -402,7 +426,7 @@ router.post('/change-email', authIpLimiter, requireAuth(), emailLimiter, async (
         ].join('\n'),
       });
     } catch (err) {
-      console.error(`Could not send the confirmation link for user ${me.id}: ${err.message}`);
+      console.error(`Could not send the confirmation link for user ${me.id}: ${errorTag(err)}`);
     }
   }
   res.json({ message: CHANGE_EMAIL_REPLY });
@@ -463,7 +487,7 @@ router.post('/confirm-email-change', authIpLimiter, async (req, res) => {
       ].join('\n'),
     });
   } catch (err) {
-    console.error(`Could not send the change notice for user ${user.id}: ${err.message}`);
+    console.error(`Could not send the change notice for user ${user.id}: ${errorTag(err)}`);
   }
   res.json({ token: signToken(user), user: publicUser(user) });
 });
@@ -503,12 +527,15 @@ router.post('/forgot-password', authIpLimiter, emailLimiter, async (req, res) =>
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'email is required' });
 
-  const [user] = await q(
-    'SELECT id, name, email FROM users WHERE email = $1 AND deactivated_at IS NULL',
-    [normalizeEmail(email)],
-  );
-  if (user) {
-    try {
+  // The reply goes first. The lookup and the send run after it, so the time taken to answer
+  // never shows whether the address has an account. A failure is logged and changes nothing.
+  res.json({ message: FORGOT_PASSWORD_REPLY });
+  try {
+    const [user] = await q(
+      'SELECT id, name, email FROM users WHERE email = $1 AND deactivated_at IS NULL',
+      [normalizeEmail(email)],
+    );
+    if (user) {
       // The old links are cancelled before the new one is made so the new one is not hit.
       await q(
         `UPDATE auth_tokens SET used_at = now()
@@ -516,12 +543,10 @@ router.post('/forgot-password', authIpLimiter, emailLimiter, async (req, res) =>
         [user.id],
       );
       await sendPasswordResetEmail(user);
-    } catch (err) {
-      console.error(`Could not send the password reset email for user ${user.id}: ${err.message}`);
     }
+  } catch (err) {
+    console.error(`Could not send the password reset email: ${errorTag(err)}`);
   }
-
-  res.json({ message: FORGOT_PASSWORD_REPLY });
 });
 
 // POST /api/auth/reset-password: use the link and set a new password. This signs the person in.
@@ -534,6 +559,7 @@ router.post('/reset-password', authIpLimiter, async (req, res) => {
   if (typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
+  if (passwordTooLong(password)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
   const consumed = await consumeToken(token, 'reset_password');
   if (!consumed) {
@@ -579,6 +605,7 @@ router.post('/redeem-invite', authIpLimiter, async (req, res) => {
   if (typeof password !== 'string' || password.length < 8) {
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
+  if (passwordTooLong(password)) return res.status(400).json({ error: PASSWORD_TOO_LONG });
 
   const invite = await consumeInvite(inviteToken);
   if (!invite) {
@@ -600,7 +627,10 @@ router.post('/redeem-invite', authIpLimiter, async (req, res) => {
   if (!user) {
     // No account was made, so the invitation is given back and not wasted.
     await releaseInvite(invite.id);
-    return res.status(400).json({ error: 'An account with this email already exists' });
+    return res.status(400).json({
+      code: 'email_taken',
+      error: 'An account with this email already exists. If you have not verified it yet, check your email for the link or ask for a new one on the sign-in page.',
+    });
   }
 
   res.status(201).json({ token: signToken(user), user: publicUser(user) });

@@ -51,12 +51,13 @@ describe('signing up', () => {
     }
   });
 
-  it('verifies the address from the emailed link and then signs the person in', async () => {
+  it('verifies the address from the emailed link without signing the person in', async () => {
     await register();
     const res = await verify();
     expect(res.status).toBe(200);
-    const me = await request(app).get('/api/auth/me').set(bearer(res.body.token));
-    expect(me.status).toBe(200);
+    expect(res.body).toEqual({ verified: true, message: expect.any(String) });
+    expect(res.body.token).toBeUndefined();
+    expect(res.body.user).toBeUndefined();
   });
 
   it('refuses an emailed link that was already used', async () => {
@@ -72,7 +73,9 @@ describe('signing up', () => {
 describe('signing in and out', () => {
   it('keeps an unverified account out until the link is used', async () => {
     await register();
-    expect((await login()).status).toBe(403);
+    const blocked = await login();
+    expect(blocked.status).toBe(403);
+    expect(blocked.body.code).toBe('not_verified');
     await verify();
     expect((await login()).status).toBe(200);
   });
@@ -89,7 +92,9 @@ describe('signing in and out', () => {
     await register();
     await verify();
     await q('UPDATE users SET deactivated_at = now()');
-    expect((await login()).status).toBe(403);
+    const res = await login();
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('deactivated');
   });
 
   it('never returns the password hash', async () => {
