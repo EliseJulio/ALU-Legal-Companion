@@ -62,10 +62,12 @@ router.get('/mine', requireAuth('student', 'staff'), async (req, res) => {
     `SELECT ${OWN_COLUMNS} FROM questions WHERE user_id = $1 ORDER BY created_at DESC, id DESC`, [req.user.id]));
 });
 
-// GET /api/questions/anon/:token : read the answer to an anonymous question. No login.
-router.get('/anon/:token', tokenLimiter, async (req, res) => {
+// POST /api/questions/anon/status : read the answer to an anonymous question. No login.
+// The code goes in the body, so it never appears in an address or a server log.
+// Registered before any /:id route so that "anon" is not read as a question id.
+router.post('/anon/status', tokenLimiter, async (req, res) => {
   const NOT_FOUND = { error: 'No question found for this token' };
-  const token = normalizeAnonToken(req.params.token);
+  const token = typeof req.body?.code === 'string' ? normalizeAnonToken(req.body.code) : null;
   if (!token) return res.status(404).json(NOT_FOUND);
   const [question] = await q(
     `SELECT ${OWN_COLUMNS} FROM questions WHERE anon_token = $1`, [hashAnonToken(token)]);

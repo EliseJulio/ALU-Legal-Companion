@@ -43,18 +43,33 @@ describe('asking a question without giving a name', () => {
 });
 
 describe('getting the answer back with the code', () => {
-  it('finds the question with the code, whatever the letter case or the dashes', async () => {
+  const check = (code) => request(app).post('/api/questions/anon/status').send({ code });
+
+  it('finds the question with the code in the body, whatever the letter case or the dashes', async () => {
     const { body } = await askAnon('Where do I go?');
     for (const typed of [body.anon_token, body.anon_token.toLowerCase(), body.anon_token.replaceAll('-', '')]) {
-      const res = await request(app).get(`/api/questions/anon/${typed}`);
+      const res = await check(typed);
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({ text: 'Where do I go?', status: 'open' });
       expect(res.body).not.toHaveProperty('anon_token');
     }
   });
 
-  it('answers 404 for a code that was never given', async () => {
-    const res = await request(app).get('/api/questions/anon/1234-5678-9ABC-DEF0');
+  it('no longer answers a read with the code in the address', async () => {
+    const { body } = await askAnon('Where do I go?');
+    const res = await request(app).get(`/api/questions/anon/${body.anon_token}`);
     expect(res.status).toBe(404);
+  });
+
+  it('answers 404 for a code that was never given', async () => {
+    const res = await check('1234-5678-9ABC-DEF0');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'No question found for this token' });
+  });
+
+  it('answers 404 for a missing or badly formed code, without reading the address', async () => {
+    expect((await request(app).post('/api/questions/anon/status').send({})).status).toBe(404);
+    expect((await check('not a code')).status).toBe(404);
+    expect((await request(app).post('/api/questions/anon/status').send({ code: 12345 })).status).toBe(404);
   });
 });
