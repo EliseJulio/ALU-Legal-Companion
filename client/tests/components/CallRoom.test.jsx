@@ -45,6 +45,25 @@ beforeEach(() => {
   useFullscreen.mockReturnValue({ full: false, pageFill: false, toggle: vi.fn() });
 });
 
+describe('when the lawyer is not ready', () => {
+  it('tells a refused guest they can ask to join again and offers the button', async () => {
+    const { onRetry } = show({ role: 'guest', call: fakeCall({ state: { phase: 'denied' } }) });
+    expect(screen.getByRole('status')).toHaveTextContent('The lawyer is not ready yet. You can ask to join again.');
+    await user().click(screen.getByRole('button', { name: 'Join again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the room is full when the service cannot take another connection', () => {
+    show({ role: 'guest', call: fakeCall({ state: { phase: 'failed', error: 'room_full' } }) });
+    expect(screen.getByRole('status')).toHaveTextContent('already has everyone it can hold');
+  });
+
+  it('says the lawyer lost their connection while the guest keeps the call', () => {
+    show({ role: 'guest', call: fakeCall({ state: { phase: 'live', peerAway: true } }) });
+    expect(screen.getByRole('status')).toHaveTextContent('The lawyer lost their connection');
+  });
+});
+
 describe('waiting to be let in', () => {
   it('tells the guest to wait and shows no call controls yet', () => {
     show({ role: 'guest', call: fakeCall({ state: { phase: 'waiting' } }) });

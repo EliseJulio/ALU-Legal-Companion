@@ -42,7 +42,6 @@ export function openSignal({ url, ticket, onMessage, onClose, WebSocketImpl = We
 
   return {
     send,
-    isOpen,
     // Tells the other person and closes. The close is not reported back.
     leave() {
       leaving = true;

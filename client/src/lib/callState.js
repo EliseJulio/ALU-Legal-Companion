@@ -8,6 +8,7 @@ export function initialCall(role) {
     role,
     phase: 'connecting',
     reconnecting: false,
+    peerAway: false,
     signalLost: false,
     peer: { mic: true, cam: true },
     peerLeft: false,
@@ -16,8 +17,8 @@ export function initialCall(role) {
   };
 }
 
-// Errors from the service that end the call. The others are shown nowhere and change nothing.
-const FATAL_CODES = new Set(['bad_ticket', 'too_large', 'rate']);
+// Errors that end the call. The other service errors are shown nowhere and change nothing.
+const FATAL_CODES = new Set(['bad_ticket', 'too_large', 'rate', 'room_full', 'bad_link']);
 
 function onReady(state, e) {
   const base = { ...state, signalLost: false };
@@ -27,7 +28,11 @@ function onReady(state, e) {
   return { ...base, phase: 'waiting' };
 }
 
+const STOPPED = new Set(['ended', 'denied', 'failed']);
+
 export function callReducer(state, e) {
+  // A failure stays on screen until the person leaves or tries again.
+  if (state.phase === 'failed' && e.type !== 'leave') return state;
   switch (e.type) {
     case 'ready':
       return onReady(state, e);
@@ -36,13 +41,18 @@ export function callReducer(state, e) {
         ? { ...state, phase: 'knock', peerLeft: false } : state;
     case 'admitted':
     case 'start':
-      return { ...state, phase: 'starting', peerLeft: false };
+      if (STOPPED.has(state.phase)) return state;
+      return { ...state, phase: 'starting', peerLeft: false, peerAway: false };
+    case 'peer-away':
+      return { ...state, peerAway: true };
+    case 'peer-back':
+      return { ...state, peerAway: false };
     case 'denied':
       return { ...state, phase: 'denied' };
     case 'peer-left':
       if (state.phase === 'ended') return state;
       if (state.role === 'host') return { ...state, phase: 'lobby', reconnecting: false, peerLeft: true };
-      return { ...state, phase: 'ended', reason: 'peer-left' };
+      return { ...state, phase: 'ended', reason: 'peer-left', peerAway: false };
     case 'host-ended':
       return { ...state, phase: 'ended', reason: 'host-ended' };
     case 'connected':

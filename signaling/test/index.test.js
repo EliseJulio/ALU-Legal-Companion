@@ -199,8 +199,8 @@ describe('worker websocket', () => {
     expect(await host.next()).toEqual({ type: 'knock' });
 
     host.ws.send(JSON.stringify({ type: 'admit' }));
-    expect(await guest.next()).toEqual({ type: 'admitted' });
-    expect(await host.next()).toEqual({ type: 'start' });
+    expect(await guest.next()).toMatchObject({ type: 'admitted' });
+    expect(await host.next()).toMatchObject({ type: 'start' });
 
     guest.ws.send(JSON.stringify({ type: 'signal', data: { mode: 'audio' } }));
     expect(await host.next()).toEqual({ type: 'signal', data: { mode: 'audio' } });

@@ -33,6 +33,8 @@ const FAILED = {
   bad_ticket: 'This call could not be opened. Go back and press Join again.',
   too_large: 'This call could not be opened. Go back and press Join again.',
   rate: 'Too many messages were sent. Go back and press Join again.',
+  room_full: 'This call already has everyone it can hold. Close other tabs of it and join again.',
+  bad_link: 'This call could not be opened. Go back and press Join again.',
 };
 
 const NOTICES = {
@@ -66,9 +68,10 @@ export default function CallRoom({ reply, audioOnly, startMuted, onLeft, onRetry
   let status = STATUS[state.phase];
   if (state.phase === 'ended') status = ENDED[state.reason] || ENDED.left;
   if (state.phase === 'failed') status = FAILED[state.error] || FAILED.media;
-  if (state.phase === 'denied') status = 'The lawyer could not take your call now. You can book another time.';
+  if (state.phase === 'denied') status = 'The lawyer is not ready yet. You can ask to join again.';
   if (isHost && state.phase === 'lobby' && state.peerLeft) status = 'The other person left the call. You are still in the room.';
   if (state.phase === 'live' && state.reconnecting) status = 'The connection is weak. Trying to reconnect…';
+  else if (state.phase === 'live' && state.peerAway) status = 'The lawyer lost their connection. Waiting for them to come back…';
   else if (state.phase === 'live' && state.signalLost) status = 'Reconnecting to the room. The call goes on.';
 
   const peerVideoOff = state.phase === 'live' && !state.peer.cam;

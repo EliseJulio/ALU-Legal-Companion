@@ -127,8 +127,8 @@ describe('admission', () => {
     const host = await join(room, 'host');
     const guest = await join(room, 'guest');
     await send(room, host, { type: 'admit' });
-    expect(guest.last()).toEqual({ type: 'admitted' });
-    expect(host.last()).toEqual({ type: 'start' });
+    expect(guest.last()).toMatchObject({ type: 'admitted', gen: expect.any(Number) });
+    expect(host.last()).toMatchObject({ type: 'start', gen: expect.any(Number) });
   });
 
   it('deny sends denied then closes the guest with 4003', async () => {
@@ -221,10 +221,10 @@ describe('admission', () => {
 
 // A clock the test moves by hand, so the 60 second grace needs no waiting.
 function timedRoom() {
-  const { room } = newRoom();
+  const { room, state } = newRoom();
   const clock = { t: 1_000_000 };
   room.now = () => clock.t;
-  return { room, clock };
+  return { room, clock, state };
 }
 
 describe('a guest who leaves must knock again', () => {
@@ -276,7 +276,7 @@ describe('a guest who leaves must knock again', () => {
     clock.t += 250_000;
     const third = await join(room, 'guest');
     expect(third.types()).toEqual(['ready', 'admitted']);
-    expect(host.last()).toEqual({ type: 'start' });
+    expect(host.last().type).toBe('start');
   });
 
   it('keeps admission for a takeover made long after a drop that was already settled', async () => {
@@ -479,46 +479,57 @@ describe('ready admitted flag', () => {
   });
 });
 
-describe('deny sticks', () => {
-  it('refuses a denied guest who was admitted and reconnects', async () => {
-    const { room } = newRoom();
+describe('deny is not final', () => {
+  it('lets a guest knock again after the cool-down', async () => {
+    const { room, clock } = timedRoom();
     const host = await join(room, 'host');
     const guest = await join(room, 'guest');
-    await send(room, host, { type: 'admit' });
     await send(room, host, { type: 'deny' });
-    const ticket = await makeTicket({ role: 'guest' });
-    const again = new FakeSocket();
-    room.attach(again, ROOM);
-    await send(room, again, { type: 'hello', ticket });
-    expect(again.sent).toEqual([{ type: 'denied' }]);
-    expect(again.closed).toBe(4003);
-    await send(room, again, { type: 'signal', data: { sdp: 'x' } });
-    expect(host.types()).not.toContain('signal');
-    expect(guest.closed).toBe(4003);
+    expect(guest.last()).toEqual({ type: 'denied' });
+    clock.t += 10_000;
+    const again = await join(room, 'guest');
+    expect(again.types()).toEqual(['ready']);
+    expect(again.closed).toBeNull();
+    expect(host.last()).toEqual({ type: 'knock' });
   });
 
-  it('keeps the denial when the object is recreated on the same storage', async () => {
-    const { room, state } = newRoom();
+  it('refuses a knock inside 10 seconds of a deny and does not knock the host', async () => {
+    const { room, clock } = timedRoom();
     const host = await join(room, 'host');
     await join(room, 'guest');
     await send(room, host, { type: 'deny' });
-    const recreated = new CallRoom(state, env);
-    await recreated.ready;
-    const again = await join(recreated, 'guest');
-    expect(again.sent).toEqual([{ type: 'denied' }]);
-    expect(again.closed).toBe(4003);
-  });
-
-  it('refuses a never admitted guest after a deny and does not knock', async () => {
-    const { room } = newRoom();
-    const host = await join(room, 'host');
-    await join(room, 'guest');
-    await send(room, host, { type: 'deny' });
+    clock.t += 9_999;
     const before = host.sent.length;
     const again = await join(room, 'guest');
     expect(again.sent).toEqual([{ type: 'denied' }]);
     expect(again.closed).toBe(4003);
     expect(host.sent.length).toBe(before);
+  });
+
+  it('a guest who was admitted and then denied is no longer admitted', async () => {
+    const { room, clock } = timedRoom();
+    const host = await join(room, 'host');
+    await join(room, 'guest');
+    await send(room, host, { type: 'admit' });
+    await send(room, host, { type: 'deny' });
+    clock.t += 10_000;
+    const again = await join(room, 'guest');
+    expect(again.sent[0].admitted).toBe(false);
+    await send(room, again, { type: 'signal', data: { sdp: 'x' } });
+    expect(again.last()).toEqual({ type: 'error', code: 'not_admitted' });
+  });
+
+  it('does not keep a denial in storage', async () => {
+    const { room, state, clock } = timedRoom();
+    const host = await join(room, 'host');
+    await join(room, 'guest');
+    await send(room, host, { type: 'deny' });
+    clock.t += 10_000;
+    const recreated = new CallRoom(state, env);
+    await recreated.ready;
+    const again = await join(recreated, 'guest');
+    expect(again.sent[0].type).toBe('ready');
+    expect(again.closed).toBeNull();
   });
 
   it('refuses a host admit after a deny', async () => {
@@ -539,16 +550,79 @@ describe('deny sticks', () => {
     expect(host2.sent[0].type).toBe('ready');
     expect(host2.closed).toBeNull();
   });
+});
 
-  it('resets when the alarm fires', async () => {
+describe('admit is idempotent', () => {
+  it('a second admit sends nothing', async () => {
     const { room } = newRoom();
     const host = await join(room, 'host');
-    await join(room, 'guest');
-    await send(room, host, { type: 'deny' });
-    await room.alarm();
     const guest = await join(room, 'guest');
-    expect(guest.sent[0].type).toBe('ready');
-    expect(guest.closed).toBeNull();
+    await send(room, host, { type: 'admit' });
+    const h = host.sent.length;
+    const g = guest.sent.length;
+    await send(room, host, { type: 'admit' });
+    expect(host.sent.length).toBe(h);
+    expect(guest.sent.length).toBe(g);
+  });
+
+  it('tells the host to start with a new gen when a new guest socket takes over', async () => {
+    const { room } = newRoom();
+    const host = await join(room, 'host');
+    const guest = await join(room, 'guest');
+    await send(room, host, { type: 'admit' });
+    const first = host.last().gen;
+    const again = await join(room, 'guest');
+    expect(host.last()).toEqual({ type: 'start', gen: first + 1 });
+    expect(again.last()).toEqual({ type: 'admitted', gen: first + 1 });
+    expect(guest.closed).toBe(4002);
+  });
+
+  it('a second hello from the same socket changes no gen and sends no start', async () => {
+    const { room } = newRoom();
+    const host = await join(room, 'host');
+    const guest = await join(room, 'guest');
+    await send(room, host, { type: 'admit' });
+    const h = host.sent.length;
+    await send(room, guest, { type: 'hello', ticket: await makeTicket({ role: 'guest' }) });
+    expect(host.sent.length).toBe(h);
+  });
+});
+
+describe('a socket that closes during hello', () => {
+  it('is not installed as a peer', async () => {
+    const { room } = newRoom();
+    const host = await join(room, 'host');
+    const ws = new FakeSocket();
+    room.attach(ws, ROOM);
+    const pending = send(room, ws, { type: 'hello', ticket: await makeTicket({ role: 'guest' }) });
+    room.onClose(ws);
+    await pending;
+    expect(room.slots.guest).toBeNull();
+    expect(host.types()).not.toContain('knock');
+  });
+});
+
+describe('state that survives an eviction', () => {
+  it('keeps an admission inside the grace window', async () => {
+    const { room, state } = newRoom();
+    const host = await join(room, 'host');
+    const guest = await join(room, 'guest');
+    await send(room, host, { type: 'admit' });
+    room.onClose(guest);
+    const recreated = new CallRoom(state, env);
+    await recreated.ready;
+    const again = await join(recreated, 'guest');
+    expect(again.sent[0].admitted).toBe(true);
+  });
+
+  it('never moves the alarm earlier than a later ticket set it', async () => {
+    const { room, state } = newRoom();
+    const now = Math.floor(Date.now() / 1000);
+    await join(room, 'host', { exp: now + 900 });
+    const recreated = new CallRoom(state, env);
+    await recreated.ready;
+    await join(recreated, 'guest', { exp: now + 300 });
+    expect(state.calls.alarms).toEqual([(now + 900) * 1000]);
   });
 });
 
@@ -561,21 +635,21 @@ describe('reconnect during an admitted call', () => {
     return { room, host, guest };
   }
 
-  it('guest reconnect gives the guest ready then admitted and the host start', async () => {
+  it('guest takeover gives the guest ready then admitted and the host a new start', async () => {
     const { room, host, guest } = await admittedCall();
     const hostBefore = host.sent.length;
     const again = await join(room, 'guest');
     expect(again.types()).toEqual(['ready', 'admitted']);
-    expect(host.sent.slice(hostBefore)).toEqual([{ type: 'start' }]);
+    expect(host.sent.slice(hostBefore).map((m) => m.type)).toEqual(['start']);
     expect(guest.closed).toBe(4002);
   });
 
-  it('host reconnect gives the host ready then start and the guest admitted', async () => {
+  it('host takeover gives the host ready then start and the guest a new admitted', async () => {
     const { room, guest } = await admittedCall();
     const guestBefore = guest.sent.length;
     const again = await join(room, 'host');
     expect(again.types()).toEqual(['ready', 'start']);
-    expect(guest.sent.slice(guestBefore)).toEqual([{ type: 'admitted' }]);
+    expect(guest.sent.slice(guestBefore).map((m) => m.type)).toEqual(['admitted']);
   });
 
   it('does not fire when the other side is absent', async () => {
@@ -594,7 +668,7 @@ describe('reconnect during an admitted call', () => {
     expect(host.types()).toEqual(['ready', 'knock']);
   });
 
-  it('does not fire on a reconnect after deny', async () => {
+  it('does not fire on a reconnect right after deny', async () => {
     const { room, host } = await admittedCall();
     await send(room, host, { type: 'deny' });
     const before = host.sent.length;

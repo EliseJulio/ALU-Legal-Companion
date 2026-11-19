@@ -20,6 +20,8 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
   const controls = useRef(null);
   // False once the page has been left. A permission prompt can still be open then.
   const mounted = useRef(false);
+  // True while a permission prompt is open, so a second press does not ask again.
+  const busy = useRef(false);
 
   useEffect(() => {
     if (video.current && video.current.srcObject !== stream) video.current.srcObject = stream;
@@ -39,6 +41,16 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
   }, []);
 
   async function start() {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      await open();
+    } finally {
+      busy.current = false;
+    }
+  }
+
+  async function open() {
     setProblem(null);
     const devices = navigator.mediaDevices;
     if (!devices?.getUserMedia) {
@@ -80,21 +92,29 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
   }
 
   async function toggleCam() {
+    if (busy.current) return;
     if (cam) {
       stream.getVideoTracks().forEach((t) => t.stop());
       setCam(false);
       onAudioOnly(true);
       return;
     }
+    busy.current = true;
     try {
       const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getVideoTracks().forEach((t) => stream.removeTrack(t));
+      if (!mounted.current) {
+        fresh.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream.getVideoTracks().forEach((t) => { t.stop(); stream.removeTrack(t); });
       stream.addTrack(fresh.getVideoTracks()[0]);
       setCam(true);
       setProblem(null);
       onAudioOnly(false);
     } catch {
       setProblem('no-camera');
+    } finally {
+      busy.current = false;
     }
   }
 
@@ -110,7 +130,7 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
     return (
       <div className="w-full">
         <button type="button" onClick={start} className={BUTTON_OUTLINE}>Check camera and microphone</button>
-        {problem && <p className="mt-2 text-sm text-muted-foreground">{MESSAGES[problem]}</p>}
+        <p role="status" className="mt-2 text-sm text-muted-foreground">{problem ? MESSAGES[problem] : null}</p>
       </div>
     );
   }
@@ -127,7 +147,7 @@ export default function JoinPreview({ audioOnly, onAudioOnly, startMuted, onStar
           <ControlButton on={cam} onLabel="Turn off camera" offLabel="Turn on camera" iconOn="videocam" iconOff="videocam_off" onClick={toggleCam} />
         )}
       </div>
-      {problem && <p className="mt-2 text-sm text-muted-foreground">{MESSAGES[problem]}</p>}
+      <p role="status" className="mt-2 text-sm text-muted-foreground">{problem ? MESSAGES[problem] : null}</p>
     </div>
   );
 }

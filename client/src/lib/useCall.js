@@ -8,9 +8,13 @@ import { cameraSends, nextCamera } from '@/lib/callMedia';
 
 const RETRY_MS = [1000, 2000, 4000, 8000];
 const DROP_GRACE_MS = 4000;
+// How long the guest keeps the call when the lawyer's link drops, before it counts as ended.
+const PEER_GRACE_MS = 8000;
 
 // Close codes the service uses to end a connection for a reason.
 const CLOSE_REASONS = { 4002: 'replaced', 4003: 'denied', 4006: 'expired' };
+// Close codes that stop the call with a message and are never retried.
+const FATAL_CLOSES = { 4004: 'too_large', 4005: 'rate', 4007: 'room_full' };
 
 function stopStream(stream) {
   stream?.getTracks().forEach((t) => t.stop());
@@ -69,9 +73,11 @@ export function useCall({ reply, audioOnly, startMuted }) {
     ref.current = {
       link: null, pc: null, stream: null, video: null, videoSender: null, queue: [], session: 0, tries: 0,
       making: false, ignore: false, gotRemote: false, attached: false, left: false, dropTimer: null, retryTimer: null,
+      peerTimer: null, gen: undefined, micOn: null, camOn: null, camBusy: false, phase: 'connecting',
     };
   }
   const c = ref.current;
+  c.phase = state.phase;
 
   const sendSignal = useCallback((data) => c.link?.send({ type: 'signal', data }), [c]);
   const sendPeerState = useCallback(() => {
@@ -88,7 +94,10 @@ export function useCall({ reply, audioOnly, startMuted }) {
   }, [sendPeerState]);
 
   const closeMedia = useCallback(() => {
+    // A permission prompt still open for an older session is ignored when it answers.
+    c.session += 1;
     clearTimeout(c.dropTimer);
+    clearTimeout(c.peerTimer);
     c.pc?.close();
     c.pc = null;
     stopStream(c.stream);
@@ -133,26 +142,35 @@ export function useCall({ reply, audioOnly, startMuted }) {
     }
   }, [c, closeMedia, polite, sendSignal]);
 
+  // A session that is connected or still connecting. A restart would only interrupt it.
+  const sessionAlive = useCallback(() => {
+    const state = c.pc?.iceConnectionState;
+    return Boolean(c.pc && c.stream && state !== 'failed' && state !== 'closed');
+  }, [c]);
+
   const startSession = useCallback(async () => {
-    const mine = c.session + 1;
-    c.session = mine;
     closeMedia();
+    const mine = c.session;
     let media;
     try {
       media = await getMedia(audioOnly);
     } catch (err) {
-      dispatch({ type: 'media-error', kind: mediaErrorKind(err) });
+      if (!c.left && mine === c.session) dispatch({ type: 'media-error', kind: mediaErrorKind(err) });
       return;
     }
     if (c.left || mine !== c.session) { stopStream(media.stream); return; }
     setNotice(media.noCamera ? 'no-camera' : null);
     c.stream = media.stream;
+    // The person's microphone and camera choices stay across a restart.
+    if (c.camOn === false) media.stream.getVideoTracks().forEach((t) => { t.stop(); media.stream.removeTrack(t); });
     c.video = media.stream.getVideoTracks()[0] || null;
     watchCamera(c.video);
     setFacing(c.video?.getSettings?.().facingMode || 'user');
     setLocal(media.stream);
-    media.stream.getAudioTracks().forEach((t) => { t.enabled = !startMuted; });
-    setMic(!startMuted);
+    const micOn = c.micOn ?? !startMuted;
+    c.micOn = micOn;
+    media.stream.getAudioTracks().forEach((t) => { t.enabled = micOn; });
+    setMic(micOn);
     setCam(Boolean(c.video));
 
     const pc = new RTCPeerConnection({ iceServers: reply.ice_servers });
@@ -203,7 +221,8 @@ export function useCall({ reply, audioOnly, startMuted }) {
   useEffect(() => {
     c.left = false;
     function connect() {
-      c.link = openSignal({
+      try {
+        c.link = openSignal({
         url: reply.signal_url,
         ticket: reply.ticket,
         onMessage(m) {
@@ -217,10 +236,28 @@ export function useCall({ reply, audioOnly, startMuted }) {
               break;
             case 'admitted':
             case 'start':
+              if (c.phase === 'ended' || c.phase === 'denied' || c.phase === 'failed') break;
+              clearTimeout(c.peerTimer);
+              // The same peer on a live connection needs nothing. A new peer gets a new offer.
+              if (sessionAlive() && m.gen === c.gen) {
+                dispatch({ type: 'peer-back' });
+                break;
+              }
+              c.gen = m.gen;
               dispatch(m);
               startSession();
               break;
             case 'peer-left':
+              // The guest keeps the call for a moment in case the lawyer's link comes straight back.
+              if (polite && sessionAlive()) {
+                dispatch({ type: 'peer-away' });
+                clearTimeout(c.peerTimer);
+                c.peerTimer = setTimeout(() => { closeMedia(); dispatch(m); }, PEER_GRACE_MS);
+                break;
+              }
+              closeMedia();
+              dispatch(m);
+              break;
             case 'denied':
               closeMedia();
               dispatch(m);
@@ -237,6 +274,11 @@ export function useCall({ reply, audioOnly, startMuted }) {
         onClose(code) {
           if (c.left) return;
           if (code === 4001) { dispatch({ type: 'server-error', code: 'bad_ticket' }); return; }
+          if (FATAL_CLOSES[code]) {
+            closeMedia();
+            dispatch({ type: 'server-error', code: FATAL_CLOSES[code] });
+            return;
+          }
           if (CLOSE_REASONS[code]) {
             closeMedia();
             dispatch(code === 4003 ? { type: 'denied' } : { type: 'closed', reason: CLOSE_REASONS[code] });
@@ -247,7 +289,12 @@ export function useCall({ reply, audioOnly, startMuted }) {
           c.retryTimer = setTimeout(connect, RETRY_MS[c.tries]);
           c.tries += 1;
         },
-      });
+        });
+      } catch {
+        // A bad address makes the browser throw at once.
+        closeMedia();
+        dispatch({ type: 'server-error', code: 'bad_link' });
+      }
     }
     connect();
     return () => {
@@ -270,27 +317,34 @@ export function useCall({ reply, audioOnly, startMuted }) {
     const track = c.stream?.getAudioTracks()[0];
     if (!track) return;
     track.enabled = !track.enabled;
+    c.micOn = track.enabled;
     setMic(track.enabled);
     sendPeerState();
   }, [c, sendPeerState]);
 
   // Turning the camera off stops it so the light goes out. Turning it on asks for it again.
   const toggleCam = useCallback(async () => {
-    if (!c.videoSender || !c.stream) return;
-    if (c.video && c.video.readyState === 'live') {
-      c.stream.removeTrack(c.video);
-      c.video.stop();
-      c.video = null;
-      await c.videoSender.replaceTrack(null);
-      setCam(false);
-      setNotice((n) => (n === 'camera-stalled' ? null : n));
-      sendPeerState();
-      return;
-    }
+    if (!c.videoSender || !c.stream || c.camBusy) return;
+    c.camBusy = true;
     try {
+      if (c.video && c.video.readyState === 'live') {
+        c.stream.removeTrack(c.video);
+        c.video.stop();
+        c.video = null;
+        c.camOn = false;
+        await c.videoSender.replaceTrack(null);
+        setCam(false);
+        setNotice((n) => (n === 'camera-stalled' ? null : n));
+        sendPeerState();
+        return;
+      }
+      const mine = c.session;
       const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
       const track = fresh.getVideoTracks()[0];
+      if (c.left || mine !== c.session || !c.stream) { fresh.getTracks().forEach((t) => t.stop()); return; }
+      if (c.video) { c.stream.removeTrack(c.video); c.video.stop(); }
       c.video = track;
+      c.camOn = true;
       watchCamera(track);
       c.stream.addTrack(track);
       await c.videoSender.replaceTrack(track);
@@ -299,6 +353,8 @@ export function useCall({ reply, audioOnly, startMuted }) {
       sendPeerState();
     } catch (err) {
       setNotice(err?.name === 'NotAllowedError' ? 'camera-blocked' : 'no-camera');
+    } finally {
+      c.camBusy = false;
     }
   }, [c, sendPeerState, watchCamera]);
 

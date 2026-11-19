@@ -23,7 +23,11 @@ export function useFullscreen(ref) {
     const el = ref.current;
     if (!el) return;
     if (document.fullscreenElement) {
-      await document.exitFullscreen();
+      try {
+        await document.exitFullscreen();
+      } catch {
+        // The browser was already leaving full screen.
+      }
       return;
     }
     if (pageFill) {

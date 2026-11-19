@@ -45,6 +45,8 @@ export default function JoinCall() {
   const [reply, setReply] = useState(null);
   const [error, setError] = useState(null);
   const [joining, setJoining] = useState(false);
+  // A signed-in person whose booking was made without their name needs its code too.
+  const [needsCode, setNeedsCode] = useState(false);
 
   const code = passedCode || typedCode.trim();
   const isLawyer = user?.role === 'legal_expert';
@@ -58,11 +60,12 @@ export default function JoinCall() {
     setError(null);
     setReply(null);
     try {
-      // A signed-in person sends the login. An anonymous booker sends the code in the body only.
+      // A signed-in person sends the login. The code, when there is one, goes in the body only.
       const body = { audio_only: audioOnly };
-      if (!user && code) body.anon_token = code;
+      if (code) body.anon_token = code;
       setReply(await apiPost(`/bookings/${encodeURIComponent(id)}/join`, body, { anonymous: !user }));
     } catch (err) {
+      if (user && !code && err?.status === 404) setNeedsCode(true);
       setError(err);
     } finally {
       setJoining(false);
@@ -80,8 +83,9 @@ export default function JoinCall() {
         </div>
       )}
 
-      {!user && !passedCode && reply?.provider !== 'own' && (
+      {(!user || needsCode) && !passedCode && reply?.provider !== 'own' && (
         <div className="mt-6 max-w-form">
+          {needsCode && <p className="mb-2 text-sm text-muted-foreground">This booking was made without your name. Enter its code.</p>}
           <label htmlFor="join-code" className="block text-sm font-semibold">Your booking code</label>
           <input
             id="join-code"
@@ -148,8 +152,11 @@ export default function JoinCall() {
             </a>
           </div>
         )}
-        {reply?.provider === 'daily' && !frame && (
-          <p className="max-w-reading font-semibold text-ink">The call could not be opened. Try again in a moment.</p>
+        {((reply?.provider === 'daily' && !frame) || (reply?.provider === 'meet' && !meet)) && (
+          <div className="max-w-reading">
+            <p className="font-semibold text-ink">The call could not be opened. Try again in a moment.</p>
+            <button type="button" onClick={() => setReply(null)} className={`${BUTTON_OUTLINE} mt-3`}>Try again</button>
+          </div>
         )}
       </div>
 
