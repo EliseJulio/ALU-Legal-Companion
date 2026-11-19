@@ -60,7 +60,7 @@ function CrashShell() {
         </div>
       </main>
       <footer className="px-4 py-4 text-center text-sm text-muted-foreground">
-        Legal information, not legal advice.
+        Legal information not legal advice.
       </footer>
     </div>
   );

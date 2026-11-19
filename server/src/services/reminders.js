@@ -67,7 +67,7 @@ function reminderText(name, dueOn, daysLeft) {
     'This reminder is a courtesy. Meeting the deadline remains your responsibility.',
     'If you are unsure what it requires, the Access to Justice Bureau of your district gives free advice.',
     '',
-    'Legal information, not legal advice.',
+    'Legal information not legal advice.',
   ].join('\n');
 }
 

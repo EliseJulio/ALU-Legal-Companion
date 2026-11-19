@@ -109,7 +109,7 @@ export default function RouteAnswer({ routeId, onBack }) {
         <Link to="/ask" className={BUTTON_OUTLINE}>Ask a legal expert</Link>
       </div>
       <p className="mt-4 text-xs text-muted-foreground">
-        Legal information, not legal advice. The office, steps and deadline come from a matter an admin published.
+        Legal information not legal advice. The office, steps and deadline come from a matter an admin published.
       </p>
     </div>
   );

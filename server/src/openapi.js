@@ -1107,7 +1107,7 @@ export const openapi = {
       '',
       'Sign in with POST /auth/login. Use "Authorize" and paste the token. Routes marked with a lock need it.',
       'Every error is { "error": "a message a person can act on" }.',
-      'Legal information, not legal advice.',
+      'Legal information not legal advice.',
     ].join('\n'),
   },
   servers: [{ url: '/api', description: 'This server' }],

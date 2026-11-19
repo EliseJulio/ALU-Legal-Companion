@@ -144,6 +144,6 @@ function reminderText(r) {
     '',
     `Open your appointments: ${link}`,
     '',
-    'Legal information, not legal advice.',
+    'Legal information not legal advice.',
   ].join('\n');
 }

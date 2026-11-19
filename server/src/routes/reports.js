@@ -211,7 +211,7 @@ function resolvedMail(report, reply) {
       '',
       'This address was used only for this message and has now been removed from our records.',
       '',
-      'Legal information, not legal advice.',
+      'Legal information not legal advice.',
     ].join('\n'),
   };
 }

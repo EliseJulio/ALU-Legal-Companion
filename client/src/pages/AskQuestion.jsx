@@ -107,7 +107,7 @@ export default function AskQuestion() {
       <h1 className={`mt-6 ${PAGE_TITLE}`}>Ask a human legal expert</h1>
       <p className="mt-4 max-w-reading text-muted-foreground">
         Send a written question to a human legal expert. A response is not guaranteed. Legal
-        information, not legal advice.
+        information not legal advice.
       </p>
 
       {/* Two columns on a wide screen: the question on the left, the explainer on the right. */}

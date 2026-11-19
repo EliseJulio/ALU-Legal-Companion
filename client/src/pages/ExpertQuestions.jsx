@@ -51,7 +51,7 @@ function AnswerForm({ question, onDone }) {
         className={FORM_TEXTAREA}
       />
       <p id="answer-note" className="mt-2 text-sm text-muted-foreground">
-        Required. Legal information, not legal advice. Use confirmed references only.
+        Required. Legal information not legal advice. Use confirmed references only.
       </p>
       {error && <ErrorNotice error={error} className="mt-2" />}
       <button type="submit" aria-disabled={busy || undefined} aria-busy={busy} className={`${BUTTON_PRIMARY} mt-3`}>
