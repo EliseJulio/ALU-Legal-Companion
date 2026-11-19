@@ -11,6 +11,8 @@
 // transport is configured. If the choice at the bottom of this file is ever changed by mistake
 // it fails loudly in development. It does not write live links into a production log.
 import nodemailer from 'nodemailer';
+import { kigaliToday } from './kigali.js';
+import { reserveOptionalSend, releaseSend, countSend, budgetReachedError } from './emailBudget.js';
 
 // This address can never be registered, so if it appears in a real mailbox MAIL_FROM was not set.
 const DEFAULT_FROM = 'ALU Legal Companion <no-reply@alu-legal.invalid>';
@@ -89,11 +91,29 @@ async function sendViaSmtp({ to, subject, text }) {
   return Object.freeze({ delivered: true });
 }
 
-export async function sendMail({ to, subject, text } = {}) {
+// Every send is counted for the day's email budget. Essential mail (sign-in, reset and similar)
+// is always sent. Optional mail (reminders and change notices) is refused with the budget code
+// once the day's budget is used up. Its place in the budget is given back if the send fails.
+export async function sendMail({ to, subject, text, optional = false } = {}) {
   if (!to || !subject || !text) {
     throw new Error('sendMail requires to, subject and text');
   }
-  return isRealTransport()
-    ? sendViaSmtp({ to, subject, text })
-    : sendViaTerminal({ to, subject, text });
+  const day = kigaliToday();
+  if (optional && !(await reserveOptionalSend(day))) {
+    throw budgetReachedError();
+  }
+  let result;
+  try {
+    result = isRealTransport()
+      ? await sendViaSmtp({ to, subject, text })
+      : sendViaTerminal({ to, subject, text });
+  } catch (err) {
+    if (optional) await releaseSend(day).catch(() => {});
+    throw err;
+  }
+  if (!optional) {
+    // The message has gone. A failed count must not turn that into an error for the caller.
+    await countSend(day).catch((err) => console.error('[mail] could not count a send', { error: err.code || err.name }));
+  }
+  return result;
 }
