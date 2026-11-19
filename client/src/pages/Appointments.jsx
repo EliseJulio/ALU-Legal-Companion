@@ -6,7 +6,11 @@ import { useAuth } from '@/lib/AuthContext';
 import { canOwnActivity, hasRole } from '@/lib/auth';
 import { useNow } from '@/lib/useNow';
 import { useScrollToHash } from '@/lib/useScrollToHash';
-import { consultItem } from '@/lib/schedule';
+import { consultItem, longDay } from '@/lib/schedule';
+import { canCancel, cancelOwnBooking, answerProposal, rescheduleBooking } from '@/lib/bookings';
+import { ScheduleRow } from '@/components/ScheduleItem';
+import CancelConsultation from '@/components/CancelConsultation';
+import TimeActions from '@/components/ConsultTimeReply';
 import OwnerOnly from '@/components/OwnerOnly';
 import Breadcrumb from '@/components/Breadcrumb';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -15,7 +19,7 @@ import { BUTTON_OUTLINE, CARD, PAGE_TITLE } from '@/lib/ui';
 
 // The student's consultations in three lists. The Calendar shows the same ones by day.
 function AppointmentList() {
-  const { data, error, loading } = useApi('/bookings/mine', LIVE);
+  const { data, error, loading, refetch } = useApi('/bookings/mine', LIVE);
   const now = useNow();
   const items = useMemo(
     () => (data ?? []).map((b) => consultItem(b, now)).filter(Boolean),
@@ -36,7 +40,32 @@ function AppointmentList() {
     );
   }
 
-  return <AppointmentGroups items={items} />;
+  // A request or an accepted time can be cancelled. The list is loaded again after a cancel.
+  return (
+    <AppointmentGroups
+      items={items}
+      renderRow={(item) => (
+        <>
+          <ScheduleRow item={item} />
+          <TimeActions
+            booking={item}
+            className="mt-3"
+            answer={(action) => answerProposal(item.id, action)}
+            move={(iso) => rescheduleBooking(item.id, iso)}
+            onChanged={refetch}
+          />
+          {canCancel(item) && (
+            <CancelConsultation
+              className="mt-3"
+              when={`${longDay(item.date)}${item.time ? ` at ${item.time}` : ''}`}
+              onCancel={() => cancelOwnBooking(item.id)}
+              onDone={refetch}
+            />
+          )}
+        </>
+      )}
+    />
+  );
 }
 
 export default function Appointments() {

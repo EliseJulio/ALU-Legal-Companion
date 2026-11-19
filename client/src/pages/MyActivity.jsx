@@ -9,6 +9,9 @@ import Breadcrumb from '@/components/Breadcrumb';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import MeetLink from '@/components/MeetLink';
+import CancelConsultation from '@/components/CancelConsultation';
+import { canCancel, cancelOwnBooking, answerProposal, rescheduleBooking } from '@/lib/bookings';
+import TimeActions from '@/components/ConsultTimeReply';
 import StatusPill from '@/components/StatusPill';
 import { bookingStatusStep, readableSlot } from '@/lib/bookings';
 import { readableDate } from '@/lib/dates';
@@ -108,7 +111,31 @@ function BookingDetail({ booking, step }) {
   );
 }
 
-function BookingTable({ bookings }) {
+// The time actions (a suggested time, a move) and the cancel control for one booking. The list is loaded
+// again after any of them.
+function BookingActions({ booking, onChanged, className = '' }) {
+  return (
+    <>
+      <TimeActions
+        booking={booking}
+        className={className}
+        answer={(action) => answerProposal(booking.id, action)}
+        move={(iso) => rescheduleBooking(booking.id, iso)}
+        onChanged={onChanged}
+      />
+      {canCancel(booking) && (
+        <CancelConsultation
+          className={className}
+          when={readableSlot(booking.slot) ?? 'this time'}
+          onCancel={() => cancelOwnBooking(booking.id)}
+          onDone={onChanged}
+        />
+      )}
+    </>
+  );
+}
+
+function BookingTable({ bookings, onChanged }) {
   return (
     <div data-scroll="intended" className="mt-3 overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full min-w-[52rem] text-left">
@@ -126,6 +153,7 @@ function BookingTable({ bookings }) {
                 <td className={CELL}><BookingDetail booking={booking} step={step} /></td>
                 <td className={`${CELL} w-[20rem]`}>
                   <MeetLink booking={booking} />
+                  <BookingActions booking={booking} onChanged={onChanged} className="mt-3" />
                   {step.next && <Link to="/directory" className={`${BUTTON_OUTLINE} mt-3`}>{step.next}</Link>}
                 </td>
               </tr>
@@ -137,7 +165,7 @@ function BookingTable({ bookings }) {
   );
 }
 
-function BookingCards({ bookings }) {
+function BookingCards({ bookings, onChanged }) {
   return (
     <ul className="mt-3 space-y-3">
       {bookings.map((booking) => {
@@ -155,6 +183,7 @@ function BookingCards({ bookings }) {
               {booking.topic && (<><dt className="text-muted-foreground">About</dt><dd>{booking.topic}</dd></>)}
             </dl>
             <MeetLink booking={booking} className="mt-3" />
+            <BookingActions booking={booking} onChanged={onChanged} className="mt-3" />
             {step.next && <Link to="/directory" className={`${BUTTON_OUTLINE} mt-3`}>{step.next}</Link>}
           </li>
         );
@@ -175,7 +204,7 @@ export default function MyActivity() {
   // that may still be good.
   const canTrack = canOwnActivity(user);
   const { data: questions, error: questionsError, loading: questionsLoading } = useApi(canTrack ? '/questions/mine' : null, LIVE);
-  const { data: bookings, error: bookingsError, loading: bookingsLoading } = useApi(canTrack ? '/bookings/mine' : null, LIVE);
+  const { data: bookings, error: bookingsError, loading: bookingsLoading, refetch: refetchBookings } = useApi(canTrack ? '/bookings/mine' : null, LIVE);
   const wide = useMediaQuery('(min-width: 1280px)');
   useScrollToHash(Boolean(questions));
 
@@ -239,7 +268,9 @@ export default function MyActivity() {
                 <Link to="/directory" className={`${BUTTON_PRIMARY} mt-3`}>Find a lawyer</Link>
               </div>
             )}
-            {bookings?.length > 0 && (wide ? <BookingTable bookings={bookings} /> : <BookingCards bookings={bookings} />)}
+            {bookings?.length > 0 && (wide
+              ? <BookingTable bookings={bookings} onChanged={refetchBookings} />
+              : <BookingCards bookings={bookings} onChanged={refetchBookings} />)}
           </section>
 
           <div className="mt-10 grid gap-6 md:grid-cols-2">

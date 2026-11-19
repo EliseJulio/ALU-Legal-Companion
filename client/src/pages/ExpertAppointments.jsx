@@ -8,6 +8,7 @@ import { useApi } from '@/lib/useApi';
 import { LIVE } from '@/lib/live';
 import { useNow } from '@/lib/useNow';
 import { useScrollToHash } from '@/lib/useScrollToHash';
+import { useConsultMove } from '@/lib/useConsultMove';
 import { expertItems } from '@/lib/schedule';
 import { BUTTON_OUTLINE, CARD, PAGE_TITLE } from '@/lib/ui';
 
@@ -23,6 +24,7 @@ export default function ExpertAppointments() {
   const now = useNow();
   const items = useMemo(() => expertItems(bookings ?? [], now), [bookings, now]);
   useScrollToHash(Boolean(bookings));
+  const { message, onDone } = useConsultMove(refetch, bookings);
 
   return (
     <div>
@@ -38,6 +40,8 @@ export default function ExpertAppointments() {
         <Link to="/expert/calendar" className={BUTTON_OUTLINE}>See the calendar</Link>
       </div>
 
+      {/* Always on the page, so the result of an action is read out when it arrives. */}
+      <div role="status" className="sr-only">{message}</div>
       {loading && !bookings && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
 
@@ -55,7 +59,7 @@ export default function ExpertAppointments() {
           items={items}
           order={['requested', 'accepted', 'earlier']}
           groups={GROUPS}
-          renderRow={(item) => <ExpertConsultRow item={item} onDone={refetch} />}
+          renderRow={(item) => <ExpertConsultRow item={item} onDone={onDone} />}
         />
       )}
     </div>
