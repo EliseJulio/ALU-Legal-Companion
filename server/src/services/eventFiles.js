@@ -36,10 +36,21 @@ export function readEventUpload(req, res, next) {
   });
 }
 
-// The upload budget is spent only by entries that carry a file.
-export function limitEventUploads(req, res, next) {
-  if (!req.file) return next();
+// Every multipart entry is counted, with or without a file, before the body is read. A JSON entry is
+// not counted.
+export function limitMultipartUploads(req, res, next) {
+  if (!req.is('multipart/form-data')) return next();
   return documentUploadLimiter(req, res, next);
+}
+
+// The most entries one matter can hold.
+export const MAX_ENTRIES = 500;
+export const ENTRY_CAP_MESSAGE = 'This matter already has the most entries it can hold.';
+
+async function countEntries(client, matterId) {
+  const { rows: [{ n }] } = await client.query(
+    'SELECT count(*)::int AS n FROM matter_events WHERE matter_id = $1', [matterId]);
+  return n;
 }
 
 // The name the person will see again. No folders and no control characters and no quotes and at most 120 long.
@@ -73,6 +84,7 @@ export async function addEntryWithFile({ matterId, userId, occurredOn, descripti
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock($1)', [matterId]);
+    if (await countEntries(client, matterId) >= MAX_ENTRIES) throw new Refusal(400, ENTRY_CAP_MESSAGE);
     const { inMatter, total } = await countFiles(client, matterId, userId);
     if (inMatter >= MAX_PER_MATTER) {
       throw new Refusal(400, `A matter can hold up to ${MAX_PER_MATTER} files. Delete one to add another.`);
@@ -95,6 +107,30 @@ export async function addEntryWithFile({ matterId, userId, occurredOn, descripti
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     await removeDocumentFile(stored.storedName); // never leave an encrypted file that nothing points at
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Writes one entry with no file. It takes the same lock as an entry with a file, so the cap on
+// entries holds for both kinds at once. The caller says the kind: 'entry' for the owner's own line,
+// 'system' for a lawyer's note.
+export async function addPlainEntry({ matterId, userId, occurredOn, description, kind = 'entry' }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [matterId]);
+    if (await countEntries(client, matterId) >= MAX_ENTRIES) throw new Refusal(400, ENTRY_CAP_MESSAGE);
+    const { rows: [e] } = await client.query(
+      `INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind) VALUES ($1,$2,$3,$4,$5)
+       RETURNING id, occurred_on, description, created_at`,
+      [matterId, userId, occurredOn, description, kind]);
+    await client.query('UPDATE matters SET updated_at = now() WHERE id = $1', [matterId]);
+    await client.query('COMMIT');
+    return e;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     client.release();
