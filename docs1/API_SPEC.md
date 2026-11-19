@@ -35,6 +35,10 @@ The base path is `/api`. Every request and reply is JSON. The server README has 
 | Wrong report codes from everyone together | 200 in 15 minutes. Only wrong codes count |
 | Search, for each IP address | 120 in 15 minutes |
 | Asking Ask AI a question, for each IP address | 5 in a minute |
+| Running the scheduled jobs (right secret only), for each IP address | 30 in 15 minutes. A wrong secret is refused before it is counted |
+| Asking for a consultation while signed in, for each person | 10 in an hour |
+| Checking the password to change an email address or erase an account, for each signed-in account | 10 wrong passwords in 15 minutes, one count for both. A right one does not count |
+| Looking up open times, for each IP address | 120 in 15 minutes |
 
 ## Publishing
 
@@ -46,8 +50,8 @@ draft  --publish (admin)-->  published
 
 - Only `published` rows reach the public routes.
 - `publish` stamps `verified_by` and `verified_at` with the admin's own id and the time. The database refuses a published row without them — the column names are historical, from when a legal expert did the verifying, but it is always the admin now.
-- Editing a published guide, route or checklist sends it back to `draft` and clears the stamp. Editing a published directory entry does the same only when a checked fact changes. Those are the name, kind, place, contact, services, languages, cost and source.
-- Each of the four has `POST <path>/:id/publish`, admin only. It takes no body and answers 400 if the record is already published or does not exist.
+- Editing a published guide, route or checklist sends it back to `draft` and clears the stamp. Editing a published directory entry does the same only when a checked fact changes. Those are the name, kind, place, contact, services, languages, cost and source. When that sends an entry back to `draft`, every matter shared with it stops being shared at once and each owner gets a line in the matter history. A lawyer reads a shared matter only while the entry is published.
+- Each of the four has `POST <path>/:id/publish`, admin only. It takes no body and answers 400 if the record is already published or does not exist. It also answers 400 when any text a reader sees still holds a note for the editor, and 409 `That record was just changed. Reload and try again.` when the record changed after it was checked.
 - A guide can also be taken off the site once published: `POST /guides/:id/withdraw` (admin only, `{ "comment": "why" }` required) sets it to `withdrawn`. Editing it and publishing again brings it back.
 - A legal expert holds no CMS access of any kind here — they hold consultations (`/bookings`) and read the matters shared with them (`/matters`), nothing more.
 
@@ -58,21 +62,33 @@ draft  --publish (admin)-->  published
 | `GET /health` | anyone | `{ "status": "ok" }` |
 | `GET /openapi.json` | anyone | The description of every route as an OpenAPI file. The same description is shown as a page at `/api/docs` |
 
+## Scheduled jobs (`/internal`)
+
+The hosting service sleeps when idle, so a GitHub workflow calls this route every 10 minutes. The call wakes the service and runs the jobs.
+
+| Route | Who | Takes | Returns |
+|---|---|---|---|
+| `POST /internal/run-jobs` | the scheduler | header `X-Job-Secret`, equal to the server setting `JOB_SECRET` (compared in constant time) | `{ reminders: { sent, failed, cancelled, missed }, booking_reminders: { sent, failed, missed, cancelled, skipped }, retention: { questions, bookings } }`. Counts only. `reminders` is `{ …all 0, skipped: true }` when another pass is already running. 401 for a missing or wrong secret. 404, as for an unknown path, when `JOB_SECRET` is shorter than 32 characters (the route is off) |
+
+- **Retention.** Anonymous questions answered more than 90 days ago, and anonymous bookings whose time is more than 90 days past, are deleted. A record exactly 90 days old is kept. Unanswered anonymous questions, signed-in questions and bookings, reports, matters, accounts and guides are never deleted by this job.
+- **Email budget.** `DAILY_EMAIL_BUDGET` (default 180, counted per Kigali day) is shared by every server process. Sign-up, password, email-change, invitation, report-reply and consultation-accepted mail is always sent. Deadline reminders and the document-changed and lawyer-responded notices stop at the budget. A reminder stays pending and is missed only by the usual rule.
+- **Seed.** `npm run seed` refuses to run unless `NODE_ENV` is exactly `development` or `test`, or else `SEED_ADMIN_PASSWORD`, `SEED_EXPERT_PASSWORD` and `SEED_STUDENT_PASSWORD` are each set, at least 12 characters and not the public defaults. A local demo run is `NODE_ENV=development npm run seed`.
+
 ## Accounts (`/auth`)
 
 | Route | Who | Takes | Returns |
 |---|---|---|---|
 | `GET /auth/mail-status` | anyone | | `{ available }`. `false` only in production with no mail service set up, so the sign-up page can pause before the form. It gives no detail about the mail setup. Never cached |
-| `POST /auth/register` | anyone | `name`, `email`, `password` (8 or more), `role` (`student` or `staff`) | 201 `{ user, message }`. No login is given. The email must end in `@alustudent.com` or `@alueducation.com` |
-| `POST /auth/verify-email` | anyone | `token` | `{ token, user }`. This signs the person in |
-| `POST /auth/resend-verification` | anyone | `email` | The same `{ message }` for every address |
-| `POST /auth/login` | anyone | `email`, `password` | `{ token, user }`. 401 for an unknown address or a wrong password, with the same words. 403 when the address is not verified or the account is switched off |
+| `POST /auth/register` | anyone | `name` (1 to 100 characters), `email`, `password` (8 or more, at most 72 bytes; the same limit applies at reset, change and invitation), `role` (`student` or `staff`) | 201 `{ user, message }`. No login is given. The email must end in `@alustudent.com` or `@alueducation.com`. An address that already has an account gets 400 with `code: "email_taken"`. The words are the same for a verified and an unverified account and say to check the email or ask for a new link on the sign-in page |
+| `POST /auth/verify-email` | anyone | `token` | `{ verified: true, message }`. The link is used once and the address is marked verified. It does not sign the person in: no token and no user come back. They sign in with their own password. 400 for a used, expired or invalid link, 403 for a switched-off account |
+| `POST /auth/resend-verification` | anyone | `email` | The same `{ message }` for every address. The reply is sent before the mail goes out, so its timing never shows whether an address has an account |
+| `POST /auth/login` | anyone | `email`, `password` | `{ token, user }`. 401 for an unknown address or a wrong password, with the same words. 403 when the address is not verified (`code: "not_verified"`) or the account is switched off (`code: "deactivated"`) |
 | `POST /auth/logout` | signed in | | 204. Ends every session of the account |
 | `GET /auth/me` | signed in | | `{ id, name, email, role, email_verified_at, created_at }` |
 | `PUT /auth/me` | signed in | `name` | `{ token, user }`. Only the name is read |
 | `DELETE /auth/me` | student or staff | `password`, `confirm: true` | `{ ok: true }`. Erases the account (Law 058/2021 Art. 23): matters with their stored files, saved guides, sign-in tokens and own questions are deleted; a booking stays for the provider with `user_id` and `topic` cleared. 400 no password or no confirm, 401 wrong password, 403 for a lawyer or admin (ask an admin), 500 if a file could not be removed (nothing is erased, retry). The old token then gets 401 |
 | `POST /auth/change-password` | signed in | `current_password`, `new_password` | `{ token, user }`. 400 for a wrong current password. Ends the other sessions |
-| `POST /auth/forgot-password` | anyone | `email` | The same `{ message }` for every address |
+| `POST /auth/forgot-password` | anyone | `email` | The same `{ message }` for every address, sent before the mail goes out |
 | `POST /auth/reset-password` | anyone | `token`, `password` | `{ token, user }`. Ends every older session |
 | `POST /auth/redeem-invite` | anyone | `invite_token`, `name`, `password` | 201 `{ token, user }`. The only way to become a legal expert |
 
@@ -137,15 +153,29 @@ Nothing about the asker is read or stored. The question and the answer are not w
 
 | Route | Who | Takes | Returns |
 |---|---|---|---|
-| `POST /bookings` | student or staff | `provider_id`, `slot` (in the future and within a year), `topic` (500 characters or fewer) | 201 `{ id, provider_id, slot, topic, status, created_at }`. The entry must be published and bookable |
-| `POST /bookings/anonymous` | anyone | The same | 201 the booking plus `anon_token` and a `warning`. The token is shown once. No account is stored. A login is ignored |
+| `GET /bookings/slots/:providerId` | anyone | `?from=&to=` (YYYY-MM-DD; from defaults to today in Kigali, to to from plus 13 days; at most 31 days) | `{ provider_id, slot_minutes: 30, timezone: "Africa/Kigali", days: [{ date, slots: [ISO time] }] }`. Only dates with an open time, earliest first. A taken or closed time is absent, so nothing shows who booked. 404 when the entry is not published and bookable. Limited per IP (120 in 15 minutes) |
+| `GET /bookings/availability` | expert | | `{ slot_minutes: 30, timezone, is_default, windows: [{ weekday: 1-7, start: "HH:MM", end: "HH:MM" }] }` for the expert's own entry. Until the lawyer saves hours, `is_default` is true and the windows are the standard hours, Monday to Friday 09:00 to 17:00 Kigali time |
+| `PUT /bookings/availability` | expert | `{ windows: [...] }` | The hours as saved (`is_default` false). Replaces every window in one step. An empty list closes bookings on purpose. At most 14 windows, on the half hour (an end of 24:00 is allowed), start before end, none overlapping on one day. 400 with a plain message, 404 when no entry is linked to the account. Changing hours never takes the entry off the site |
+| `POST /bookings` | student or staff | `provider_id`, `slot` (an open time from `/bookings/slots`), `topic` (500 characters or fewer) | 201 `{ id, provider_id, slot, topic, status, created_at }`. The entry must be published and bookable. 400 when the time is not an open time ("That time is not available. Choose one of the times shown.") or the lawyer has closed bookings ("This lawyer has no open times right now."), and when the person already has 3 open requests with that lawyer. 429 above 10 requests an hour. The lawyer is emailed that a request is waiting. The email carries the time and never a name or topic |
+| `POST /bookings/anonymous` | anyone | The same | 201 the booking plus `anon_token` and a `warning`. The token is shown once. No account is stored. A login is ignored. The same open-time rule applies |
 | `GET /bookings/mine` | student or staff | | The person's bookings with `provider_name` and `meet_link` |
-| `GET /bookings/anon/:token` | anyone | | `{ id, slot, topic, status, provider_name, meet_link }`. 404 for an unknown or badly formed code |
+| `POST /bookings/anon/status` | anyone | `code` (in the body, never in the address) | `{ id, provider_id, slot, topic, status, proposed_slot, provider_name, meet_link }`. 404 for an unknown or badly formed code. Limited per IP |
 | `GET /bookings/expert` | expert | | The bookings for the entry linked to the expert's account. `requester` is the person's name for a signed-in requester, or always `Anonymous requester` for an anonymous one. No part of the token or its hash is sent. The expert acts by `id` |
-| `POST /bookings/:id/status` | expert | `status` | The booking. A booking only moves forward: requested to accepted or declined, accepted to completed or declined. 409 for a clash |
+| `POST /bookings/:id/cancel` | student or staff | | The booking, now `cancelled`. Only the person's own request or accepted consultation. It frees the time and cancels the reminders. 400 when it is declined, completed or already cancelled. 404 for anyone else. The lawyer is emailed when an accepted one is cancelled (time only) |
+| `POST /bookings/anon/cancel` | anyone | `anon_token` (in the body, never in the address) | The booking, now `cancelled`. Same rules. 404 for an unknown or badly formed code. Limited per IP |
+| `POST /bookings/:id/propose` | expert | `slot` | The booking with `proposed_slot` set. The lawyer suggests another time for a request that is still waiting. The time must be an open time and not the one asked for. A second suggestion replaces the first. 400 for a request that is not waiting, 404 for a booking of another entry. A signed-in person is emailed the suggested time, never the topic |
+| `POST /bookings/:id/proposal` | student or staff | `action` (`accept` or `decline`) | The booking. Accepting moves the consultation to the suggested time and accepts it, with reminders and the accepted email. 400 when there is nothing to answer or the time is no longer open, 409 when it was just taken. Declining keeps the original request waiting. The lawyer is emailed the answer (time only) |
+| `POST /bookings/anon/proposal` | anyone | `anon_token` and `action` (in the body, never in the address) | The same answer for an anonymous booker. 404 for an unknown or badly formed code. Limited per IP |
+| `POST /bookings/:id/reschedule` | student or staff | `slot` | The booking at its new time, now waiting for the lawyer. Only while it is waiting or accepted and has not started (400 otherwise). The new time must be an open time and not the one already held. The old time is free again and the reminders are cancelled. Counts against the 10 an hour limit, and an accepted consultation moved back to waiting counts towards the 3 open requests with one lawyer. The lawyer is emailed the new time, which stops at the daily email budget (the request still shows on the lawyer's appointments page) |
+| `POST /bookings/anon/reschedule` | anyone | `anon_token` and `slot` (in the body) | The same move for an anonymous booker. Limited per IP |
+| `POST /bookings/:id/status` | expert | `status` | The booking. A booking only moves forward: requested to accepted or declined, accepted to completed or declined. 409 for a clash. 400 when a time that has already started is accepted ("That time has already passed.") and when a consultation is completed before it starts. Accepting sets reminders 24 hours and 1 hour before for the lawyer and for a signed-in person. Declining or completing cancels them. Declining also emails a signed-in person once, with the time and a link to the directory and never the topic. A decline email stops at the daily email budget |
 | `POST /bookings/:id/join` | the owner, the lawyer, or the anonymous booker | `anon_token` (the anonymous booker only, in the body, never in the address), `audio_only` (true to start with the camera off) | 200 `{ provider: 'own', room, role, ticket, signal_url, ice_servers, audioOnlyAllowed: true }` for a call held inside the platform when `CALL_TICKET_SECRET` and `CALL_SIGNAL_URL` are set. The lawyer is `host` and everyone else is `guest`. The `ticket` is a signed token for one room and one role and holds no name or email. Otherwise `{ provider: 'daily', url, token, audioOnlyAllowed: true }` for a private video room made the first time and reused after. Or `{ provider: 'meet', url, reason }` when the call cannot start in the platform, or `{ provider: 'none', message, reason }` when there is no Meet link either. `reason` is `daily_unavailable`, `daily_failed` or `daily_cap`. 404 for anyone else. 409 unless the booking is accepted, and the Meet link is never sent for a request that is not accepted. Limited per IP |
 
 `meet_link` is sent only when the status is `accepted`. The three reads share one rule so they cannot differ.
+
+A consultation is 30 minutes. Times sit on the half hour in Kigali time (UTC+2, no daylight saving). A time is open when it is inside the lawyer's hours, at least an hour ahead, at most 60 days ahead, and not already accepted for someone. A request does not hold a time. Only an accepted booking does. A booking status is `requested`, `accepted`, `declined`, `completed` or `cancelled`. Every read of a booking (`/bookings/mine`, `/bookings/expert`, `POST /bookings/anon/status`) also carries `proposed_slot`, the time a lawyer suggested instead, or null. A suggestion exists only while the booking is `requested`, so every change of status clears it.
+
+The booking emails are plain. A request email goes to the lawyer. The reminder emails go to the lawyer and to a signed-in person, never to an anonymous one, who has no address. No booking email carries a topic or a name. Reminders are optional mail under the daily email budget. A reminder is never sent after its time has begun or more than 30 minutes late.
 
 ## Matters (`/matters`)
 
@@ -154,7 +184,7 @@ A matter is private to its owner. Someone else's matter gives 404.
 | Route | Who | Takes | Returns |
 |---|---|---|---|
 | `GET /matters` | student or staff | | The person's matters. The soonest deadline first and finished ones last |
-| `POST /matters` | student or staff | Either `title`, `next_action`, `next_due`. Or `route_id` with an optional `title`, `next_action` and `deadline_start` | 201 the matter. With `deadline_start` the server works out `next_due` from the route's days. It makes the reminders |
+| `POST /matters` | student or staff | Either `title`, `next_action`, `next_due`. Or `route_id` with an optional `title`, `next_action` and `deadline_start` | 201 the matter. With `deadline_start` the server works out `next_due` from the route's days. It makes the reminders. A person keeps at most 50 open matters (closed ones do not count) and a matter holds at most 500 record entries. Past either limit the answer is a plain 400 |
 | `GET /matters/share-targets` | student or staff | | The published entries that have an expert account |
 | `GET /matters/reminders` | student or staff | | Up to 20 reminders of my open matters that are waiting or sent, newest send date first. A deadline more than 14 days past is left out. Carries the matter `title`, which only the owner reads |
 | `GET /matters/progress` | student or staff | | Each open matter with `next_due`, `shared` and its `checklist`. For a published checklist, the required documents by state: `needed`, `complete`, `awaiting`, `to_fix`, `expired`, `missing` and `ready`. A checklist being checked again, or none, carries no figures |
@@ -163,6 +193,8 @@ A matter is private to its owner. Someone else's matter gives 404.
 | `PUT /matters/:id` | owner | `title`, `next_action`, `next_due`, `status` (`open` or `closed`) | The matter. A new date replaces the reminders. Closing cancels them |
 | `POST /matters/:id/events` | owner or an expert while it is shared | `description`, `occurred_on` (not in the future). JSON, or `multipart/form-data` with the same fields and one optional `file` (PDF, JPG or PNG read from its bytes, at most 5 MB; owner only, never on a lawyer's note) | 201 the entry, with `file: { name, size_bytes, mime }` when it has one. The entry and its file are made together or not at all. 400 wrong type, too big or no room (the 25 per matter and 100 per person caps count checklist documents and these files together), 503 when the server has no `DOCUMENT_KEY` (nothing is stored and no entry is made), 429 too many uploads |
 | `GET /matters/:id/events/:eventId/file` | owner, or the expert it is shared with at this moment | | The decrypted file as an attachment (`Cache-Control: no-store`, `X-Content-Type-Options: nosniff`). Anyone else, an admin too, gets 404. The file is deleted only when the owner deletes the matter |
+| `DELETE /matters/:id/events/:eventId` | owner | | 204. Deletes a line of the record the owner wrote, with its stored file. Lines the system wrote (shares, checks, comments) and a lawyer's notes are never deleted this way. They and every other caller get 404. No line about the deletion is kept |
+| `DELETE /matters/:id/events/:eventId/file` | owner | | 204. Removes only the file on a line the owner wrote. The text stays. 404 when the line has no file, and for every other caller |
 | `POST /matters/:id/share` | owner | `provider_id` | The matter. It replaces any earlier share |
 | `DELETE /matters/:id/share` | owner | | The matter. The expert's access ends on their next request |
 | `DELETE /matters/:id` | owner | | 204. The record and its reminders go |
@@ -178,7 +210,7 @@ Reminders go out 7 days and 1 day before the deadline. A reminder that would be 
 | `GET /guides/all` | admin | | Every guide in every state with its full text. It is the only read that returns a draft |
 | `POST /guides` | admin | `domain`, `title`, `situation`, `law_says`, `your_rights`, `steps`, `get_help`, `source_law`, `source_url`, `summary` (optional, at most 280 characters, empty means none) | 201 the guide as a draft. Editing the `summary` sends a published guide back to draft like any other edit |
 | `PUT /guides/:id` | admin | The same fields | The guide as a draft with the stamp cleared. This is the integrity rule |
-| `POST /guides/:id/publish` | admin | | The guide, published and stamped. 400 if it does not exist or is already published. 400 with the section and the words if any text a reader sees still holds a note for the editor (`[verify …]`, text left by a test edit or placeholder text). The guide stays a draft |
+| `POST /guides/:id/publish` | admin | | The guide, published and stamped. 400 if it does not exist or is already published. 409 `That record was just changed. Reload and try again.` when the guide changed after it was checked. 400 with the section and the words if any text a reader sees still holds a note for the editor (`[verify …]`, text left by a test edit or placeholder text). The guide stays a draft |
 | `POST /guides/:id/withdraw` | admin | `comment` (required) | The guide, `withdrawn`. 400 unless it was `published` |
 
 `domain` is one of `tenancy`, `employment`, `business`, `immigration`, `harassment`, `vehicles`. The same six values are the `area` of a route. The code list is in `server/src/services/domains.js` and a test checks it against both database rules. `summary` is at most 280 characters of text. `source_url` must start with `https://`. The rules are checked before anything is written, so a mistake cannot take a published guide off the site and save nothing.
@@ -198,7 +230,7 @@ Reminders go out 7 days and 1 day before the deadline. A reminder that would be 
 | `POST /questions` | student or staff | `text` (5000 characters or fewer) | 201 `{ id, text, status, created_at }` |
 | `POST /questions/anonymous` | anyone | `text` | 201 the question plus `anon_token` and a `warning`. No account is stored. A login is ignored |
 | `GET /questions/mine` | student or staff | | The person's questions with `answer` |
-| `GET /questions/anon/:token` | anyone | | `{ id, text, answer, status, created_at }`. 404 for an unknown or badly formed code |
+| `POST /questions/anon/status` | anyone | `code` (in the body, never in the address) | `{ id, text, answer, status, created_at }`. 404 for an unknown or badly formed code. Limited per IP |
 | `GET /questions/summary` | expert | | `{ open, overdue, answer_target_days, answered_this_month, average_wait_days? }`. Own answers only. The average is left out when none were answered this month. Answers given before `answered_at` existed are not counted |
 | `GET /questions/open` | expert | | The open questions, oldest first, as `{ id, text, created_at, kind, overdue }`. `kind` is `anonymous` or `signed-in` and nothing more. `overdue` is true once the question has waited longer than the answer target (3 days) |
 | `POST /questions/:id/answer` | expert | `answer` (10000 characters or fewer) | `{ id, status }`. 404 if it is not found or already answered |
@@ -232,12 +264,12 @@ Every admin route needs an admin login.
 | `GET /admin/reports/export` | `status`, `type` (optional, as in the list) | A CSV file (`text/csv; charset=utf-8`, UTF-8 with a BOM, `Content-Disposition: attachment; filename="reports-YYYY-MM-DD.csv"`). Columns: `id, type, about_kind, about_label, status, reply_channel, created_at, read_at, resolved_at, message, admin_reply`. Dates are ISO 8601. Never the code hash or an email address. A cell that starts with `=`, `+`, `-`, `@`, tab or CR gets a leading `'` |
 | `GET /admin/reports/:id` | | The report with its message and `about_exists`. Opening it sets `read_at`. `contact_email` is there only until the reply is sent |
 | `PUT /admin/reports/:id` | `status` (`received`, `in_progress`, `resolved`), `admin_reply` (1000 characters or fewer) | The report. Resolving an email report sends one email with the reply and then erases the address. If the send fails the address stays and the answer has `delivery: "failed"` |
-| `GET /admin/stats` | | Counts only: guides, entries and routes by state, stale entries, bookings, questions (with `overdue`), matters, reminders and people by role. Also `weekly`: the last 8 weeks (Monday to Sunday, UTC, oldest first) as `{ week_start, questions, bookings }`, and `answer_target_days` (3), the age after which an open question is overdue |
+| `GET /admin/stats` | | Counts only: guides, entries and routes by state, stale entries, bookings (by status, including `cancelled`), questions (with `overdue`), matters, reminders and people by role. Also `weekly`: the last 8 weeks (Monday to Sunday, UTC, oldest first) as `{ week_start, questions, bookings }`, and `answer_target_days` (3), the age after which an open question is overdue |
 | `GET /admin/bookings` | `?from=&to=` (YYYY-MM-DD, optional) | Every consultation as `{ id, provider_id, provider_name, slot, status }`, soonest first. View only. Never who asked: no name, account, token or topic |
 
 ## How many routes
 
-The API has 107 operations. The Swagger page lists all of them and a test checks that list against the real routes. The tables on this page give the detail for each group.
+The API has 121 operations. The Swagger page lists all of them and a test checks that list against the real routes. The tables on this page give the detail for each group.
 
 ## Email address change (`/auth`)
 
@@ -293,11 +325,11 @@ npx newman run ALU_Legal_Companion.postman_collection.json -e ALU_Legal_Companio
 
 ## Security headers
 
-The API sends them on every reply (`helmet` in `server/src/app.js`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a Content-Security-Policy with `frame-ancestors 'none'`. A test in `server/tests/integration/security-headers.test.js` pins them. CORS is unchanged.
+The API sends them on every reply (`helmet` in `server/src/app.js`): `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a Content-Security-Policy with `frame-ancestors 'none'`. CORS is unchanged.
 
 The website is a Render static site, so its headers are set in the `headers:` block of `render.yaml`, not in code: a Content-Security-Policy, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and a Permissions-Policy that turns off camera, microphone and location.
 
 - The policy lets the page load only its own files, call its own API address (`connect-src`) and frame the Google map that the Show map button opens (`frame-src https://www.google.com`). Nothing else loads from another site.
-- The one inline script (the theme, in `client/index.html`) is allowed by its SHA-256 hash. If you edit that script, recompute the hash and update `render.yaml`. `client/tests/lib/securityHeaders.test.js` fails until they match.
+- The one inline script (the theme, in `client/index.html`) is allowed by its SHA-256 hash. If you edit that script, recompute the hash and update `render.yaml`, or the browser will block the script.
 - If the API moves to another address, change `connect-src` too, or every API call from the browser is blocked.
 - Check the live site after a deploy with `curl -I https://alu-legal-companion-qu8w.onrender.com/`, and open the browser console on the site: a blocked request is reported there as a Content-Security-Policy violation.

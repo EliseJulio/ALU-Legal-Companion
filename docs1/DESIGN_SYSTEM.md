@@ -1,6 +1,6 @@
 # Design system
 
-The look of the client, decided in the November 2026 redesign. Black, white and blue only, with red kept for emergencies. Source Sans 3 for all type, at a small scale. Every colour is a token in `client/src/index.css`, and `client/tests/lib/tokens.test.js` measures the contrast. This file records the decisions. The code is the source of truth for the values once the build is done.
+The look of the client, decided in the November 2026 redesign. Black, white and blue only, with red kept for emergencies. Source Sans 3 for all type, at a small scale. Every colour is a token in `client/src/index.css`, and the contrast of each pair was measured. This file records the decisions. The code is the source of truth for the values once the build is done.
 
 **Status (9 Nov 2026): built.** The client was reset to the last commit and rebuilt in slices: tokens and Source Sans 3, lucide icons and the two-theme logo, the shell (one sidebar, top bar, bell, avatar menu, phone bars), the overviews for student, lawyer and admin, then every page by group, the Calendar page for each role, the admin bookings list (`GET /admin/bookings`, shown in the admin Calendar) and Reports ("Report a problem" for anyone, `/admin/reports` for the admin). The landing page is shipped.
 
@@ -32,7 +32,7 @@ Contrast measured with the WCAG formula (AA needs 4.5 for text):
 
 - Dark: text 19.7, muted 7.8, faint 5.8, blue text 7.1, white on blue 4.8, Checked pill 6.2, urgent pill 21.
 - Light: text 19.8, muted 7.4, faint 5.3, blue 6.4, white on blue 6.4, Checked pill 5.5, urgent pill 19.8.
-- Control edge (`border-control`): on the page 5.3 light / 6.2 dark, on a card 5.3 / 5.8, on the raised grey of a field 4.8 / 5.5, on the selected tint 4.5 / 5.0. The blue outline-button edge is 6.4 light / 4.1 dark on a card. The floor is 3 (WCAG 1.4.11). `tests/lib/tokens.test.js` measures each pair.
+- Control edge (`border-control`): on the page 5.3 light / 6.2 dark, on a card 5.3 / 5.8, on the raised grey of a field 4.8 / 5.5, on the selected tint 4.5 / 5.0. The blue outline-button edge is 6.4 light / 4.1 dark on a card. The floor is 3 (WCAG 1.4.11). Each pair was measured.
 - Emergency: white on red 5.4, red numbers on dark 7.9, on light 7.2.
 
 ## Type
@@ -49,7 +49,7 @@ Contrast measured with the WCAG formula (AA needs 4.5 for text):
 
 - A status uses a word and a shape, never colour alone. There is one pill with three tones (`pillClass` in `client/src/lib/ui.js`): urgent is a solid inverted pill, current (under way, accepted, published, selected) is a soft blue pill, neutral is a grey pill with a control edge. `statusToneFor` is the one list of which state wears which tone, read by `StatusPill` and by the Calendar chips (`lib/scheduleStyle.js`). No red.
 - The Emergency numbers link is on every page, red, with the warning triangle. It is the `warning` glyph the app already uses. Rule 5 stays.
-- "Legal information, not legal advice" stays on every guide page, every route page and in the footer.
+- "Legal information not legal advice" stays on every guide page, every route page and in the footer.
 - A guide card has no "verified by" line.
 - **No legal-expert review wording anywhere.** In this product the admin writes and publishes guides, checklists, routes and directory entries. There is no "needs a legal expert", "waiting for a legal expert", "awaiting review", "only a legal expert can publish" or "checked by a legal expert". Statuses are Draft and Published. A legal expert answers questions, takes appointments and checks files in shared matters, nothing else.
 - Ready means a lawyer checked the files. It is never a promise an office will accept them.
