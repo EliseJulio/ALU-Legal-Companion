@@ -1,6 +1,6 @@
 // Admin: invitations for legal experts and user management and crisis contacts and counts.
 import { Router } from 'express';
-import { q } from '../db.js';
+import { q, pool } from '../db.js';
 import { requireAuth, normalizeEmail } from '../middleware/auth.js';
 import { requireIntParam } from '../middleware/validate.js';
 import { createInvite, deleteInvite } from '../services/invites.js';
@@ -57,7 +57,7 @@ router.post('/invites', requireAuth('admin'), async (req, res) => {
     });
   } catch (err) {
     // An invitation nobody received is not worth keeping. Say so and let the admin try again.
-    console.error(`Could not send the invitation for ${invite.id}: ${err.message}`);
+    console.error(`Could not send the invitation for ${invite.id}: ${[err?.name, err?.code].filter(Boolean).join(' ')}`);
     await deleteInvite(invite.id);
     res.status(502).json({ error: 'The invitation email could not be sent. Check the mail settings and try again.' });
   }
@@ -84,11 +84,29 @@ router.get('/users', requireAuth('admin'), async (_req, res) => {
 });
 
 // Counts the other active admins. The last admin cannot be demoted or deactivated.
-async function otherActiveAdmins(excludeUserId) {
-  const [row] = await q(
+async function otherActiveAdmins(client, excludeUserId) {
+  const { rows: [row] } = await client.query(
     `SELECT count(*)::int AS n FROM users WHERE role = 'admin' AND deactivated_at IS NULL AND id <> $1`,
     [excludeUserId]);
   return row.n;
+}
+
+// Runs one change to the admin roster in a transaction under an exclusive lock. Two admins changing the
+// roster at the same moment cannot both pass the last-admin check. Returns what fn returns.
+async function withAdminRoster(fn) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('admin-roster'))`);
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 const ASSIGNABLE_ROLES = ['student', 'staff', 'admin'];
@@ -107,23 +125,29 @@ router.put('/users/:id/role', requireAuth('admin'), requireIntParam('id'), async
     return res.status(400).json({ error: `Role must be one of: ${ASSIGNABLE_ROLES.join(', ')}` });
   }
 
-  const [target] = await q('SELECT id, role FROM users WHERE id = $1', [req.params.id]);
-  if (!target) return res.status(404).json({ error: 'User not found' });
+  const outcome = await withAdminRoster(async (client) => {
+    const { rows: [target] } = await client.query('SELECT id, role FROM users WHERE id = $1', [req.params.id]);
+    if (!target) return { status: 404, error: 'User not found' };
 
-  // A legal expert's role stays as it is. Entries in the directory and the booking inbox are
-  // tied to the account. A new role would leave them with nobody behind them.
-  if (target.role === 'legal_expert') {
-    return res.status(400).json({ error: 'The role of a legal expert cannot be changed. Switch the account off instead.' });
-  }
+    // A legal expert's role stays as it is. Entries in the directory and the booking inbox are
+    // tied to the account. A new role would leave them with nobody behind them.
+    if (target.role === 'legal_expert') {
+      return { status: 400, error: 'The role of a legal expert cannot be changed. Switch the account off instead.' };
+    }
 
-  if (target.role === 'admin' && role !== 'admin' && (await otherActiveAdmins(target.id)) === 0) {
-    return res.status(400).json({
-      error: 'This is the last active admin. Promote another account to admin first. Otherwise nobody would be left to manage the platform.',
-    });
-  }
+    if (target.role === 'admin' && role !== 'admin' && (await otherActiveAdmins(client, target.id)) === 0) {
+      return {
+        status: 400,
+        error: 'This is the last active admin. Promote another account to admin first. Otherwise nobody would be left to manage the platform.',
+      };
+    }
 
-  const [updated] = await q(`UPDATE users SET role = $1 WHERE id = $2 RETURNING ${USER_COLUMNS}`, [role, target.id]);
-  res.json(updated);
+    const { rows: [updated] } = await client.query(
+      `UPDATE users SET role = $1 WHERE id = $2 RETURNING ${USER_COLUMNS}`, [role, target.id]);
+    return { status: 200, body: updated };
+  });
+  if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
+  res.json(outcome.body);
 });
 
 // POST /api/admin/users/:id/deactivate
@@ -136,12 +160,24 @@ router.post('/users/:id/deactivate', requireAuth('admin'), requireIntParam('id')
   // COALESCE keeps the first time access was withdrawn if the button is pressed twice.
   // session_version goes up so the person's old tokens stay dead even if the account is
   // switched on again later.
-  const [updated] = await q(
-    `UPDATE users SET deactivated_at = COALESCE(deactivated_at, now()), session_version = session_version + 1
-      WHERE id = $1 RETURNING ${USER_COLUMNS}`,
-    [req.params.id]);
-  if (!updated) return res.status(404).json({ error: 'User not found' });
-  res.json(updated);
+  const outcome = await withAdminRoster(async (client) => {
+    const { rows: [target] } = await client.query(
+      'SELECT id, role, deactivated_at FROM users WHERE id = $1', [req.params.id]);
+    if (!target) return { status: 404, error: 'User not found' };
+    if (target.role === 'admin' && !target.deactivated_at && (await otherActiveAdmins(client, target.id)) === 0) {
+      return {
+        status: 400,
+        error: 'This is the last active admin. Promote another account to admin first. Otherwise nobody would be left to manage the platform.',
+      };
+    }
+    const { rows: [updated] } = await client.query(
+      `UPDATE users SET deactivated_at = COALESCE(deactivated_at, now()), session_version = session_version + 1
+        WHERE id = $1 RETURNING ${USER_COLUMNS}`,
+      [req.params.id]);
+    return { status: 200, body: updated };
+  });
+  if (outcome.error) return res.status(outcome.status).json({ error: outcome.error });
+  res.json(outcome.body);
 });
 
 // POST /api/admin/users/:id/reactivate
@@ -255,7 +291,7 @@ router.get('/stats', requireAuth('admin'), async (_req, res) => {
     },
     bookings: {
       ...bookings,
-      by_status: counts(['requested', 'accepted', 'declined', 'completed'], await byStatus('bookings')),
+      by_status: counts(['requested', 'accepted', 'declined', 'completed', 'cancelled'], await byStatus('bookings')),
     },
     questions: { ...questions, overdue: await countOverdue() },
     // The last eight weeks, oldest first. Counts only.

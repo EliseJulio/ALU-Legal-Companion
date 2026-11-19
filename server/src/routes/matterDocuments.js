@@ -235,7 +235,7 @@ router.put('/:docId/review', requireAuth(...ROLES), requireIntParam('matterId'),
 
   // A line in the history of the matter written by the lawyer. So the owner sees when and what. It
   // can never pass for the owner's own note because author_is_owner is false for it.
-  await q('INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)',
+  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind) VALUES ($1,$2,$3,$4,'system')`,
     [access.matter.id, req.user.id, kigaliToday(), `Checked “${row.label}”: ${PHRASE[status]}`]);
   lawyerRespondedOnDocument(access.matter.id, 'review');
   res.json(view(row));
@@ -266,7 +266,7 @@ router.post('/:docId/comments', requireAuth(...ROLES), requireIntParam('matterId
     `INSERT INTO matter_document_comments (document_id, author_id, body) VALUES ($1,$2,$3)
      RETURNING id, body, created_at`, [doc.id, req.user.id, body]);
   // A line in the history of the matter so the owner notices. The text stays on the document.
-  await q('INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)',
+  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind) VALUES ($1,$2,$3,$4,'system')`,
     [access.matter.id, req.user.id, kigaliToday(), `Commented on “${doc.label}”`]);
   lawyerRespondedOnDocument(access.matter.id, 'comment');
   res.status(201).json({ ...row, author_name: null, by_you: true });

@@ -8,13 +8,13 @@
 //
 // There is no anonymous matter. A lasting record and an untraceable one cannot both be true.
 import { Router } from 'express';
-import { q } from '../db.js';
+import { q, pool } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { scheduleReminders, isDateString, addDays, kigaliToday } from '../services/reminders.js';
-import { removeMatterFiles, documentsEnabled, readDocument, EXTENSION } from '../services/documentStore.js';
+import { removeMatterFiles, removeDocumentFile, documentsEnabled, readDocument, EXTENSION } from '../services/documentStore.js';
 import {
-  readEventUpload, limitEventUploads, typeOfUpload, addEntryWithFile, Refusal,
+  readEventUpload, limitMultipartUploads, typeOfUpload, addEntryWithFile, addPlainEntry, Refusal,
 } from '../services/eventFiles.js';
 import { progressFigures } from '../services/checklists.js';
 
@@ -25,13 +25,42 @@ const MAX_TEXT = 2000;
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : '');
 
+// The most matters one person can have open at once. Closed matters do not count.
+const MAX_OPEN = 50;
+const OPEN_CAP_MESSAGE = 'You already have the most open matters you can keep. Close or delete one first.';
+
+// Saves a matter that is becoming open. The count and the save run under one lock per person, so two
+// requests at once cannot both pass the cap. Returns the saved row, or null when the cap is reached.
+async function saveOpening(userId, save) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('open-matters'), $1)`, [userId]);
+    const { rows: [{ n }] } = await client.query(
+      `SELECT count(*)::int AS n FROM matters WHERE user_id = $1 AND status = 'open'`, [userId]);
+    if (n >= MAX_OPEN) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const row = await save(client);
+    await client.query('COMMIT');
+    return row;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // The one place that decides whether the caller may see a matter.
 //   owner   always
 //   expert  only while the matter is shared with a directory entry linked to their account
 //   anyone else  as if it did not exist
 export async function loadMatter(matterId, user) {
   const [m] = await q(
-    `SELECT m.*, r.title AS route_title, p.name AS shared_with_name, p.user_id AS shared_with_user
+    `SELECT m.*, r.title AS route_title, p.name AS shared_with_name, p.user_id AS shared_with_user,
+            p.status AS shared_with_status
        FROM matters m
        LEFT JOIN matter_routes r ON r.id = m.route_id
        LEFT JOIN providers p ON p.id = m.shared_with
@@ -39,7 +68,9 @@ export async function loadMatter(matterId, user) {
     [matterId]);
   if (!m) return null;
   if (OWNERS.includes(user.role) && m.user_id === user.id) return { matter: m, as: 'owner' };
-  if (user.role === 'legal_expert' && m.shared_with && m.shared_with_user === user.id) {
+  // The lawyer reads a matter only while the office it is shared with is published.
+  if (user.role === 'legal_expert' && m.shared_with && m.shared_with_user === user.id
+      && m.shared_with_status === 'published') {
     return { matter: m, as: 'expert' };
   }
   return null;
@@ -104,9 +135,10 @@ router.post('/', requireAuth(...OWNERS), async (req, res) => {
   if (nextAction && nextAction.length > MAX_TEXT) return res.status(400).json({ error: 'That next step is too long' });
   if (nextDue !== null && !isDateString(nextDue)) return res.status(400).json({ error: 'next_due must be a date (YYYY-MM-DD)' });
 
-  const [m] = await q(
+  const m = await saveOpening(req.user.id, async (db) => (await db.query(
     `INSERT INTO matters (user_id, route_id, title, next_action, next_due) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-    [req.user.id, routeId, title, nextAction, nextDue]);
+    [req.user.id, routeId, title, nextAction, nextDue])).rows[0]);
+  if (!m) return res.status(400).json({ error: OPEN_CAP_MESSAGE });
   const reminders = await scheduleReminders(m.id, nextDue);
   // Read back through loadMatter so the answer has the route title like every other read.
   const full = await loadMatter(m.id, req.user);
@@ -194,7 +226,7 @@ router.get('/shared', requireAuth('legal_expert'), async (req, res) => {
             (SELECT count(*)::int FROM matter_documents d
               WHERE d.matter_id = m.id AND d.review_status = 'pending') AS documents_waiting
        FROM matters m
-       JOIN providers p ON p.id = m.shared_with AND p.user_id = $1
+       JOIN providers p ON p.id = m.shared_with AND p.user_id = $1 AND p.status = 'published'
        LEFT JOIN matter_routes r ON r.id = m.route_id
       ORDER BY (m.status = 'closed'), m.next_due NULLS LAST, m.updated_at DESC`,
     [req.user.id]));
@@ -214,7 +246,7 @@ router.post('/:id/share', requireAuth(...OWNERS), requireIntParam('id'), async (
   await q(`UPDATE matters SET shared_with = $1, shared_at = now(), updated_at = now() WHERE id = $2`,
     [target.id, access.matter.id]);
   // A line in the matter's own history so the owner can see later when it was shared and with whom.
-  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)`,
+  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind) VALUES ($1,$2,$3,$4,'system')`,
     [access.matter.id, req.user.id, kigaliToday(), `Shared with ${target.name}`]);
   const full = await loadMatter(access.matter.id, req.user);
   res.json(ownerView(full.matter));
@@ -227,7 +259,7 @@ router.delete('/:id/share', requireAuth(...OWNERS), requireIntParam('id'), async
   if (!access || access.as !== 'owner') return res.status(404).json({ error: 'Matter not found' });
   if (!access.matter.shared_with) return res.status(400).json({ error: 'This matter is not shared' });
   await q(`UPDATE matters SET shared_with = NULL, shared_at = NULL, updated_at = now() WHERE id = $1`, [access.matter.id]);
-  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)`,
+  await q(`INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind) VALUES ($1,$2,$3,$4,'system')`,
     [access.matter.id, req.user.id, kigaliToday(), `Stopped sharing with ${access.matter.shared_with_name}`]);
   const full = await loadMatter(access.matter.id, req.user);
   res.json(ownerView(full.matter));
@@ -262,8 +294,9 @@ router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id')
   const { matter: m } = access;
   // author_is_owner is sent and not the author's id or name. The owner needs to tell their own
   // entries from the expert's notes. The expert needs nothing more about the owner than that.
-  const events = await q(
-    `SELECT e.id, e.occurred_on, e.description, e.created_at, (e.author_id = $2) AS author_is_owner,
+  // can_delete is worked out here and only for the owner. The line kind stays on the server.
+  const events = (await q(
+    `SELECT e.id, e.occurred_on, e.description, e.created_at, e.kind, (e.author_id = $2) AS author_is_owner,
             CASE WHEN e.author_id = $2 THEN NULL ELSE u.name END AS author_name,
             CASE WHEN f.id IS NULL THEN NULL
                  ELSE json_build_object('name', f.original_name, 'size_bytes', f.size_bytes, 'mime', f.mime) END AS file
@@ -271,7 +304,9 @@ router.get('/:id', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id')
        LEFT JOIN matter_event_files f ON f.event_id = e.id
       WHERE e.matter_id = $1
       ORDER BY e.occurred_on DESC, e.id DESC`,
-    [m.id, m.user_id]);
+    [m.id, m.user_id])).map(({ kind, ...e }) => ({
+    ...e, can_delete: access.as === 'owner' && kind === 'entry' && e.author_is_owner,
+  }));
   const reminders = access.as === 'owner'
     ? await q(`SELECT id, due_on, send_on, status, sent_at FROM reminders WHERE matter_id = $1 ORDER BY send_on, id`, [m.id])
     : [];
@@ -306,9 +341,13 @@ router.put('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, re
   if (nextDue !== null && !isDateString(nextDue)) return res.status(400).json({ error: 'next_due must be a date (YYYY-MM-DD)' });
   if (!['open', 'closed'].includes(status)) return res.status(400).json({ error: 'status must be open or closed' });
 
-  const [updated] = await q(
+  const writeChanges = async (db) => (await db.query(
     `UPDATE matters SET title=$1, next_action=$2, next_due=$3, status=$4, updated_at=now() WHERE id=$5 RETURNING *`,
-    [title, nextAction, nextDue, status, m.id]);
+    [title, nextAction, nextDue, status, m.id])).rows[0];
+  // Reopening a closed matter counts against the cap. Editing one that is already open does not.
+  const reopening = status === 'open' && m.status !== 'open';
+  const updated = reopening ? await saveOpening(req.user.id, writeChanges) : await writeChanges(pool);
+  if (!updated) return res.status(400).json({ error: OPEN_CAP_MESSAGE });
   if (nextDue !== m.next_due || status !== m.status) {
     await scheduleReminders(m.id, status === 'open' ? nextDue : null);
   }
@@ -319,7 +358,7 @@ router.put('/:id', requireAuth(...OWNERS), requireIntParam('id'), async (req, re
 // POST /api/matters/:id/events: log a step taken. The owner can. An expert can while it is shared.
 // The owner may also attach one file (multipart/form-data, field "file"). The entry and its file are
 // made together or not at all. A lawyer's note never carries a file.
-router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id'), readEventUpload, limitEventUploads, async (req, res) => {
+router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntParam('id'), limitMultipartUploads, readEventUpload, async (req, res) => {
   const access = await loadMatter(req.params.id, req.user);
   if (!access) return res.status(404).json({ error: 'Matter not found' });
   const description = clean(req.body?.description);
@@ -348,11 +387,19 @@ router.post('/:id/events', requireAuth(...OWNERS, 'legal_expert'), requireIntPar
     }
   }
 
-  const [e] = await q(
-    `INSERT INTO matter_events (matter_id, author_id, occurred_on, description) VALUES ($1,$2,$3,$4)
-     RETURNING id, occurred_on, description, created_at`,
-    [access.matter.id, req.user.id, occurredOn, description]);
-  await q('UPDATE matters SET updated_at = now() WHERE id = $1', [access.matter.id]);
+  let e;
+  try {
+    e = await addPlainEntry({
+      matterId: access.matter.id,
+      userId: req.user.id,
+      occurredOn,
+      description,
+      kind: access.as === 'owner' ? 'entry' : 'system',
+    });
+  } catch (err) {
+    if (err instanceof Refusal) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
   res.status(201).json({ ...e, author_is_owner: access.as === 'owner' });
 });
 
@@ -381,6 +428,43 @@ router.get('/:id/events/:eventId/file', requireAuth(), requireIntParam('id'), re
     'X-Content-Type-Options': 'nosniff',
   });
   res.send(bytes);
+});
+
+// The entry the owner may delete: one they wrote as a record entry in this matter. Anything else is
+// null, which the two routes below answer as a 404. Nobody else gets a different answer.
+async function ownEntry(matterId, eventId, user) {
+  const access = await loadMatter(matterId, user);
+  if (!access || access.as !== 'owner') return null;
+  const [row] = await q(
+    `SELECT e.id, e.matter_id, f.stored_name
+       FROM matter_events e LEFT JOIN matter_event_files f ON f.event_id = e.id
+      WHERE e.id = $1 AND e.matter_id = $2 AND e.author_id = $3 AND e.kind = 'entry'`,
+    [eventId, access.matter.id, user.id]);
+  return row ?? null;
+}
+
+// DELETE /api/matters/:id/events/:eventId: the owner removes one of their own entries with its file.
+// The row goes first. The cascade removes the file row with it. The encrypted file is removed after
+// that. No history line is written, so nothing is left about what the entry said.
+// requireAuth() has no role list on purpose. A lawyer or an admin then gets the same 404 as anyone else.
+router.delete('/:id/events/:eventId', requireAuth(), requireIntParam('id'), requireIntParam('eventId'), async (req, res) => {
+  const found = await ownEntry(req.params.id, req.params.eventId, req.user);
+  if (!found) return res.status(404).json({ error: 'Entry not found' });
+  await q('DELETE FROM matter_events WHERE id = $1 AND matter_id = $2', [found.id, found.matter_id]);
+  if (found.stored_name) await removeDocumentFile(found.stored_name);
+  res.status(204).end();
+});
+
+// DELETE /api/matters/:id/events/:eventId/file: the owner removes only the file on their own entry.
+// The text of the entry stays. The file row goes first, then the encrypted file.
+router.delete('/:id/events/:eventId/file', requireAuth(), requireIntParam('id'), requireIntParam('eventId'), async (req, res) => {
+  const found = await ownEntry(req.params.id, req.params.eventId, req.user);
+  if (!found || !found.stored_name) return res.status(404).json({ error: 'File not found' });
+  const [gone] = await q(
+    'DELETE FROM matter_event_files WHERE event_id = $1 AND matter_id = $2 RETURNING stored_name',
+    [found.id, found.matter_id]);
+  if (gone) await removeDocumentFile(gone.stored_name);
+  res.status(204).end();
 });
 
 // DELETE /api/matters/:id: the owner only. The events and reminders are deleted with it.

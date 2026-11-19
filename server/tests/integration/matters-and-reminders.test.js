@@ -1,5 +1,6 @@
 import request from 'supertest';
 import app from '../../src/app.js';
+import { q } from '../../src/db.js';
 import { kigaliToday, addDays } from '../../src/services/reminders.js';
 import { resetDb, makeUser, makeProvider, makeRoute, makeMatter } from '../helpers.js';
 
@@ -72,6 +73,89 @@ describe('who can see a matter', () => {
     expect((await as(owner, 'get', `/api/matters/${theirs.id}`)).status).toBe(404);
   });
 
+});
+
+describe('sharing a matter with a lawyer', () => {
+  let lawyer;
+  let office;
+  let matter;
+  beforeEach(async () => {
+    lawyer = await makeUser('legal_expert', 'lawyer.one@example.org');
+    office = await makeProvider({ name: 'Legal Aid Office', user_id: lawyer.user.id }, { verifiedBy: expert.user.id });
+    matter = await makeMatter(owner.user.id, { title: 'Deposit dispute' });
+  });
+  const share = (who = owner, providerId = office.id) => as(who, 'post', `/api/matters/${matter.id}/share`).send({ provider_id: providerId });
+
+  it('lets the lawyer read it without learning who the owner is', async () => {
+    expect((await share()).status).toBe(200);
+    const list = await as(lawyer, 'get', '/api/matters/shared');
+    expect(list.body.map((m) => m.title)).toEqual(['Deposit dispute']);
+    const detail = await as(lawyer, 'get', `/api/matters/${matter.id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.viewer).toBe('expert');
+    expect(JSON.stringify(detail.body)).not.toContain(owner.user.email);
+    expect(JSON.stringify(detail.body)).not.toContain(owner.user.name);
+  });
+
+  it('ends the lawyer’s access on the very next request when the owner stops sharing', async () => {
+    await share();
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(200);
+    expect((await as(owner, 'delete', `/api/matters/${matter.id}/share`)).status).toBe(200);
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(404);
+  });
+
+  it('keeps it from every lawyer it was not shared with', async () => {
+    await share();
+    expect((await as(expert, 'get', `/api/matters/${matter.id}`)).status).toBe(404);
+  });
+
+  it('lets only the owner share it', async () => {
+    expect((await share(other)).status).toBe(404);
+  });
+
+  it('refuses an office that has no lawyer account behind it', async () => {
+    const noAccount = await makeProvider({ name: 'Walk-in Office' }, { verifiedBy: expert.user.id });
+    expect((await share(owner, noAccount.id)).status).toBe(400);
+  });
+
+  it('ends the share when an admin links the office to a different account', async () => {
+    await share();
+    const admin = await makeUser('admin');
+    const res = await as(admin, 'put', `/api/directory/providers/${office.id}`).send({ user_id: expert.user.id });
+    expect(res.status).toBe(200);
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(404);
+    const mine = await as(owner, 'get', `/api/matters/${matter.id}`);
+    expect(mine.body.shared_with).toBeNull();
+    expect(mine.body.events.map((e) => e.description).join(' ')).toContain('Sharing with Legal Aid Office ended');
+  });
+
+  it('ends the share when an admin changes a checked fact and the office goes back to draft', async () => {
+    await share();
+    const admin = await makeUser('admin');
+    const res = await as(admin, 'put', `/api/directory/providers/${office.id}`).send({ address: 'KG 9 Avenue, Kigali' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('draft');
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(404);
+    const mine = await as(owner, 'get', `/api/matters/${matter.id}`);
+    expect(mine.body.shared_with).toBeNull();
+    expect(mine.body.events.map((e) => e.description).join(' ')).toContain('Sharing with Legal Aid Office ended');
+  });
+
+  it('keeps the share when the admin changes something that is not a checked fact', async () => {
+    await share();
+    const admin = await makeUser('admin');
+    const res = await as(admin, 'put', `/api/directory/providers/${office.id}`).send({ meet_link: 'https://meet.google.com/abc-defg-hij' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('published');
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(200);
+  });
+
+  it('gives the lawyer nothing while the office is not published, even if a share is still recorded', async () => {
+    await share();
+    await q(`UPDATE providers SET status = 'draft', verified_by = NULL, verified_at = NULL WHERE id = $1`, [office.id]);
+    expect((await as(lawyer, 'get', `/api/matters/${matter.id}`)).status).toBe(404);
+    expect((await as(lawyer, 'get', '/api/matters/shared')).body).toEqual([]);
+  });
 });
 
 describe('the date rules', () => {
