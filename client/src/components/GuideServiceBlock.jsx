@@ -10,6 +10,8 @@ import { secureAddress } from '@/lib/url';
 // A fact the sources could not confirm is shown as that. It is never filled in.
 // An amount that is empty says so. "FRW 0" and "not published" are different things.
 const LINK = `inline-flex min-h-touch items-center font-semibold text-primary-text underline ${RING}`;
+// A "source" link is a 44 px target with side padding, and its text is 14 px at least.
+const SOURCE = `inline-flex min-h-touch min-w-touch items-center px-2 text-sm text-primary-text underline ${RING}`;
 const H3 = 'font-sans text-sm font-semibold text-ink';
 
 const frw = (n) => `FRW ${Number(n).toLocaleString('en-US')}`;
@@ -60,16 +62,6 @@ export default function GuideServiceBlock({ service }) {
               {portal.help_url && <External href={portal.help_url}>Read the official help article</External>}
             </p>
           )}
-          {(portal?.name?.toLowerCase().includes('irembo') || portal?.url?.includes('irembo.gov.rw')) && (
-            <div className="mt-3 rounded-card border border-border bg-primary-subtle p-3 text-xs text-primary-text">
-              <p className="font-semibold flex items-center gap-1.5">
-                <Icon name="verified" className="text-sm" /> Official Rwanda Government Portal (IremboGov)
-              </p>
-              <p className="mt-1">
-                <strong>How to pay:</strong> After submitting on Irembo, you will receive an 8-digit billing number (starts with 88...). Pay within 8 hours via <strong>MTN Mobile Money (*182*8*1#)</strong>, Airtel Money, or Bank of Kigali.
-              </p>
-            </div>
-          )}
           <dl className="mt-2 space-y-2 text-sm">
             {service.who_can_apply && (
               <div><dt className="font-semibold">Who can apply</dt><dd>{service.who_can_apply}</dd></div>
@@ -85,7 +77,7 @@ export default function GuideServiceBlock({ service }) {
                           {fee.amount_rwf === null || fee.amount_rwf === undefined ? 'not published. Ask the office' : frw(fee.amount_rwf)}
                         </span>
                         {fee.note && <span> ({fee.note})</span>}
-                        {fee.source_url && <> · <External href={fee.source_url} className={`underline text-primary-text ${RING}`}>source</External></>}
+                        {fee.source_url && <> · <External href={fee.source_url} className={SOURCE}>source</External></>}
                       </li>
                     ))}
                   </ul>
@@ -151,18 +143,12 @@ export default function GuideServiceBlock({ service }) {
                     {doc.required_if && <span> (only if {doc.required_if})</span>}
                     {doc.notes && <span className="block text-muted-foreground no-underline">{doc.notes}</span>}
                     {doc.where_to_get && <span className="block text-muted-foreground no-underline">Get it from: {doc.where_to_get}</span>}
-                    {doc.source_url && <External href={doc.source_url} className={`text-xs underline text-primary-text ${RING}`}>source</External>}
+                    {doc.source_url && <External href={doc.source_url} className={SOURCE}>source</External>}
                   </span>
                 </li>
               );
             })}
           </ul>
-          <div className="mt-3 rounded-card border border-border bg-surface-subtle p-2.5 text-xs text-muted-foreground">
-            <p className="font-semibold text-ink">Rwandan civic tip</p>
-            <p className="mt-0.5">
-              Always bring original physical documents (Passport/Alien Card, signed physical lease, or stamped certificates). Rwandan administrative offices require seeing the physical original even when an electronic copy was uploaded.
-            </p>
-          </div>
         </section>
       )}
 
@@ -178,7 +164,7 @@ export default function GuideServiceBlock({ service }) {
                 <p className="flex flex-wrap gap-x-4">
                   {office.phone && <a href={`tel:${office.phone.replace(/[^\d+]/g, '')}`} className={LINK}>{office.phone}</a>}
                   {office.map_url && <External href={office.map_url}>Open in maps</External>}
-                  {office.source_url && <External href={office.source_url}>Source</External>}
+                  {office.source_url && <External href={office.source_url} className={SOURCE}>Source</External>}
                 </p>
               </li>
             ))}

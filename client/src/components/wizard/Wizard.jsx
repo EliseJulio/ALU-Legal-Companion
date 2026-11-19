@@ -146,7 +146,9 @@ export default function Wizard({
   const problems = view.filter((s) => s.state === 'error').map((s) => s.label);
   // The phone order is the step heading then the circles then the form.
   // Desktop keeps the circles on top. The aside keeps them on top on every width.
-  const phoneOrder = (n) => (aside ? '' : `max-[1179px]:order-${n}`);
+  // Whole class names, so Tailwind finds and builds them. A class built from a number is not found.
+  const PHONE_ORDER = { 1: 'max-[1179px]:order-1', 2: 'max-[1179px]:order-2' };
+  const phoneOrder = (n) => (aside ? '' : PHONE_ORDER[n]);
   const phoneOnly = aside ? '' : 'hidden max-[1179px]:block';
 
   return (

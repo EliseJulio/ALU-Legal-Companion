@@ -8,6 +8,7 @@ import { signInPath } from '@/lib/url';
 import { BUTTON_OUTLINE, BUTTON_PRIMARY, BUTTON_TEXT } from '@/lib/ui';
 import RwandaJurisdictionLadder from '@/components/RwandaJurisdictionLadder';
 import NoMatchPanel from '@/components/NoMatchPanel';
+import ErrorNotice from '@/components/ErrorNotice';
 
 const SECTION = 'mt-6';
 const LABEL = 'text-sm font-semibold text-muted-foreground';
@@ -28,11 +29,20 @@ export default function RouteAnswer({ routeId, onBack }) {
 
   if (loading) return <p role="status" className="mt-4 text-muted-foreground">Loading this matter…</p>;
   if (error) {
+    if (error.status === 404) {
+      return (
+        <NoMatchPanel>
+          <p className="font-head text-[15px] leading-[1.3] text-ink">This matter is no longer listed</p>
+          <p className="mt-2 text-sm text-muted-foreground">It may have been changed. Browse the directory or ask a legal expert.</p>
+        </NoMatchPanel>
+      );
+    }
+    // Any other failure shows the server's own message, with a way back.
     return (
-      <NoMatchPanel>
-        <p className="font-head text-[15px] leading-[1.3] text-ink">This matter is no longer listed</p>
-        <p className="mt-2 text-sm text-muted-foreground">It may have been changed. Browse the directory or ask a legal expert.</p>
-      </NoMatchPanel>
+      <div className="mt-4">
+        <ErrorNotice error={error} />
+        <button type="button" onClick={onBack} className={`mt-3 ${BUTTON_TEXT}`}>Back to the matters</button>
+      </div>
     );
   }
   if (!route) return null;

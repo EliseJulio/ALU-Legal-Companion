@@ -19,7 +19,6 @@ export default function CrisisAlert() {
           >
             <span className="font-mono text-base font-bold text-alert-text">3029</span>{' '}
             <span>Isange One Stop Centre</span>
-            <span className="rounded-control bg-badge px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">Toll-free</span>
           </a>
         </li>
         <li>
@@ -29,13 +28,9 @@ export default function CrisisAlert() {
           >
             <span className="font-mono text-base font-bold text-alert-text">112</span>{' '}
             <span>Police</span>
-            <span className="rounded-control bg-badge px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">Toll-free</span>
           </a>
         </li>
       </ul>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Free, confidential, 24 hours · Toll-free / Ubuntu (dialable without airtime on MTN and Airtel Rwanda).
-      </p>
     </div>
   );
 }
