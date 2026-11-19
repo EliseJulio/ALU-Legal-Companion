@@ -3,7 +3,7 @@ import Breadcrumb from '@/components/Breadcrumb';
 import { useApi } from '@/lib/useApi';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
-import SubmitForReview from '@/components/SubmitForReview';
+import PublishButton from '@/components/PublishButton';
 import { CARD, PAGE_TITLE } from '@/lib/ui';
 import { ADMIN_BUTTON_OUTLINE, ADMIN_BUTTON_PRIMARY, Cell, RecordList, RecordRow } from '@/components/AdminRecords';
 
@@ -43,7 +43,7 @@ export default function AdminChecklists() {
             </Cell>
             <Cell className="flex flex-wrap items-start gap-2 md:justify-end">
               <Link to={`/admin/checklists/${list.id}`} className={ADMIN_BUTTON_OUTLINE} aria-label={`Edit ${list.title}`}>Edit</Link>
-              {list.status === 'draft' && <SubmitForReview path={`/checklists/${list.id}`} onDone={refetch} />}
+              {list.status === 'draft' && <PublishButton path={`/checklists/${list.id}`} onDone={refetch} />}
             </Cell>
           </RecordRow>
         ))}

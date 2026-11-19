@@ -4,7 +4,7 @@ import { useApi } from '@/lib/useApi';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
-import SubmitForReview from '@/components/SubmitForReview';
+import PublishButton from '@/components/PublishButton';
 import DisputeLadderEditor from '@/components/DisputeLadderEditor';
 import { ADMIN_BUTTON_OUTLINE, ADMIN_BUTTON_PRIMARY, Cell, RecordList, RecordRow } from '@/components/AdminRecords';
 import { readableDays } from '@/lib/directory';
@@ -50,7 +50,7 @@ export default function AdminRoutes() {
             </Cell>
             <Cell className="flex flex-wrap items-start gap-2 md:justify-end">
               <Link to={`/admin/routes/${r.id}`} className={ADMIN_BUTTON_OUTLINE} aria-label={`Edit ${r.title}`}>Edit</Link>
-              {r.status === 'draft' && <SubmitForReview path={`/directory/routes/${r.id}`} onDone={refetch} />}
+              {r.status === 'draft' && <PublishButton path={`/directory/routes/${r.id}`} onDone={refetch} />}
             </Cell>
           </RecordRow>
         ))}

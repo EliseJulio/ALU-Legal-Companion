@@ -25,10 +25,10 @@ function steps(report) {
 
 const LOOK = {
   done: 'border-primary-subtle bg-primary-subtle text-primary-text',
-  current: 'border-ink bg-surface font-semibold text-ink',
+  current: 'border-primary bg-primary-subtle font-semibold text-ink',
   next: 'border-border bg-canvas text-muted-foreground',
 };
-const STATE_WORD = { done: 'done', current: 'now', next: 'not yet' };
+const STATE_WORD = { done: 'Done', current: 'Now', next: 'Next' };
 
 // Check where a report is, with the code shown when it was sent. The code goes in the body of one
 // POST and nowhere else: not in the address, not in storage.
@@ -102,7 +102,7 @@ export default function ReportCheck() {
                   {steps(report).map((s) => (
                     <li key={s.label} className={`inline-flex items-center whitespace-nowrap rounded-control border px-3 py-1 text-xs ${LOOK[s.state]}`}>
                       {s.label}{s.date ? ` ${s.date}` : ''}
-                      <span className="sr-only"> ({STATE_WORD[s.state]})</span>
+                      {' '}<span className="ml-1 text-[11px] font-normal">{STATE_WORD[s.state]}</span>
                     </li>
                   ))}
                 </ol>

@@ -10,7 +10,7 @@ import { consultItem, longDay } from '@/lib/schedule';
 import { canCancel, cancelOwnBooking, answerProposal, rescheduleBooking } from '@/lib/bookings';
 import { ScheduleRow } from '@/components/ScheduleItem';
 import CancelConsultation from '@/components/CancelConsultation';
-import TimeActions from '@/components/ConsultTimeReply';
+import TimeActions, { ConsultNotice } from '@/components/ConsultTimeReply';
 import OwnerOnly from '@/components/OwnerOnly';
 import Breadcrumb from '@/components/Breadcrumb';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -19,7 +19,13 @@ import { BUTTON_OUTLINE, CARD, PAGE_TITLE } from '@/lib/ui';
 
 // The student's consultations in three lists. The Calendar shows the same ones by day.
 function AppointmentList() {
-  const { data, error, loading, refetch } = useApi('/bookings/mine', LIVE);
+  const { data, error, refreshError, loading, refetch } = useApi('/bookings/mine', LIVE);
+  const refreshNote = refreshError && (
+    <div role="status" className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+      <p>Could not refresh. Showing what was loaded before. Try again.</p>
+      <button type="button" className={BUTTON_OUTLINE} onClick={refetch}>Try again</button>
+    </div>
+  );
   const now = useNow();
   const items = useMemo(
     () => (data ?? []).map((b) => consultItem(b, now)).filter(Boolean),
@@ -32,16 +38,21 @@ function AppointmentList() {
 
   if (items.length === 0) {
     return (
-      <div className={`mt-6 ${CARD}`}>
-        <p className="font-medium">You have no appointments yet.</p>
-        <p className="mt-1 text-sm text-muted-foreground">Find a lawyer in the Directory and ask for a time.</p>
-        <Link to="/directory" className={`${BUTTON_OUTLINE} mt-3`}>Find a lawyer</Link>
-      </div>
+      <>
+        {refreshNote}
+        <div className={`mt-6 ${CARD}`}>
+          <p className="font-medium">You have no appointments yet.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Find a lawyer in the Directory and ask for a time.</p>
+          <Link to="/directory" className={`${BUTTON_OUTLINE} mt-3`}>Find a lawyer</Link>
+        </div>
+      </>
     );
   }
 
   // A request or an accepted time can be cancelled. The list is loaded again after a cancel.
   return (
+    <>
+    {refreshNote}
     <AppointmentGroups
       items={items}
       renderRow={(item) => (
@@ -65,6 +76,7 @@ function AppointmentList() {
         </>
       )}
     />
+    </>
   );
 }
 
@@ -87,6 +99,7 @@ export default function Appointments() {
             </div>
             <Link to="/calendar" className={BUTTON_OUTLINE}>See the calendar</Link>
           </div>
+          <ConsultNotice />
           <AppointmentList />
         </div>
       )}

@@ -233,14 +233,14 @@ function PersonRow({ person, isMe, onDone, onAnnounce, reloadFailed = false }) {
 // or booked.
 export default function AdminUsers() {
   const { user: me } = useAuth();
-  const { data: fetched, error, loading, refetch } = useApi('/admin/users');
+  const { data: fetched, error, refreshError, loading, refetch } = useApi('/admin/users');
   const [announcement, setAnnouncement] = useState('');
   // The list kept from before the last change. A failed reload gives no list from the server, so the
   // page keeps this one and the changed person's row says the list is out of date.
   const [before, setBefore] = useState(null);
   const [changed, setChanged] = useState(null);
   const people = fetched ?? before;
-  const reloadFailed = Boolean(error) && changed !== null;
+  const reloadFailed = Boolean(refreshError) && changed !== null;
 
   function changeSaved(personId) {
     setBefore(fetched ?? before);

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
 import CrisisAlert from '@/components/CrisisAlert';
 import ErrorNotice from '@/components/ErrorNotice';
@@ -13,10 +13,21 @@ const MAX_QUESTION = 500;
 const UNAVAILABLE = 'Ask AI is not available right now.';
 
 // Answers a question from the published guides with a Google Gemini model. The question is
-// prefilled from ?q=, but nothing is sent until the person ticks the box and presses Ask.
+// prefilled from the router state or from ?q=, but nothing is sent until the person ticks the box
+// and presses Ask.
 export default function AskAI() {
   const [params] = useSearchParams();
-  const [text, setText] = useState(() => (params.get('q') ?? '').slice(0, MAX_QUESTION));
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromState = typeof location.state?.q === 'string' ? location.state.q : '';
+  const fromQuery = params.get('q') ?? '';
+  const [text, setText] = useState(() => (fromState || fromQuery).slice(0, MAX_QUESTION));
+
+  // A question in the address bar is moved into the history entry's state, so it does not stay in the URL.
+  useEffect(() => {
+    if (fromQuery) navigate(location.pathname, { replace: true, state: { q: fromQuery } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [understood, setUnderstood] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
@@ -107,6 +118,7 @@ export default function AskAI() {
           <button
             type="submit"
             aria-disabled={canAsk ? undefined : true}
+            aria-describedby="ask-ai-hint"
             className={`mt-4 ${BUTTON_PRIMARY}`}
           >
             {sending ? 'Asking…' : 'Ask'}

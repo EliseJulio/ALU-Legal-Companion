@@ -261,7 +261,6 @@ export default function BookProvider() {
                 onDate={(d) => { setDate(d); setSlot(''); if (errorFor === 'slot') setErrorFor(null); }}
                 onTime={(iso) => { setSlot(iso); if (errorFor === 'slot') setErrorFor(null); }}
                 describedBy={errorFor === 'slot' ? 'booking-error' : undefined}
-                invalid={errorFor === 'slot'}
                 groupRef={slotRef}
               />
             )}

@@ -216,14 +216,14 @@ export default function GuideLibrary() {
       {shown?.length === 0 && (
         <div className={`mt-6 ${CARD}`}>
           <p className="font-medium">
-            {search.trim() ? `No guides match “${search.trim()}” yet.` : 'No guides match that yet.'}
+            {asked ? `No guides match “${asked}” yet.` : 'No guides match that yet.'}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             The library is still growing. Try fewer words, such as “neighbour” or “land”. A legal expert can
             answer directly, and you can ask without giving your name.
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            {(chosen.length > 0 || search.trim()) && (
+            {(chosen.length > 0 || asked) && (
               <button
                 type="button"
                 // This button leaves the page when it is pressed. Focus goes to the search box.

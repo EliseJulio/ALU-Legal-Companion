@@ -30,7 +30,7 @@ const PATHWAY = [
 ];
 
 const REVIEW = [
-  { title: 'Before publication', text: 'An administrator reviews content against official sources before it is shown.' },
+  { title: 'Before publication', text: 'An administrator checks content against official sources before it is shown.' },
   { title: 'After a significant change', text: 'Editing a published guide turns it back into a draft. It stays hidden until an administrator publishes it again.' },
   { title: 'At the point of use', text: 'Official sources and the date of the last check are shown when available. Missing evidence is never disguised.' },
 ];
@@ -93,8 +93,8 @@ export default function Landing() {
               connect with a human legal expert.
             </p>
             <p className="mt-6 flex flex-wrap gap-3">
-              <Link to="/where-to-go" className={`${BUTTON_PRIMARY} ${ON_CANVAS}`}>Find Where to Go</Link>
-              <Link to="/guides" className={`${BUTTON_OUTLINE} ${ON_CANVAS}`}>Explore Legal guides</Link>
+              <Link to="/where-to-go" className={`${BUTTON_PRIMARY} ${ON_CANVAS}`}>Find where to go</Link>
+              <Link to="/guides" className={`${BUTTON_OUTLINE} ${ON_CANVAS}`}>Explore legal guides</Link>
             </p>
             <p className="mt-4 text-sm text-muted-foreground">Browse without an account. Your personal matters stay private.</p>
           </div>
@@ -211,7 +211,7 @@ export default function Landing() {
           ) : (
             routes && routes.length === 0 && (
               <p className="mt-8 rounded-card border border-border bg-surface p-6 text-sm text-muted-foreground">
-                No matter has been verified yet. Each one appears here only after an admin has
+                No matter has been published yet. Each one appears here only after an admin has
                 checked and published it. Until then the free legal aid office in your district can tell you where to start.{' '}
                 <Link to="/directory" className={LINK}>See the directory</Link>
               </p>
@@ -245,7 +245,7 @@ export default function Landing() {
             ))}
           </ul>
         )}
-        <p className="mt-4"><Link to="/guides" className={LINK}>Explore all Legal guides<span aria-hidden="true">&nbsp;→</span></Link></p>
+        <p className="mt-4"><Link to="/guides" className={LINK}>Explore all legal guides<span aria-hidden="true">&nbsp;→</span></Link></p>
       </Band>
 
       <Band id="landing-people" tone="bg-canvas">
@@ -283,7 +283,7 @@ export default function Landing() {
       </Band>
 
       <Band id="landing-review" tone="bg-primary-subtle">
-        <Heading id="landing-review" eyebrow="What review should mean" eyebrowClass="text-sm font-medium text-ink" title="Trust is a visible record." />
+        <Heading id="landing-review" eyebrow="How content is published" eyebrowClass="text-sm font-medium text-ink" title="Trust is a visible record." />
         <ul className="mt-7 grid gap-4 xl:grid-cols-3">
           {REVIEW.map(({ title, text }) => (
             <li key={title} className="rounded-card border border-border bg-surface p-6">
@@ -322,7 +322,7 @@ export default function Landing() {
               A good next step starts with a clearer question.
             </h2>
             <p className="mt-4 text-muted-foreground">Choose your situation. Read the context. Decide what to check next.</p>
-            <Link to="/where-to-go" className={`${BUTTON_PRIMARY} mt-6 ${ON_CANVAS}`}>Find Where to Go</Link>
+            <Link to="/where-to-go" className={`${BUTTON_PRIMARY} mt-6 ${ON_CANVAS}`}>Find where to go</Link>
           </div>
         </div>
       </section>

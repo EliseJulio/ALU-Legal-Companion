@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import AskAI from '@/pages/AskAI';
 
 const reply = (status, body) => ({
@@ -24,14 +24,20 @@ function stub({ available = true, ask = reply(200, { answer: 'Short answer.', so
   });
 }
 
-function show(query = '') {
+function show(query = '', state) {
   return render(
-    <MemoryRouter initialEntries={[`/ask-ai${query}`]}>
+    <MemoryRouter initialEntries={[{ pathname: '/ask-ai', search: query, state }]}>
       <Routes>
         <Route path="/ask-ai" element={<AskAI />} />
       </Routes>
+      <Where />
     </MemoryRouter>,
   );
+}
+
+function Where() {
+  const location = useLocation();
+  return <p data-testid="where">{location.pathname}{location.search}</p>;
 }
 
 const user = () => userEvent.setup({ delay: null });
@@ -39,6 +45,27 @@ const user = () => userEvent.setup({ delay: null });
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+});
+
+describe('Ask AI: the question and the Ask button', () => {
+  it('points the Ask button at its hint', async () => {
+    stub();
+    show();
+    expect(await screen.findByRole('button', { name: 'Ask' })).toHaveAttribute('aria-describedby', 'ask-ai-hint');
+  });
+
+  it('reads the question from the router state', async () => {
+    stub();
+    show('', { q: 'Can my landlord keep my deposit' });
+    expect(await screen.findByLabelText('Your question')).toHaveValue('Can my landlord keep my deposit');
+  });
+
+  it('drops ?q= from the address once it is read', async () => {
+    stub();
+    show('?q=Can my landlord keep my deposit');
+    expect(await screen.findByLabelText('Your question')).toHaveValue('Can my landlord keep my deposit');
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/ask-ai$/);
+  });
 });
 
 describe('Ask AI', () => {

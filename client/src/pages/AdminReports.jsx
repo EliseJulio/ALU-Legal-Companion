@@ -125,9 +125,16 @@ function Detail({ id, onSaved, onOpened }) {
 export default function AdminReports() {
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
-  // A link from the bell can name the report: ?report=ID. That one is open when the page loads.
+  // A link from the bell can name the report: ?report=ID. It is followed when the page loads and
+  // whenever the link changes.
   const [params] = useSearchParams();
-  const [selected, setSelected] = useState(() => Number(params.get('report')) || null);
+  const linked = Number(params.get('report')) || null;
+  const [selected, setSelected] = useState(linked);
+  const [lastLinked, setLastLinked] = useState(linked);
+  if (lastLinked !== linked) {
+    setLastLinked(linked);
+    if (linked) setSelected(linked);
+  }
   const [downloading, setDownloading] = useState(false);
   const [downloadNote, setDownloadNote] = useState('');
   const [downloadError, setDownloadError] = useState(null);

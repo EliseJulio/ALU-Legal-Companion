@@ -113,7 +113,7 @@ export default function MatterDetail() {
   const here = useLocation();
   const navigate = useNavigate();
   const allowed = hasRole(user, ['student', 'staff', 'legal_expert']);
-  const { data: m, error, loading, refetch } = useApi(allowed ? `/matters/${id}` : null, LIVE);
+  const { data: m, error, refreshError, loading, refetch } = useApi(allowed ? `/matters/${id}` : null, LIVE);
   useScrollToHash(Boolean(m));
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -192,6 +192,12 @@ export default function MatterDetail() {
         trail={[{ label: 'Home', to: '/' }, owner ? { label: 'My matters', to: '/matters' } : { label: 'Shared matters', to: '/expert/matters' }]}
         current={m.title}
       />
+      {refreshError && (
+        <div role="status" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+          <p>Could not refresh. Showing what was loaded before. Try again.</p>
+          <button type="button" className={BUTTON_OUTLINE} onClick={refetch}>Try again</button>
+        </div>
+      )}
       <p className="mt-6 text-sm font-semibold text-muted-foreground">
         {owner ? (open ? 'Open matter' : 'Finished matter') : 'Shared matter'}
       </p>
@@ -280,7 +286,7 @@ export default function MatterDetail() {
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">
-                Reminders go to your email and say only the date, never what the matter is.
+                Reminders go to your email and give the date, never what the matter is.
               </p>
             </section>
           )}

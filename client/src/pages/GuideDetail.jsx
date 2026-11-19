@@ -129,7 +129,7 @@ export default function GuideDetail() {
             ))}
 
             <section aria-labelledby="guide-sources" className="border-t border-border-soft pt-6">
-              <h2 id="guide-sources" className="font-head text-[15px] leading-[1.3] text-ink">Sources &amp; review</h2>
+              <h2 id="guide-sources" className="font-head text-[15px] leading-[1.3] text-ink">Sources</h2>
               <dl className="mt-3 flex flex-col gap-3 text-sm">
                 <div>
                   <dt className="text-sm text-faint">Official reference</dt>

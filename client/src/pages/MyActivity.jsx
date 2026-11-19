@@ -11,7 +11,7 @@ import ErrorNotice from '@/components/ErrorNotice';
 import MeetLink from '@/components/MeetLink';
 import CancelConsultation from '@/components/CancelConsultation';
 import { canCancel, cancelOwnBooking, answerProposal, rescheduleBooking } from '@/lib/bookings';
-import TimeActions from '@/components/ConsultTimeReply';
+import TimeActions, { ConsultNotice } from '@/components/ConsultTimeReply';
 import StatusPill from '@/components/StatusPill';
 import { bookingStatusStep, readableSlot } from '@/lib/bookings';
 import { readableDate } from '@/lib/dates';
@@ -204,7 +204,7 @@ export default function MyActivity() {
   // that may still be good.
   const canTrack = canOwnActivity(user);
   const { data: questions, error: questionsError, loading: questionsLoading } = useApi(canTrack ? '/questions/mine' : null, LIVE);
-  const { data: bookings, error: bookingsError, loading: bookingsLoading, refetch: refetchBookings } = useApi(canTrack ? '/bookings/mine' : null, LIVE);
+  const { data: bookings, error: bookingsError, refreshError: bookingsRefreshError, loading: bookingsLoading, refetch: refetchBookings } = useApi(canTrack ? '/bookings/mine' : null, LIVE);
   const wide = useMediaQuery('(min-width: 1280px)');
   useScrollToHash(Boolean(questions));
 
@@ -260,8 +260,15 @@ export default function MyActivity() {
               <p className="text-sm text-muted-foreground">Appointments you requested with this account. They are on your Calendar.</p>
               <Link to="/calendar" className={BUTTON_OUTLINE}>Open Calendar</Link>
             </div>
+            <ConsultNotice />
             {bookingsLoading && <p className="mt-3 text-muted-foreground">Loading your appointments…</p>}
             {bookingsError && <ErrorNotice error={bookingsError} className="mt-3" />}
+            {bookingsRefreshError && (
+              <div role="status" className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+                <p>Could not refresh. Showing what was loaded before. Try again.</p>
+                <button type="button" className={BUTTON_OUTLINE} onClick={refetchBookings}>Try again</button>
+              </div>
+            )}
             {bookings?.length === 0 && (
               <div className={`mt-3 ${CARD}`}>
                 <p className="font-medium">You have not requested an appointment yet.</p>

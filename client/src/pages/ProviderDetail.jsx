@@ -81,7 +81,7 @@ export default function ProviderDetail() {
 
         <aside className="flex min-w-0 flex-col gap-5" aria-label="Sources and a note">
           <section className={CARD} aria-labelledby="provider-sources">
-            <h2 id="provider-sources" className="font-head text-[15px] leading-[1.3] text-ink">Sources &amp; review</h2>
+            <h2 id="provider-sources" className="font-head text-[15px] leading-[1.3] text-ink">Sources</h2>
             <dl className="mt-3 flex flex-col gap-3 text-sm">
               <div>
                 <dt className="text-sm text-muted-foreground">Official source</dt>

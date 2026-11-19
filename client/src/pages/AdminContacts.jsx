@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Breadcrumb from '@/components/Breadcrumb';
 import { apiDelete } from '@/lib/api';
 import { useApi } from '@/lib/useApi';
+import { usePanelFocus } from '@/lib/panelFocus';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import { CARD, PAGE_TITLE } from '@/lib/ui';
@@ -18,6 +19,7 @@ function ContactRow({ contact, onDone }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { firstRef, openerRef } = usePanelFocus(asking);
 
   async function remove() {
     setBusy(true);
@@ -44,11 +46,11 @@ function ContactRow({ contact, onDone }) {
       </Cell>
       <Cell className="flex flex-wrap items-start gap-2 md:justify-end">
         <Link to={`/admin/contacts/${contact.id}`} className={ADMIN_BUTTON_OUTLINE} aria-label={`Edit ${contact.name}`}>Edit</Link>
-        {!asking && <button type="button" className={ADMIN_BUTTON_OUTLINE} onClick={() => setAsking(true)}>Delete</button>}
+        {!asking && <button type="button" ref={openerRef} className={ADMIN_BUTTON_OUTLINE} onClick={() => setAsking(true)}>Delete</button>}
       </Cell>
       {asking && (
         <Cell className="md:col-span-full" >
-          <div role="group" aria-label={`Delete ${contact.name}`}>
+          <div ref={firstRef} tabIndex={-1} role="group" aria-label={`Delete ${contact.name}`} className="focus:outline-none">
             <p className="text-sm font-semibold">Delete this contact? It disappears from the urgent help page at once. The built-in list stays available if you delete every one.</p>
             <div className="mt-2 flex flex-wrap gap-3">
               <button type="button" aria-disabled={busy || undefined} className={ADMIN_BUTTON_DANGER} onClick={remove}>Delete contact record</button>

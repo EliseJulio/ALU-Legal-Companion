@@ -24,7 +24,7 @@ function SavedTable({ guides, onRemoved }) {
   return (
     <div data-scroll="intended" className="mt-6 overflow-x-auto rounded-card border border-border bg-surface">
       <table className="w-full min-w-[52rem] text-left">
-        <caption className="sr-only">Your saved guides with their subject, who checked them and what you can do</caption>
+        <caption className="sr-only">Your saved guides with their category, status and the actions you can take</caption>
         <thead className="border-b border-border bg-canvas">
           <tr>
             {['Guide', 'Category', 'Status', 'Actions'].map((name) => (
@@ -192,7 +192,7 @@ export default function SavedGuides() {
             Check the source each time you use a guide. Saving keeps your
             reference, not a legal guarantee.
           </Callout>
-          <p className="mt-4"><Link to="/guides" className={BUTTON_TEXT}>Explore Legal guides →</Link></p>
+          <p className="mt-4"><Link to="/guides" className={BUTTON_TEXT}>Explore legal guides →</Link></p>
         </>
       )}
     </div>

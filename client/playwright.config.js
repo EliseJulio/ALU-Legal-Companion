@@ -8,7 +8,9 @@ import { defineConfig } from '@playwright/test';
 // E2E_BASE_URL=http://localhost:5200. When it is set no server is started and none is reused,
 // so a different app already on the default port cannot answer the tests.
 const external = process.env.E2E_BASE_URL;
-const baseURL = external ?? 'http://localhost:5173';
+// With no E2E_BASE_URL the tests start their own server on a private port and never reuse another app.
+const PRIVATE_PORT = Number(process.env.E2E_PORT) || 5317;
+const baseURL = external ?? `http://localhost:${PRIVATE_PORT}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -27,13 +29,13 @@ export default defineConfig({
     viewport: { width: 390, height: 844 },
     hasTouch: true,
   },
-  // Starts the page if it is not already running. Skipped when the tests point at a running server.
+  // Starts its own page server. Skipped when the tests point at a running server.
   webServer: external
     ? undefined
     : {
-      command: 'npx vite --host localhost',
-      url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      command: `npx vite --host localhost --port ${PRIVATE_PORT} --strictPort`,
+      url: baseURL,
+      reuseExistingServer: false,
       timeout: 120000,
     },
 });

@@ -47,6 +47,7 @@ export default function RedeemInvite() {
     setError(null);
     setSending(true);
     inFlight.current = true;
+    let lostConnection = false;
     try {
       const session = await apiPost('/auth/redeem-invite', {
         invite_token: code.trim(),
@@ -58,12 +59,16 @@ export default function RedeemInvite() {
       navigate('/expert');
     } catch (err) {
       // The server says why an invitation was refused. The message is shown as it is.
+      // With no connection the typed passwords stay, so the reader can press again.
+      lostConnection = err?.status === 0;
       setError(err);
     } finally {
       inFlight.current = false;
-      setPassword('');
-      setShown(false);
-      setAgain('');
+      if (!lostConnection) {
+        setPassword('');
+        setShown(false);
+        setAgain('');
+      }
       setSending(false);
     }
   }

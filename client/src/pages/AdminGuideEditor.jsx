@@ -6,7 +6,7 @@ import RowEditor from '@/components/RowEditor';
 import { toFormService, toApiService, newRow } from '@/lib/serviceForm';
 import ErrorNotice from '@/components/ErrorNotice';
 import AdminEditorPage from '@/components/AdminEditorPage';
-import SubmitForReview from '@/components/SubmitForReview';
+import PublishButton from '@/components/PublishButton';
 import Field from '@/components/Field';
 import Wizard from '@/components/wizard/Wizard';
 import { WizField } from '@/components/wizard/WizardField';
@@ -394,7 +394,7 @@ export default function AdminGuideEditor() {
       {guide.status === 'withdrawn' && (
         <p className="mt-2 text-sm text-muted-foreground">Withdrawn. Edit it and publish again to bring it back.</p>
       )}
-      {guide.status === 'draft' && <SubmitForReview path={`/guides/${guide.id}`} onDone={refetch} className="mt-4" />}
+      {guide.status === 'draft' && <PublishButton path={`/guides/${guide.id}`} onDone={refetch} className="mt-4" />}
     </>
   );
 

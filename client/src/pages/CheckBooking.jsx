@@ -5,8 +5,9 @@ import Breadcrumb from '@/components/Breadcrumb';
 import StatusPill from '@/components/StatusPill';
 import MeetLink from '@/components/MeetLink';
 import CancelConsultation from '@/components/CancelConsultation';
-import TimeActions from '@/components/ConsultTimeReply';
+import TimeActions, { ConsultNotice } from '@/components/ConsultTimeReply';
 import { readableSlot, bookingStatusStep, canCancel, lookUpAnonBooking, cancelAnonBooking, answerProposalAnon, rescheduleBookingAnon } from '@/lib/bookings';
+import { clearNotice } from '@/lib/notice';
 import { FORM_FIELD, BUTTON_LG_PRIMARY, BUTTON_DISABLED, BUTTON_OUTLINE, BUTTON_TEXT, PAGE_TITLE, CARD } from '@/lib/ui';
 
 // Check an anonymous booking with its code. The code is kept in state and goes only into the
@@ -50,6 +51,7 @@ export default function CheckBooking() {
   function changeCode(value) {
     setCode(value);
     setBooking(null);
+    clearNotice();
     latest.current += 1;
     setLooking(false);
   }
@@ -109,6 +111,7 @@ export default function CheckBooking() {
         <p className="mt-2 text-sm text-muted-foreground">Try again when you have a connection. Keep the code you already saved.</p>
       )}
 
+      <ConsultNotice />
       {/* Always on the page so the result is read out when it arrives. */}
       <div role="status">
       {booking && (

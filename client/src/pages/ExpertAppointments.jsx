@@ -20,7 +20,7 @@ const GROUPS = {
 // The lawyer's consultations in three lists with the requests first.
 // Accept and decline and join are on each row. The Calendar shows the same ones by day.
 export default function ExpertAppointments() {
-  const { data: bookings, error, loading, refetch } = useApi('/bookings/expert', LIVE);
+  const { data: bookings, error, refreshError, loading, refetch } = useApi('/bookings/expert', LIVE);
   const now = useNow();
   const items = useMemo(() => expertItems(bookings ?? [], now), [bookings, now]);
   useScrollToHash(Boolean(bookings));
@@ -44,6 +44,12 @@ export default function ExpertAppointments() {
       <div role="status" className="sr-only">{message}</div>
       {loading && !bookings && <p className="mt-6 text-muted-foreground">Loading…</p>}
       {error && <ErrorNotice error={error} className="mt-6" />}
+      {refreshError && (
+        <div role="status" className="mt-6 flex flex-wrap items-center gap-3 text-sm">
+          <p>Could not refresh. Showing what was loaded before. Try again.</p>
+          <button type="button" className={BUTTON_OUTLINE} onClick={refetch}>Try again</button>
+        </div>
+      )}
 
       {bookings && bookings.length === 0 && (
         <div className={`mt-6 ${CARD}`}>

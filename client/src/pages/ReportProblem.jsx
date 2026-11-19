@@ -33,7 +33,9 @@ export default function ReportProblem() {
   const [where, setWhere] = useState('');
   const [aboutCleared, setAboutCleared] = useState(false);
   const [typed, setTyped] = useState('');
-  const filled = Boolean(about) && !aboutCleared;
+  // When the title cannot be found the field is left open for the reader to type in.
+  const [lookupFailed, setLookupFailed] = useState(false);
+  const filled = Boolean(about) && !aboutCleared && !lookupFailed;
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [errorCount, setErrorCount] = useState(0);
@@ -51,12 +53,13 @@ export default function ReportProblem() {
   useEffect(() => {
     let cancelled = false;
     setAboutCleared(false);
+    setLookupFailed(false);
     if (!about) { setWhere(''); return undefined; }
     if (about.kind === 'page') { setWhere(aboutText('page', about.path)); return undefined; }
     setWhere('');
     apiGet(aboutLookupPath(about), { anonymous: true })
       .then((data) => { if (!cancelled) setWhere(aboutText(about.kind, data.title ?? data.name)); })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setLookupFailed(true); });
     return () => { cancelled = true; };
     // "about" is rebuilt on every render. Its key says when it really changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps

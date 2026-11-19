@@ -20,6 +20,7 @@ function AnswerForm({ question, onDone }) {
 
   async function send(event) {
     event.preventDefault();
+    if (busy) return;
     if (!answer.trim()) {
       setError({ message: 'Write the answer first.' });
       return;
@@ -83,10 +84,21 @@ function QuestionPane({ question, headingRef, onDone }) {
 // Open questions with the oldest first and the chosen one beside them.
 // Anonymous questions have no name and no account behind them.
 export default function ExpertQuestions() {
-  const { data: questions, error, loading, refetch } = useApi('/questions/open', LIVE);
-  // A link from the bell can name the question: ?question=ID. That one is open when the page loads.
+  const { data: allQuestions, error, loading, refetch } = useApi('/questions/open', LIVE);
+  // A link from the bell can name the question: ?question=ID. It is followed when the page loads and
+  // whenever the link changes.
   const [params] = useSearchParams();
-  const [chosen, setChosen] = useState(() => Number(params.get('question')) || null);
+  const linked = Number(params.get('question')) || null;
+  const [chosen, setChosen] = useState(linked);
+  // Questions answered here stay hidden until the reload no longer lists them.
+  const [answered, setAnswered] = useState([]);
+  const questions = allQuestions && allQuestions.filter((q) => !answered.includes(q.id));
+
+  const [lastLinked, setLastLinked] = useState(linked);
+  if (lastLinked !== linked) {
+    setLastLinked(linked);
+    if (linked) setChosen(linked);
+  }
   // A new object each time, so the same words twice still move focus to the message again.
   const [notice, setNotice] = useState(null);
   const heading = useRef(null);
@@ -161,7 +173,7 @@ export default function ExpertQuestions() {
               key={current.id}
               question={current}
               headingRef={heading}
-              onDone={() => { setNotice({ text: 'Answer sent.' }); setChosen(null); refetch(); }}
+              onDone={() => { setAnswered((ids) => [...ids, current.id]); setNotice({ text: 'Answer sent.' }); setChosen(null); refetch(); }}
             />
           )}
         </div>

@@ -4,7 +4,7 @@ import { useApi } from '@/lib/useApi';
 import Callout from '@/components/Callout';
 import ErrorNotice from '@/components/ErrorNotice';
 import StatusPill from '@/components/StatusPill';
-import SubmitForReview from '@/components/SubmitForReview';
+import PublishButton from '@/components/PublishButton';
 import { ADMIN_BUTTON_OUTLINE, ADMIN_BUTTON_PRIMARY, Cell, RecordList, RecordRow } from '@/components/AdminRecords';
 import { CATEGORIES } from '@/lib/directory';
 import { PAGE_TITLE } from '@/lib/ui';
@@ -55,7 +55,7 @@ export default function AdminProviders() {
             </Cell>
             <Cell className="flex flex-wrap items-start gap-2 md:justify-end">
               <Link to={`/admin/providers/${p.id}`} className={ADMIN_BUTTON_OUTLINE} aria-label={`Edit ${p.name}`}>Edit</Link>
-              {p.status === 'draft' && <SubmitForReview path={`/directory/providers/${p.id}`} onDone={refetch} />}
+              {p.status === 'draft' && <PublishButton path={`/directory/providers/${p.id}`} onDone={refetch} />}
             </Cell>
           </RecordRow>
         ))}

@@ -42,7 +42,7 @@ export default function Privacy() {
       <Section id="collect" title="What we collect">
         <p>When you create an account we keep your name and email address. Your password is stored only as a hash, so nobody can read it.</p>
         <p>We also keep what you choose to add: your matters, their dates and your documents, the questions you send and your appointment bookings.</p>
-        <p>We do not collect a phone number, a home address or a student number.</p>
+        <p>We do not collect a phone number, a home address or a student number. We do not store profile photos.</p>
       </Section>
 
       <Section id="anonymous" title="Anonymous questions and bookings">
@@ -54,12 +54,12 @@ export default function Privacy() {
       <Section id="ask-ai" title="Ask AI">
         <p>Ask AI answers only from published guides. Nothing is stored: there is no chat log and no identity.</p>
         <p>Your question is sent to Google&apos;s Gemini service. That is why you must tick &quot;I understand&quot; before anything is sent.</p>
-        <p>AI answers may be wrong. They are legal information, not legal advice.</p>
+        <p>AI answers may be wrong. They are legal information not legal advice.</p>
       </Section>
 
       <Section id="documents" title="Documents, sharing and reminders">
         <p>Documents you add to a matter are stored encrypted. Only you, and a lawyer you share that matter with, can open them.</p>
-        <p>You can end sharing at any time. Reminder emails say only the date.</p>
+        <p>You can end sharing at any time. Reminder emails give the date and never say what your matter is.</p>
       </Section>
 
       <Section id="email" title="Email">
