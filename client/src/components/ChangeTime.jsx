@@ -53,6 +53,7 @@ export default function ChangeTime({ providerId, primaryLabel, onPick, onNeverMi
           time={time}
           onDate={(next) => { setDate(next); setTime(null); }}
           onTime={setTime}
+          compact
         />
       )}
       <div className="mt-3 flex flex-wrap gap-2">
