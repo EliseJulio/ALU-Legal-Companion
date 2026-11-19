@@ -1,6 +1,6 @@
 # Database design
 
-The database is PostgreSQL 16. There are 20 tables. They are made by the numbered files in `server/src/migrations/`. This page is drawn from those files.
+The database is PostgreSQL 16. There are 23 tables. They are made by the numbered files in `server/src/migrations/`. This page is drawn from those files.
 
 ## The tables and how they connect
 
@@ -109,7 +109,9 @@ erDiagram
         int provider_id FK
         timestamptz slot
         text topic "emptied when the person erases their account"
-        text status "requested, accepted, declined, completed"
+        text status "requested, accepted, declined, completed or cancelled"
+        timestamptz proposed_slot "a time the lawyer suggested, only while the status is requested"
+        timestamptz proposed_at
         text room_name "the Daily room, made the first time it is needed"
         timestamptz room_created_at
     }
@@ -138,6 +140,7 @@ erDiagram
         int author_id FK
         date occurred_on
         text description
+        text kind "entry or system"
     }
     reminders {
         int id PK
@@ -215,7 +218,30 @@ erDiagram
         timestamptz read_at
         timestamptz resolved_at
     }
+    email_sends {
+        date day PK "the day in Kigali"
+        int count "emails sent that day"
+    }
+    provider_availability {
+        int id PK
+        int provider_id FK
+        int weekday "1 Monday to 7 Sunday"
+        int start_minute "minutes after midnight, on the half hour"
+        int end_minute "minutes after midnight, on the half hour"
+    }
+    booking_reminders {
+        int id PK
+        int booking_id FK
+        text recipient "owner or lawyer"
+        text kind "day or hour"
+        timestamptz send_at
+        text status "pending, sent, missed or cancelled"
+    }
 ```
+
+`matter_events.kind` tells a line the owner wrote (`entry`) from a line the application or a lawyer wrote (`system`). Only the owner's own `entry` lines can be deleted, with their file. `email_sends` stands alone. It holds one row for each day with the number of emails sent, so the daily email budget is shared by every server process.
+
+`provider_availability` holds a lawyer's weekly consultation hours, one row for each window, in Kigali time. `providers.availability_set_at` is empty until the lawyer first saves hours. While it is empty the standard hours (Monday to Friday, 09:00 to 17:00) apply and no rows are needed. A saved empty list means bookings are closed on purpose. `booking_reminders` holds the reminders 24 hours and 1 hour before an accepted consultation, one row for each person and kind, and goes when its booking goes. A booking status can also be `cancelled`.
 
 `users` also has a `pending_email` column that holds a new address until its link is used. `matters` has a `checklist_id` that is cleared if the checklist is deleted, so a checklist can never delete a matter.
 
