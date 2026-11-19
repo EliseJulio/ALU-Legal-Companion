@@ -8,7 +8,14 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { newSubmitLimiter, newTokenLookupLimiter } from '../middleware/rateLimit.js';
 import { makeAnonToken, normalizeAnonToken, hashAnonToken } from '../services/anonToken.js';
-import { bookingAccepted } from '../services/notify.js';
+import { createLimiter } from '../middleware/rateLimit.js';
+import { bookingAccepted, bookingDeclined, newRequest, bookingCancelled } from '../services/notify.js';
+import {
+  isBookable, requestProblem, MESSAGES, MAX_OPEN_REQUESTS,
+} from '../services/bookingHours.js';
+import {
+  scheduleBookingReminders, cancelBookingReminders,
+} from '../services/bookingReminders.js';
 import { dailyAvailable, roomsPerDay, createRoom, createToken, roomUrl } from '../services/dailyRooms.js';
 import { callConfigured, roomNameFor, signTicket, signalUrl, iceServers } from '../services/callTickets.js';
 
@@ -19,7 +26,7 @@ const anonymousLimiter = newSubmitLimiter();
 const tokenLimiter = newTokenLookupLimiter();
 
 // The columns every read returns. The row also has user_id and it is not needed.
-const BOOKING_COLUMNS = 'b.id, b.provider_id, b.slot, b.topic, b.status, b.created_at';
+export const BOOKING_COLUMNS = 'b.id, b.provider_id, b.slot, b.topic, b.status, b.created_at, b.proposed_slot';
 
 // The video room is given out only once the expert has accepted. A requested booking is a
 // request and not an appointment. Giving out the link earlier invites somebody to a
@@ -27,43 +34,76 @@ const BOOKING_COLUMNS = 'b.id, b.provider_id, b.slot, b.topic, b.status, b.creat
 // reason. The rule is written once here so the three reads cannot drift apart.
 const ROOM_WHEN_ACCEPTED = `CASE WHEN b.status = 'accepted' THEN p.meet_link END AS meet_link`;
 
-// A person is only ever sent to a body that somebody checked. So the entry must be
-// published as well as bookable. Posting its id directly must not get around that.
-async function bookableProvider(id) {
-  const [p] = await q(
-    `SELECT id FROM providers WHERE id = $1 AND bookable = true AND status = 'published'`, [id]);
-  return p;
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 // Checks the body of a booking request. Returns { error } or the clean values.
-function bookingInput(body) {
+// Whether the slot is open is checked later, by requestProblem, for every kind of request.
+export function bookingInput(body) {
   const { provider_id: providerId, slot, topic } = body || {};
   if (!providerId || !slot) return { error: 'provider_id and slot are required' };
   if (!isValidId(providerId)) return { error: 'provider_id must be a valid id' };
   const when = typeof slot === 'string' ? new Date(slot) : null;
-  if (!when || Number.isNaN(when.getTime()) || when <= new Date() || when.getTime() > Date.now() + 365 * DAY_MS) {
-    return { error: 'slot must be a date and time in the future within the next year' };
+  if (!when || Number.isNaN(when.getTime())) {
+    return { error: 'slot must be a date and time, such as 2026-12-01T08:00:00.000Z' };
   }
   if (topic !== undefined && topic !== null && (typeof topic !== 'string' || topic.length > 500)) {
     return { error: 'topic must be text of 500 characters or fewer' };
   }
-  return { providerId: Number(providerId), slot: when.toISOString(), topic: topic?.trim() || null };
+  return { providerId: Number(providerId), instant: when, slot: when.toISOString(), topic: topic?.trim() || null };
 }
 
-const NOT_BOOKABLE = { error: 'This provider does not take online bookings yet' };
+// The checks every request meets, signed in or anonymous. Returns a message, or null when it may go on.
+export async function requestRefusal(input) {
+  if (!(await isBookable(input.providerId))) return MESSAGES.notBookable;
+  return requestProblem(input.providerId, input.instant);
+}
+
+// Per signed-in person, per entry, 10 requests an hour. The count includes refused requests.
+export const bookingLimiter = createLimiter({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => `user:${req.user.id}`,
+  message: 'Too many consultation requests. Please wait an hour and try again.',
+});
+
+// Saves a signed-in request if the person has fewer than MAX_OPEN_REQUESTS open with this entry.
+// The count and the insert share one transaction and a lock on the pair, so two requests at once
+// cannot both take the last place.
+async function saveSignedInRequest(userId, input) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`request:${userId}:${input.providerId}`]);
+    const [{ open }] = (await client.query(
+      `SELECT count(*)::int AS open FROM bookings
+        WHERE user_id = $1 AND provider_id = $2 AND status = 'requested'`,
+      [userId, input.providerId])).rows;
+    if (open >= MAX_OPEN_REQUESTS) {
+      await client.query('ROLLBACK');
+      return { error: MESSAGES.cap };
+    }
+    const { rows: [booking] } = await client.query(
+      `INSERT INTO bookings (user_id, provider_id, slot, topic) VALUES ($1,$2,$3,$4)
+       RETURNING id, provider_id, slot, topic, status, created_at`,
+      [userId, input.providerId, input.slot, input.topic]);
+    await client.query('COMMIT');
+    return { booking };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 // POST /api/bookings: a signed-in student or staff member
-router.post('/', requireAuth('student', 'staff'), async (req, res) => {
+router.post('/', requireAuth('student', 'staff'), bookingLimiter, async (req, res) => {
   const input = bookingInput(req.body);
   if (input.error) return res.status(400).json({ error: input.error });
-  if (!(await bookableProvider(input.providerId))) return res.status(400).json(NOT_BOOKABLE);
-  const [booking] = await q(
-    `INSERT INTO bookings (user_id, provider_id, slot, topic) VALUES ($1,$2,$3,$4)
-     RETURNING id, provider_id, slot, topic, status, created_at`,
-    [req.user.id, input.providerId, input.slot, input.topic]);
-  res.status(201).json(booking);
+  const refusal = await requestRefusal(input);
+  if (refusal) return res.status(400).json({ error: refusal });
+  const saved = await saveSignedInRequest(req.user.id, input);
+  if (saved.error) return res.status(400).json({ error: saved.error });
+  newRequest(saved.booking.id);
+  res.status(201).json(saved.booking);
 });
 
 // POST /api/bookings/anonymous: no identity is stored and the token is shown once.
@@ -71,13 +111,15 @@ router.post('/', requireAuth('student', 'staff'), async (req, res) => {
 router.post('/anonymous', anonymousLimiter, async (req, res) => {
   const input = bookingInput(req.body);
   if (input.error) return res.status(400).json({ error: input.error });
-  if (!(await bookableProvider(input.providerId))) return res.status(400).json(NOT_BOOKABLE);
+  const refusal = await requestRefusal(input);
+  if (refusal) return res.status(400).json({ error: refusal });
   // The person gets the token. The database keeps only its hash.
   const anonToken = makeAnonToken();
   const [booking] = await q(
     `INSERT INTO bookings (anon_token, provider_id, slot, topic) VALUES ($1,$2,$3,$4)
      RETURNING id, provider_id, slot, topic, status`,
     [hashAnonToken(anonToken), input.providerId, input.slot, input.topic]);
+  newRequest(booking.id);
   res.status(201).json({
     ...booking,
     anon_token: anonToken,
@@ -93,16 +135,18 @@ router.get('/mine', requireAuth('student', 'staff'), async (req, res) => {
       WHERE b.user_id = $1 ORDER BY b.slot DESC`, [req.user.id]));
 });
 
-// GET /api/bookings/anon/:token: check the status of an anonymous booking. No login.
+// POST /api/bookings/anon/status: check the status of an anonymous booking. No login.
+// The code goes in the body, so it never appears in an address or a server log.
 // The room belongs to the expert. Giving it to the person who booked reveals nothing about
 // who they are. Holding it back would force an anonymous person to identify themselves at
 // the last step.
-router.get('/anon/:token', tokenLimiter, async (req, res) => {
+// Registered before the /:id routes so that "anon" is not read as a booking id.
+router.post('/anon/status', tokenLimiter, async (req, res) => {
   const NOT_FOUND = { error: 'No booking found for this token' };
-  const token = normalizeAnonToken(req.params.token);
+  const token = typeof req.body?.code === 'string' ? normalizeAnonToken(req.body.code) : null;
   if (!token) return res.status(404).json(NOT_FOUND);
   const [booking] = await q(
-    `SELECT b.id, b.slot, b.topic, b.status, p.name AS provider_name, ${ROOM_WHEN_ACCEPTED}
+    `SELECT b.id, b.provider_id, b.slot, b.topic, b.status, b.proposed_slot, p.name AS provider_name, ${ROOM_WHEN_ACCEPTED}
        FROM bookings b JOIN providers p ON p.id = b.provider_id WHERE b.anon_token = $1`,
     [hashAnonToken(token)]);
   if (!booking) return res.status(404).json(NOT_FOUND);
@@ -125,6 +169,46 @@ router.get('/expert', requireAuth('legal_expert'), async (req, res) => {
 // A booking only moves forward. A finished or declined booking cannot be changed again.
 const NEXT_STATUS = { requested: ['accepted', 'declined'], accepted: ['completed', 'declined'] };
 
+// A consultation can be cancelled while it is requested or accepted.
+const CANCELLABLE = ['requested', 'accepted'];
+
+// Cancels a booking that the caller has already found. Frees its slot and its reminders. A lawyer
+// is told only when an accepted consultation is cancelled.
+async function cancelBooking(res, current) {
+  if (!CANCELLABLE.includes(current.status)) {
+    return res.status(400).json({ error: `This consultation is ${current.status} and cannot be cancelled.` });
+  }
+  const [booking] = await q(
+    `UPDATE bookings SET status = 'cancelled', proposed_slot = NULL, proposed_at = NULL WHERE id = $1 AND status = $2
+     RETURNING ${BOOKING_COLUMNS.replaceAll('b.', '')}`,
+    [current.id, current.status]);
+  if (!booking) return res.status(409).json({ error: 'That booking was just changed. Reload and try again.' });
+  await cancelBookingReminders(booking.id);
+  if (current.status === 'accepted') bookingCancelled(booking.id);
+  res.json(booking);
+}
+
+// POST /api/bookings/anon/cancel: the code goes in the body, never in the address. Registered before
+// the signed-in cancel route so that "anon" is not read as a booking id.
+router.post('/anon/cancel', tokenLimiter, async (req, res) => {
+  const NOT_FOUND = { error: 'No booking found for this token' };
+  const token = typeof req.body?.anon_token === 'string' ? normalizeAnonToken(req.body.anon_token) : null;
+  if (!token) return res.status(404).json(NOT_FOUND);
+  const [current] = await q('SELECT id, status FROM bookings WHERE anon_token = $1', [hashAnonToken(token)]);
+  if (!current) return res.status(404).json(NOT_FOUND);
+  return cancelBooking(res, current);
+});
+
+// POST /api/bookings/:id/cancel: the signed-in person who made the booking. Anyone else gets 404.
+router.post('/:id/cancel', requireAuth('student', 'staff'), requireIntParam('id'), async (req, res) => {
+  const [current] = await q('SELECT id, status FROM bookings WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+  if (!current) return res.status(404).json({ error: 'Booking not found (or not yours)' });
+  return cancelBooking(res, current);
+});
+
+// Reminders are a convenience. A failure to make them must not undo the change that caused it.
+const logReminderError = (err) => console.error('[booking-reminders] could not update', { error: err.code || err.name });
+
 // POST /api/bookings/:id/status: the expert accepts, declines or completes their own bookings
 router.post('/:id/status', requireAuth('legal_expert'), requireIntParam('id'), async (req, res) => {
   const { status } = req.body || {};
@@ -132,21 +216,34 @@ router.post('/:id/status', requireAuth('legal_expert'), requireIntParam('id'), a
     return res.status(400).json({ error: 'status must be accepted, declined or completed' });
   }
   const [current] = await q(
-    `SELECT b.id, b.status FROM bookings b JOIN providers p ON p.id = b.provider_id
+    `SELECT b.id, b.status, b.slot FROM bookings b JOIN providers p ON p.id = b.provider_id
       WHERE b.id = $1 AND p.user_id = $2`, [req.params.id, req.user.id]);
   if (!current) return res.status(404).json({ error: 'Booking not found (or not yours)' });
   if (!NEXT_STATUS[current.status]?.includes(status)) {
     return res.status(400).json({ error: `A booking that is ${current.status} cannot be marked ${status}.` });
   }
+  const now = new Date();
+  if (status === 'accepted' && new Date(current.slot) <= now) {
+    return res.status(400).json({ error: 'That time has already passed.' });
+  }
+  if (status === 'completed' && new Date(current.slot) > now) {
+    return res.status(400).json({ error: 'The consultation has not happened yet.' });
+  }
   try {
     // The old status is in the WHERE so two changes at once cannot both succeed.
     const [booking] = await q(
-      `UPDATE bookings b SET status = $1 WHERE b.id = $2 AND b.status = $3
+      `UPDATE bookings b SET status = $1, proposed_slot = NULL, proposed_at = NULL WHERE b.id = $2 AND b.status = $3
        RETURNING ${BOOKING_COLUMNS.replaceAll('b.', '')}`,
       [status, current.id, current.status]);
     if (!booking) return res.status(409).json({ error: 'That booking was just changed. Reload and try again.' });
     // A signed-in person is told by email with the time and the room. A failed send is logged only.
-    if (status === 'accepted') bookingAccepted(booking.id);
+    if (status === 'accepted') {
+      bookingAccepted(booking.id);
+      await scheduleBookingReminders(booking.id).catch(logReminderError);
+    } else {
+      if (status === 'declined') bookingDeclined(booking.id);
+      await cancelBookingReminders(booking.id).catch(logReminderError);
+    }
     res.json(booking);
   } catch (err) {
     // The database allows one accepted booking for each provider and time.
@@ -182,7 +279,7 @@ async function claimRoom(bookingId) {
   try {
     await client.query('BEGIN');
     const { rows: [booking] } = await client.query(
-      'SELECT room_name FROM bookings WHERE id = $1 FOR UPDATE', [bookingId]);
+      'SELECT room_name, slot FROM bookings WHERE id = $1 FOR UPDATE', [bookingId]);
     if (booking.room_name) {
       await client.query('COMMIT');
       return { name: booking.room_name };
@@ -198,7 +295,7 @@ async function claimRoom(bookingId) {
     }
     let name;
     try {
-      name = await createRoom();
+      name = await createRoom(booking.slot);
     } catch (err) {
       // Only the error type is logged. Nothing from the request or the reply is written down.
       console.error('[video] room not made:', err.name);
