@@ -34,7 +34,7 @@ export function validateChecklist(input) {
   const slug = text(input, 'slug', 'checklist', { required: true, max: 60 });
   if (slug !== undefined && !SLUG.test(slug)) fail('checklist.slug', 'use lower-case letters, digits and single hyphens');
   const title = text(input, 'title', 'checklist', { required: true, max: 200 });
-  const description = text(input, 'description', 'checklist', { max: 1000 });
+  const description = text(input, 'description', 'checklist', { max: 2000 });
 
   let items;
   if (!Array.isArray(input.items) || input.items.length === 0) {

@@ -6,6 +6,7 @@ import { q } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam } from '../middleware/validate.js';
 import { validateChecklist } from '../services/checklists.js';
+import { noteIn } from '../services/guideNotes.js';
 
 const router = Router();
 
@@ -64,10 +65,12 @@ router.post('/', requireAuth('admin'), async (req, res) => {
 router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   const [existing] = await q('SELECT * FROM document_checklists WHERE id = $1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Checklist not found' });
+  // A description sent as null is cleared. One left out keeps its value.
+  const hasDescription = Object.prototype.hasOwnProperty.call(req.body || {}, 'description');
   const merged = {
     slug: req.body?.slug ?? existing.slug,
     title: req.body?.title ?? existing.title,
-    description: req.body?.description ?? existing.description ?? undefined,
+    description: hasDescription ? (req.body.description ?? undefined) : (existing.description ?? undefined),
     items: req.body?.items ?? existing.items,
   };
   const checked = validateChecklist(merged);
@@ -89,11 +92,34 @@ router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res)
 
 // POST /api/checklists/:id/publish : the admin publishes a draft directly.
 router.post('/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  // A note left for the editor must not go public. The checklist stays a draft until it is removed.
+  // The version that was checked is remembered by its update time. Only that version is published.
+  const [draft] = await q(
+    `SELECT title, description, items, updated_at::text AS seen_at
+       FROM document_checklists WHERE id = $1 AND status <> 'published'`, [req.params.id]);
+  if (draft) {
+    const entries = [['Checklist title', draft.title], ['Checklist description', draft.description]];
+    for (const item of draft.items ?? []) {
+      entries.push(['Document name', item?.name], ['Document notes', item?.notes],
+        ['Where to get it', item?.where_to_get], ['Required if', item?.required_if]);
+    }
+    const note = noteIn(entries);
+    if (note) return res.status(400).json({ error: note });
+  }
   const [c] = await q(
     `UPDATE document_checklists
         SET status='published', verified_by=$1, verified_at=now(), review_comment=NULL, updated_at=now()
-      WHERE id=$2 AND status <> 'published' RETURNING *`, [req.user.id, req.params.id]);
-  if (!c) return res.status(400).json({ error: 'That checklist could not be found or is already published' });
+      WHERE id=$2 AND status <> 'published' AND updated_at = $3::timestamptz RETURNING *`,
+    [req.user.id, req.params.id, draft?.seen_at ?? null]);
+  if (!c) {
+    if (draft) {
+      const [current] = await q('SELECT status FROM document_checklists WHERE id = $1', [req.params.id]);
+      if (current && current.status !== 'published') {
+        return res.status(409).json({ error: 'That record was just changed. Reload and try again.' });
+      }
+    }
+    return res.status(400).json({ error: 'That checklist could not be found or is already published' });
+  }
   res.json(c);
 });
 

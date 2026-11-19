@@ -8,6 +8,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireIntParam, isValidId } from '../middleware/validate.js';
 import { recordReview } from './reviewSteps.js';
 import { kigaliToday } from '../services/reminders.js';
+import { noteIn } from '../services/guideNotes.js';
 
 const router = Router();
 
@@ -40,11 +41,20 @@ const OPTIONAL_TEXT = [
 
 const clean = (v) => (typeof v === 'string' ? v.trim() : v);
 
+// Longest text an admin may enter for each field of an entry.
+const ENTRY_LIMITS = {
+  location: 300, contact: 300, languages: 300, address: 300, hours: 300,
+  services: 2000, address_note: 500, official_source_url: 500,
+};
+
 // Returns a message for the first problem found or null. It runs on the merged row so a
 // partial edit is checked as the entry it would become.
 async function providerError(p) {
   if (typeof p.name !== 'string' || !p.name) return 'name is required';
   if (p.name.length > 200) return 'name must be 200 characters or fewer';
+  for (const [field, max] of Object.entries(ENTRY_LIMITS)) {
+    if (typeof p[field] === 'string' && p[field].length > max) return `${field} must be ${max} characters or fewer`;
+  }
   if (!PROVIDER_CATEGORIES.includes(p.category)) return `category must be one of: ${PROVIDER_CATEGORIES.join(', ')}`;
   if (!PROVIDER_TYPES.includes(p.type)) return `type must be one of: ${PROVIDER_TYPES.join(', ')}`;
   if (p.official_source_url) {
@@ -193,17 +203,21 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
      merged.languages, merged.is_free, merged.official_source_url, merged.user_id, merged.bookable,
      merged.meet_link, merged.address, merged.hours, merged.address_note, existing.id]);
 
-  // Changing the linked account changes who can read every matter already shared with this entry.
-  // So those shares end here and each owner is told. They can share again.
-  if (String(merged.user_id ?? '') !== String(existing.user_id ?? '')) {
+  // A matter is shared with a published office and one linked account. When the account changes, or
+  // the office goes back to draft, those shares end here and each owner is told. They can share again.
+  const accountChanged = String(merged.user_id ?? '') !== String(existing.user_id ?? '');
+  const leftPublished = existing.status === 'published' && row.status !== 'published';
+  if (accountChanged || leftPublished) {
+    const message = accountChanged
+      ? `Sharing with ${row.name} ended because the contact account of that office was changed. Share again if you still want them to see this.`
+      : `Sharing with ${row.name} ended because that office was changed and is waiting to be published again. Share again once it is back in the directory.`;
     await q(
       `WITH ended AS (
          UPDATE matters SET shared_with = NULL, shared_at = NULL, updated_at = now()
           WHERE shared_with = $1 RETURNING id, user_id)
-       INSERT INTO matter_events (matter_id, author_id, occurred_on, description)
-       SELECT id, user_id, $2, $3 FROM ended`,
-      [row.id, kigaliToday(),
-       `Sharing with ${row.name} ended because the contact account of that office was changed. Share again if you still want them to see this.`]);
+       INSERT INTO matter_events (matter_id, author_id, occurred_on, description, kind)
+       SELECT id, user_id, $2, $3, 'system' FROM ended`,
+      [row.id, kigaliToday(), message]);
   }
   res.json(row);
 });
@@ -211,12 +225,34 @@ router.put('/providers/:id', requireAuth('admin'), requireIntParam('id'), async 
 // ------------------------------------------------------------------------------ publishing
 
 router.post('/providers/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  // A note left for the editor must not go public. The entry stays a draft until it is removed.
+  // The version that was checked is remembered by its update time. Only that version is published.
+  const [draft] = await q(
+    `SELECT name, location, contact, services, languages, address, hours, address_note,
+            updated_at::text AS seen_at
+       FROM providers WHERE id = $1 AND status <> 'published'`, [req.params.id]);
+  if (draft) {
+    const note = noteIn([
+      ['Name', draft.name], ['Location', draft.location], ['Contact', draft.contact],
+      ['Services', draft.services], ['Languages', draft.languages], ['Address', draft.address],
+      ['Hours', draft.hours], ['Address note', draft.address_note],
+    ]);
+    if (note) return res.status(400).json({ error: note });
+  }
   const [row] = await q(
     `UPDATE providers SET status = 'published', verified_by = $1, verified_at = now(),
             last_checked_at = (now() AT TIME ZONE 'Africa/Kigali')::date, updated_at = now()
-      WHERE id = $2 AND status <> 'published' RETURNING id, status`,
-    [req.user.id, req.params.id]);
-  if (!row) return res.status(400).json({ error: 'That entry could not be found or is already published' });
+      WHERE id = $2 AND status <> 'published' AND updated_at = $3::timestamptz RETURNING id, status`,
+    [req.user.id, req.params.id, draft?.seen_at ?? null]);
+  if (!row) {
+    if (draft) {
+      const [current] = await q('SELECT status FROM providers WHERE id = $1', [req.params.id]);
+      if (current && current.status !== 'published') {
+        return res.status(409).json({ error: 'That record was just changed. Reload and try again.' });
+      }
+    }
+    return res.status(400).json({ error: 'That entry could not be found or is already published' });
+  }
   await recordReview('provider', row.id, req.user.id, 'published');
   res.json(row);
 });

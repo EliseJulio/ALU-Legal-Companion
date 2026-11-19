@@ -11,6 +11,7 @@ import { searchRoutes } from '../services/routing.js';
 import { PUBLIC_PROVIDER_COLUMNS } from './directory.js';
 import { DOMAINS, normalizeDomain } from '../services/domains.js';
 import { recordReview } from './reviewSteps.js';
+import { noteIn } from '../services/guideNotes.js';
 
 const router = Router();
 
@@ -30,6 +31,37 @@ function stepsFrom(value) {
   return value.map((s) => (typeof s === 'string' ? s.trim() : '')).filter(Boolean);
 }
 
+// Caps on the cleaned text. The first four are the limits an admin can read in the editor.
+const TEXT_LIMITS = {
+  title: 300, keywords: 500, legal_basis: 1000, exclusions: 2000, deadline_runs_from: 300, deadline_note: 1000,
+};
+const TEXT_FIELDS = ['matter_type', ...Object.keys(TEXT_LIMITS)];
+const MAX_STEPS = 20;
+const MAX_STEP = 1000;
+
+// A whole number of days, as a number or as text of digits. A decimal or true or a list is refused.
+const wholeDays = (v) => (typeof v === 'number' && Number.isInteger(v) && v > 0)
+  || (typeof v === 'string' && /^[1-9]\d{0,5}$/.test(v.trim()));
+
+// Refuses a request whose fields have the wrong shape. It runs before anything is cleaned, so a
+// number or a list is refused and not turned into text or dropped.
+function shapeError(body) {
+  for (const f of TEXT_FIELDS) {
+    const v = body[f];
+    if (v !== undefined && v !== null && typeof v !== 'string') return `${f} must be text`;
+  }
+  const days = body.deadline_days;
+  if (days !== undefined && days !== null && days !== '' && !wholeDays(days)) {
+    return 'deadline_days must be a whole number of days greater than zero';
+  }
+  const { steps } = body;
+  if (steps !== undefined && steps !== null
+      && (!Array.isArray(steps) || steps.some((s) => typeof s !== 'string'))) {
+    return 'steps must be a list of text';
+  }
+  return null;
+}
+
 // Returns a message for the first problem found or null. It runs on the merged row so a
 // partial edit is checked as the route it would become.
 function routeError(r) {
@@ -40,12 +72,17 @@ function routeError(r) {
   if (!r.legal_basis) return 'legal_basis is required. It is the article that sends this matter there';
   if (!isValidId(r.first_forum_id)) return 'first_forum_id must name a directory entry';
   if (!Array.isArray(r.steps) || r.steps.length === 0) return 'steps must list at least one step';
+  if (r.steps.length > MAX_STEPS) return `steps can hold at most ${MAX_STEPS} steps`;
+  if (r.steps.some((s) => s.length > MAX_STEP)) return `each step must be ${MAX_STEP} characters or fewer`;
+  for (const [field, max] of Object.entries(TEXT_LIMITS)) {
+    if (typeof r[field] === 'string' && r[field].length > max) return `${field} must be ${max} characters or fewer`;
+  }
   const hasDays = r.deadline_days !== null && r.deadline_days !== undefined && r.deadline_days !== '';
   const hasFrom = Boolean(r.deadline_runs_from);
   if (hasDays !== hasFrom) {
     return 'A deadline needs both a number of days and what it runs from. Or neither';
   }
-  if (hasDays && !(Number.isInteger(Number(r.deadline_days)) && Number(r.deadline_days) > 0)) {
+  if (hasDays && !wholeDays(r.deadline_days)) {
     return 'deadline_days must be a whole number of days greater than zero';
   }
   if (r.area !== null && r.area !== undefined && !DOMAINS.includes(r.area)) {
@@ -113,6 +150,8 @@ router.get('/routes/:id', requireIntParam('id'), async (req, res) => {
 // A new route always starts as a draft. Publishing is the admin's act.
 router.post('/routes', requireAuth('admin'), async (req, res) => {
   const b = req.body || {};
+  const shape = shapeError(b);
+  if (shape) return res.status(400).json({ error: shape });
   const r = {
     matter_type: clean(b.matter_type),
     title: clean(b.title),
@@ -146,6 +185,8 @@ router.post('/routes', requireAuth('admin'), async (req, res) => {
 // Any edit sends the route back to draft and clears the stamp.
 // Every field of a route is a published fact (where to go and why and what next and by when) so no field is exempt.
 router.put('/routes/:id', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  const shape = shapeError(req.body || {});
+  if (shape) return res.status(400).json({ error: shape });
   const [existing] = await q('SELECT * FROM matter_routes WHERE id = $1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'Route not found' });
 
@@ -184,11 +225,34 @@ router.put('/routes/:id', requireAuth('admin'), requireIntParam('id'), async (re
 });
 
 router.post('/routes/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
+  // A note left for the editor must not go public. The route stays a draft until it is removed.
+  // The version that was checked is remembered by its update time. Only that version is published.
+  const [draft] = await q(
+    `SELECT title, keywords, legal_basis, exclusions, steps, deadline_runs_from, deadline_note,
+            updated_at::text AS seen_at
+       FROM matter_routes WHERE id = $1 AND status <> 'published'`, [req.params.id]);
+  if (draft) {
+    const note = noteIn([
+      ['Route title', draft.title], ['Keywords', draft.keywords], ['Legal basis', draft.legal_basis],
+      ['Exclusions', draft.exclusions], ['Deadline runs from', draft.deadline_runs_from],
+      ['Deadline note', draft.deadline_note],
+      ...(draft.steps ?? []).map((step) => ['Steps', step]),
+    ]);
+    if (note) return res.status(400).json({ error: note });
+  }
   const [row] = await q(
     `UPDATE matter_routes SET status = 'published', verified_by = $1, verified_at = now(), updated_at = now()
-      WHERE id = $2 AND status <> 'published' RETURNING id, status`,
-    [req.user.id, req.params.id]);
-  if (!row) return res.status(400).json({ error: 'That route could not be found or is already published' });
+      WHERE id = $2 AND status <> 'published' AND updated_at = $3::timestamptz RETURNING id, status`,
+    [req.user.id, req.params.id, draft?.seen_at ?? null]);
+  if (!row) {
+    if (draft) {
+      const [current] = await q('SELECT status FROM matter_routes WHERE id = $1', [req.params.id]);
+      if (current && current.status !== 'published') {
+        return res.status(409).json({ error: 'That record was just changed. Reload and try again.' });
+      }
+    }
+    return res.status(400).json({ error: 'That route could not be found or is already published' });
+  }
   await recordReview('route', row.id, req.user.id, 'published');
   res.json(row);
 });

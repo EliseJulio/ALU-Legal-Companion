@@ -175,16 +175,27 @@ router.put('/:id', requireAuth('admin'), requireIntParam('id'), async (req, res)
 // POST /api/guides/:id/publish : the admin publishes a draft directly.
 router.post('/:id/publish', requireAuth('admin'), requireIntParam('id'), async (req, res) => {
   // A note left for the editor must not go public. The guide stays a draft until it is removed.
+  // The version that was checked is remembered by its update time. The update below publishes only
+  // that version, so an edit made after the check is never published unchecked.
   const [draft] = await q(
-    `SELECT title, summary, situation, law_says, your_rights, steps, get_help, source_law
+    `SELECT title, summary, situation, law_says, your_rights, steps, get_help, source_law, service,
+            updated_at::text AS seen_at
        FROM guides WHERE id = $1 AND status <> 'published'`, [req.params.id]);
   const note = draft ? leftoverNote(draft) : null;
   if (note) return res.status(400).json({ error: note });
   const [row] = await q(
     `UPDATE guides SET status = 'published', verified_by = $1, verified_at = now(), updated_at = now()
-      WHERE id = $2 AND status <> 'published' RETURNING id, status`,
-    [req.user.id, req.params.id]);
-  if (!row) return res.status(400).json({ error: 'That guide could not be found or is already published' });
+      WHERE id = $2 AND status <> 'published' AND updated_at = $3::timestamptz RETURNING id, status`,
+    [req.user.id, req.params.id, draft?.seen_at ?? null]);
+  if (!row) {
+    if (draft) {
+      const [current] = await q('SELECT status FROM guides WHERE id = $1', [req.params.id]);
+      if (current && current.status !== 'published') {
+        return res.status(409).json({ error: 'That record was just changed. Reload and try again.' });
+      }
+    }
+    return res.status(400).json({ error: 'That guide could not be found or is already published' });
+  }
   await recordReview('guide', row.id, req.user.id, 'published');
   res.json(row);
 });
