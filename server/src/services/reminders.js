@@ -1,12 +1,16 @@
 // Deadline reminders. They are advice only. The deadline stays the person's responsibility.
 // Every reminder ends as sent, missed or cancelled. One is never sent after its date.
-import { q } from '../db.js';
+import { q, pool } from '../db.js';
 import { sendMail } from './mailer.js';
+import { kigaliToday } from './kigali.js';
+import { EMAIL_BUDGET_CODE } from './emailBudget.js';
 
-// Rwanda is UTC+2 all year. Today for a deadline is today in Kigali and not on the server clock.
-export function kigaliToday(now = new Date()) {
-  return new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
+export { kigaliToday };
+
+// The key of the lock that stops two reminder passes running at once. It is held on one
+// connection for the whole pass. Two passes can come from the timer in the server, the job
+// endpoint, or two server processes.
+export const REMINDER_LOCK_KEY = 4242001;
 
 // How many days before the deadline a reminder goes out.
 export const REMINDER_OFFSETS = [7, 1];
@@ -68,8 +72,31 @@ function reminderText(name, dueOn, daysLeft) {
 }
 
 // One pass of the scheduler. It is safe to run as often as you like because a reminder
-// leaves "pending" only once.
+// leaves "pending" only once. Two passes never run at the same time: when the lock is held
+// elsewhere this returns at once with skipped set and sends nothing.
 export async function runDueReminders(today = kigaliToday()) {
+  const client = await pool.connect();
+  let broken = false;
+  try {
+    const [{ locked }] = (await client.query('SELECT pg_try_advisory_lock($1) AS locked', [REMINDER_LOCK_KEY])).rows;
+    if (!locked) return { sent: 0, failed: 0, cancelled: 0, missed: 0, skipped: true };
+    try {
+      return await runReminderPass(today);
+    } finally {
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [REMINDER_LOCK_KEY]);
+      } catch {
+        // The lock could not be let go. The connection is discarded below, which ends the session
+        // and with it the lock. A broken connection must not go back into the pool holding it.
+        broken = true;
+      }
+    }
+  } finally {
+    client.release(broken ? new Error('reminder lock not released') : undefined);
+  }
+}
+
+async function runReminderPass(today) {
   // Reminders whose deadline has passed are marked missed and never sent.
   const missed = await q(
     `UPDATE reminders SET status = 'missed' WHERE status = 'pending' AND due_on < $1 RETURNING id`,
@@ -100,10 +127,16 @@ export async function runDueReminders(today = kigaliToday()) {
         to: r.email,
         subject: 'A deadline you recorded is coming up',
         text: reminderText(r.name, r.due_on, daysLeft),
+        optional: true,
       });
       await q(`UPDATE reminders SET status = 'sent', sent_at = now() WHERE id = $1 AND status = 'pending'`, [r.id]);
       sent += 1;
     } catch (err) {
+      // The daily budget is used up. Every reminder left stays pending for the next pass.
+      if (err.code === EMAIL_BUDGET_CODE) {
+        console.log('[reminders] daily email budget reached; the rest wait for the next pass');
+        break;
+      }
       // It stays pending so the next pass tries again. After the deadline it becomes missed.
       // The log does not include the address.
       console.error('[reminders] send failed', { reminder: r.id, error: err.code || err.name });
@@ -111,16 +144,4 @@ export async function runDueReminders(today = kigaliToday()) {
     }
   }
   return { sent, failed, cancelled, missed: missed.length };
-}
-
-// Started by index.js. Once an hour is enough for deadlines counted in days.
-// The timer does not keep the process alive on its own.
-export function startReminderScheduler({ everyMs = 60 * 60 * 1000 } = {}) {
-  const tick = () => runDueReminders()
-    .then((r) => { if (r.sent || r.missed || r.failed) console.log('[reminders]', r); })
-    .catch((err) => console.error('[reminders] pass failed', { error: err.code || err.name }));
-  tick();
-  const handle = setInterval(tick, everyMs);
-  handle.unref?.();
-  return handle;
 }
