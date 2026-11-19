@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useScrollToHash } from '@/lib/useScrollToHash';
 import Icon from '@/components/Icon';
@@ -8,7 +8,7 @@ import { RING, TAB_CURRENT, TAB_IDLE, CARD } from '@/lib/ui';
 import { todayIso } from '@/lib/dates';
 import { MONTH_NAMES, WEEKDAYS, daysInMonth, isoDate, itemsByDay, monthOf, weekOf } from '@/lib/calendar';
 import {
-  LEGEND, addDays, addMonths, agendaDays, longDay, monthDays, nextAfter, shortWeekDay, weekTitle,
+  LEGEND, addDays, addMonths, agendaDays, byWhen, hoursItems, longDay, monthDays, nextAfter, shortWeekDay, weekTitle,
 } from '@/lib/schedule';
 
 // The Calendar page view of the schedule. One list of items (lib/schedule.js) feeds all three views.
@@ -27,7 +27,8 @@ function nextLine(item) {
 // `legend` names the circles on the page. `renderRow` draws one item in the day list and the agenda.
 // The student page keeps the defaults. A lawyer page and an admin page pass their own.
 // So an admin row never offers an action that is not there.
-export default function ScheduleCalendar({ items, today, legend = LEGEND, renderRow = (item) => <ScheduleRow item={item} /> }) {
+// `hours` is the lawyer's weekly windows. They are drawn as Open items on the days in view and are not bookings.
+export default function ScheduleCalendar({ items, today, legend = LEGEND, hours = [], renderRow = (item) => <ScheduleRow item={item} /> }) {
   const todayKey = todayIso(today);
   // A link can end in #consult-ID. The calendar then opens on the day of that item and shows its row.
   const { hash } = useLocation();
@@ -48,8 +49,10 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, render
   }, [selected]);
 
   const shown = monthOf(selected) ?? monthOf(todayKey);
-  const byDay = useMemo(() => itemsByDay(items, (item) => item.date), [items]);
   const weeks = view === 'week' ? [weekOf(selected)] : monthDays(shown.year, shown.month);
+  // The consultations and deadlines plus the open hours of the days in view, in one order.
+  const allItems = [...items, ...hoursItems(hours, weeks.flat())].sort(byWhen);
+  const byDay = itemsByDay(allItems, (item) => item.date);
   const heads = view === 'week'
     ? weeks[0].map((iso, i) => `${WEEKDAYS[i]} ${Number(iso.slice(8))}`)
     : WEEKDAYS;
@@ -74,10 +77,10 @@ export default function ScheduleCalendar({ items, today, legend = LEGEND, render
   };
 
   const dayItems = byDay.get(selected) ?? [];
-  const next = nextAfter(items, selected);
-  const days = agendaDays(items, shown.year, shown.month);
+  const next = nextAfter(allItems, selected);
+  const days = agendaDays(allItems, shown.year, shown.month);
   const monthEnd = isoDate(shown.year, shown.month, daysInMonth(shown.year, shown.month));
-  const nextAfterMonth = nextAfter(items, monthEnd);
+  const nextAfterMonth = nextAfter(allItems, monthEnd);
 
   return (
     <div>

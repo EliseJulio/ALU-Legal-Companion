@@ -30,6 +30,7 @@ const PHRASES = {
   requested: 'Requested',
   accepted: 'Accepted',
   declined: 'Declined',
+  cancelled: 'Cancelled',
   completed: 'Completed',
   // reports of a problem
   received: 'Received',
