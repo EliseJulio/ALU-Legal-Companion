@@ -133,7 +133,7 @@ export const DATA = {
 // Chooses the date and then the time from the open times on the request page. The date button names its
 // day and the time button names the Kigali clock time.
 export async function pickSlot(page, time = '10:00') {
-  await page.getByRole('button', { name: /1 January/ }).click();
+  await page.getByRole('button', { name: /^\w+ 1 January,/ }).click();
   await page.getByRole('button', { name: time, exact: true }).click();
 }
 
